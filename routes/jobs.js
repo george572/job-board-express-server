@@ -5,7 +5,7 @@ const router = express.Router();
 const db = new sqlite3.Database("./database.db");
 router.use(cors()); // Ensure CORS is applied to this router
 
-// Route to get all jobs
+// get all jobs
 router.get("/", (req, res) => {
   const { category, company, page = 1, limit = 10 } = req.query;
 
@@ -29,8 +29,8 @@ router.get("/", (req, res) => {
     params.push(category);
   }
 
-  // Add pagination to the query
-  query += " LIMIT ? OFFSET ?";
+  // Add sorting by created_at in descending order and pagination
+  query += " ORDER BY created_at DESC LIMIT ? OFFSET ?";
   params.push(limit, offset);
 
   db.all(query, params, (err, rows) => {
@@ -127,7 +127,8 @@ router.post("/", async (req, res) => {
     jobExperienceRequired,
     jobIsUrgent,
     user_uid,
-    category_id, // Add category_id to the payload
+    category_id,
+    short_description,
   } = req.body;
 
   // Validate input
@@ -139,6 +140,7 @@ router.post("/", async (req, res) => {
     jobExperienceRequired === undefined ||
     jobIsUrgent === undefined ||
     !user_uid ||
+    !short_description ||
     !category_id // Check if category_id is provided
   ) {
     return res.status(400).json({ error: "Missing required fields" });
@@ -153,8 +155,9 @@ router.post("/", async (req, res) => {
                 jobExperienceRequired,
                 jobIsUrgent,
                 user_uid,
+                short_description,
                 category_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   db.run(
     query,
@@ -167,6 +170,7 @@ router.post("/", async (req, res) => {
       jobIsUrgent,
       user_uid,
       category_id, // Include category_id value
+      short_description, // Include category_id value
     ],
     function (err) {
       if (err) {
@@ -200,6 +204,7 @@ router.patch("/:id", (req, res) => {
     "jobExperienceRequired",
     "jobIsUrgent",
     "user_uid",
+    "short_description",
   ];
 
   // Build dynamic columns and values for the query

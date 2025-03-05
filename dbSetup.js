@@ -61,7 +61,11 @@ db.serialize(() => {
   `);
 });
 
-
+// db.serialize(() => {
+//   db.run(`
+// ALTER TABLE jobs ADD COLUMN short_description TEXT NOT NULL DEFAULT ''
+//   `);
+// });
 
 // Export the db instance to be used in other files
 module.exports = db;
