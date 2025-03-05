@@ -63,7 +63,7 @@ db.serialize(() => {
 
 // db.serialize(() => {
 //   db.run(`
-// ALTER TABLE jobs ADD COLUMN short_description TEXT NOT NULL DEFAULT ''
+// ALTER TABLE jobs ADD COLUMN company_email TEXT NOT NULL DEFAULT ''
 //   `);
 // });
 

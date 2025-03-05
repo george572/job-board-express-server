@@ -129,6 +129,7 @@ router.post("/", async (req, res) => {
     user_uid,
     category_id,
     short_description,
+    company_email
   } = req.body;
 
   // Validate input
@@ -141,6 +142,7 @@ router.post("/", async (req, res) => {
     jobIsUrgent === undefined ||
     !user_uid ||
     !short_description ||
+    !company_email ||
     !category_id // Check if category_id is provided
   ) {
     return res.status(400).json({ error: "Missing required fields" });
@@ -155,9 +157,10 @@ router.post("/", async (req, res) => {
                 jobExperienceRequired,
                 jobIsUrgent,
                 user_uid,
-                short_description,
-                category_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                category_id,
+                short_description.
+                company_email)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   db.run(
     query,
@@ -171,6 +174,7 @@ router.post("/", async (req, res) => {
       user_uid,
       category_id, // Include category_id value
       short_description, // Include category_id value
+      company_email, // Include category_id value
     ],
     function (err) {
       if (err) {
@@ -205,6 +209,7 @@ router.patch("/:id", (req, res) => {
     "jobIsUrgent",
     "user_uid",
     "short_description",
+    "company_email",
   ];
 
   // Build dynamic columns and values for the query
