@@ -61,9 +61,15 @@ db.serialize(() => {
   `);
 });
 
+db.serialize(() => {
+  db.run(
+    `CREATE TABLE IF NOT EXISTS company_logos (id INTEGER PRIMARY KEY, filename TEXT, user_uid TEXT)`
+  );
+});
+
 // db.serialize(() => {
 //   db.run(`
-// ALTER TABLE jobs ADD COLUMN company_email TEXT NOT NULL DEFAULT ''
+// ALTER TABLE jobs ADD COLUMN imagePath TEXT NOT NULL DEFAULT ''
 //   `);
 // });
 

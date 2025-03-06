@@ -4,6 +4,8 @@ const sqlite3 = require("sqlite3").verbose();
 const router = express.Router();
 const db = new sqlite3.Database("./database.db");
 router.use(cors()); // Ensure CORS is applied to this router
+const multer = require('multer');
+const path = require('path');
 
 // get all jobs
 router.get("/", (req, res) => {
@@ -71,19 +73,19 @@ router.get("/", (req, res) => {
 });
 
 //search jobs
-router.get('/search', (req, res) => {
+router.get("/search", (req, res) => {
   const searchTerm = req.query.q; // Query parameter 'q' for search
-  
+
   if (!searchTerm) {
-    return res.status(400).send('Search term is required');
+    return res.status(400).send("Search term is required");
   }
-  
+
   const query = `SELECT * FROM jobs WHERE jobName LIKE ?`;
   const searchQuery = `%${searchTerm}%`; // SQL wildcards for partial match
 
   db.all(query, [searchQuery], (err, rows) => {
     if (err) {
-      return res.status(500).send('Error querying database');
+      return res.status(500).send("Error querying database");
     }
 
     res.json(rows); // Respond with search results
@@ -118,7 +120,20 @@ router.get("/:id", (req, res) => {
 });
 
 // create new job
-router.post("/", async (req, res) => {
+// Configure multer for image uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/'); // Set the folder where images will be stored
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname)); // Unique filename
+  }
+});
+
+const upload = multer({ storage });
+
+// Handle the job post request
+router.post("/", upload.single('company_logo'), async (req, res) => {
   const {
     companyName,
     jobName,
@@ -129,8 +144,9 @@ router.post("/", async (req, res) => {
     user_uid,
     category_id,
     short_description,
-    company_email
+    company_email,
   } = req.body;
+
 
   // Validate input
   if (
@@ -143,12 +159,11 @@ router.post("/", async (req, res) => {
     !user_uid ||
     !short_description ||
     !company_email ||
-    !category_id // Check if category_id is provided
+    !category_id
   ) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
-  // Insert data into the jobs table
   const query = `INSERT INTO jobs (
                 companyName,
                 jobName,
@@ -158,7 +173,7 @@ router.post("/", async (req, res) => {
                 jobIsUrgent,
                 user_uid,
                 category_id,
-                short_description.
+                short_description,
                 company_email)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
@@ -172,9 +187,9 @@ router.post("/", async (req, res) => {
       jobExperienceRequired,
       jobIsUrgent,
       user_uid,
-      category_id, // Include category_id value
-      short_description, // Include category_id value
-      company_email, // Include category_id value
+      category_id,
+      short_description,
+      company_email,
     ],
     function (err) {
       if (err) {

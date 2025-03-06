@@ -23,5 +23,11 @@ app.use("/resumes", resumesRouter)
 const categoriesRouter = require("./routes/categories")
 app.use("/categories", categoriesRouter)
 
+// company logos router
+const companyLogosRouter = require("./routes/company_logos")
+app.use("/upload-logo", companyLogosRouter)
+
+app.use("/uploads", express.static("uploads"));
+
 app.listen(3000);
 
