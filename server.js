@@ -27,6 +27,10 @@ app.use("/categories", categoriesRouter)
 const companyLogosRouter = require("./routes/company_logos")
 app.use("/upload-logo", companyLogosRouter)
 
+// send cv router
+const sendCvRouter = require("./routes/sendCv")
+app.use("/send-cv", sendCvRouter)
+
 app.use("/uploads", express.static("uploads"));
 
 app.listen(3000);
