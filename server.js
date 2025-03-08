@@ -3,7 +3,7 @@ const cors = require("cors")
 
 const app = express();
 const db = require('./dbSetup'); // Import dbSetup to run the DB initialization
-
+const port = process.env.PORT || 3000;
 app.use(cors()); // Allow all origins
 app.use(express.json());
 
@@ -33,5 +33,7 @@ app.use("/send-cv", sendCvRouter)
 
 app.use("/uploads", express.static("uploads"));
 
-app.listen(3000);
+app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+  });
 
