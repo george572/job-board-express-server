@@ -48,7 +48,7 @@ router.get("/:user_uid", (req, res) => {
       if (!row) return res.status(404).json({ error: "No logo found" });
 
       // Construct the URL to the image file
-      const imageUrl = `http://localhost:3000/uploads/${row.filename}`;
+      const imageUrl = `https://samushao-ge-50bc666c11b1.herokuapp.com//uploads/${row.filename}`;
       res.json({ imageUrl });
     }
   );
