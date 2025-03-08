@@ -4,8 +4,8 @@ const sqlite3 = require("sqlite3").verbose();
 const router = express.Router();
 const db = new sqlite3.Database("./database.db");
 router.use(cors()); // Ensure CORS is applied to this router
-const multer = require('multer');
-const path = require('path');
+const multer = require("multer");
+const path = require("path");
 
 // get all jobs
 router.get("/", (req, res) => {
@@ -123,30 +123,31 @@ router.get("/:id", (req, res) => {
 // Configure multer for image uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/'); // Set the folder where images will be stored
+    cb(null, "uploads/"); // Set the folder where images will be stored
   },
   filename: (req, file, cb) => {
     cb(null, Date.now() + path.extname(file.originalname)); // Unique filename
-  }
+  },
 });
 
 const upload = multer({ storage });
 
 // Handle the job post request
-router.post("/", upload.single('company_logo'), async (req, res) => {
+router.post("/", upload.single("company_logo"), async (req, res) => {
   const {
     companyName,
     jobName,
     jobSalary,
     jobDescription,
-    jobExperienceRequired,
     jobIsUrgent,
     user_uid,
     category_id,
-    short_description,
     company_email,
+    job_experience,
+    job_city,
+    job_address,
+    job_type,
   } = req.body;
-
 
   // Validate input
   if (
@@ -154,10 +155,8 @@ router.post("/", upload.single('company_logo'), async (req, res) => {
     !jobName ||
     !jobSalary ||
     !jobDescription ||
-    jobExperienceRequired === undefined ||
     jobIsUrgent === undefined ||
     !user_uid ||
-    !short_description ||
     !company_email ||
     !category_id
   ) {
@@ -169,13 +168,15 @@ router.post("/", upload.single('company_logo'), async (req, res) => {
                 jobName,
                 jobSalary,
                 jobDescription,
-                jobExperienceRequired,
                 jobIsUrgent,
                 user_uid,
                 category_id,
-                short_description,
-                company_email)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                company_email,
+                job_experience,
+                job_city,
+                job_address,
+                job_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   db.run(
     query,
@@ -184,12 +185,14 @@ router.post("/", upload.single('company_logo'), async (req, res) => {
       jobName,
       jobSalary,
       jobDescription,
-      jobExperienceRequired,
       jobIsUrgent,
       user_uid,
       category_id,
-      short_description,
       company_email,
+      job_experience,
+      job_city,
+      job_address,
+      job_type,
     ],
     function (err) {
       if (err) {
@@ -220,11 +223,13 @@ router.patch("/:id", (req, res) => {
     "jobName",
     "jobSalary",
     "jobDescription",
-    "jobExperienceRequired",
     "jobIsUrgent",
     "user_uid",
-    "short_description",
     "company_email",
+    "job_experience",
+    "job_city",
+    "job_address",
+    "job_type",
   ];
 
   // Build dynamic columns and values for the query

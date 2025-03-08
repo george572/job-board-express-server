@@ -22,10 +22,14 @@ db.serialize(() => {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       companyName TEXT NOT NULL,
       user_uid TEXT NOT NULL,
+      company_email TEXT NOT NULL,
       jobName TEXT NOT NULL,
       jobSalary TEXT NOT NULL,
       jobDescription TEXT NOT NULL,
-      jobExperienceRequired BOOLEAN,
+      job_experience TEXT,
+      job_city TEXT,
+      job_address TEXT,
+      job_type TEXT,
       jobIsUrgent BOOLEAN,
       category_id INTEGER NOT NULL,  -- Foreign key reference to categories
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT
