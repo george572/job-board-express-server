@@ -67,7 +67,7 @@ db.serialize(() => {
 
 db.serialize(() => {
   db.run(
-    `CREATE TABLE IF NOT EXISTS company_logos (id INTEGER PRIMARY KEY, filename TEXT, user_uid TEXT)`
+    `CREATE TABLE IF NOT EXISTS company_logos (id INTEGER PRIMARY KEY, secure_url TEXT, user_uid TEXT)`
   );
 });
 

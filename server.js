@@ -1,11 +1,18 @@
 const express = require("express");
 const cors = require("cors")
+const cloudinary = require('cloudinary').v2;
 
 const app = express();
 const db = require('./dbSetup'); // Import dbSetup to run the DB initialization
 const port = process.env.PORT || 3000;
 app.use(cors()); // Allow all origins
 app.use(express.json());
+
+cloudinary.config({ 
+    cloud_name: 'dd7gz0aqv', 
+    api_key: '345132216437496', 
+    api_secret: 'gRBZZuGtsxALJlZ7sxh8SCwgTVw' 
+  });
 
 // jobs router
 const jobsRouter = require("./routes/jobs");
