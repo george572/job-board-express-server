@@ -20,52 +20,74 @@ const transporter = nodemailer.createTransport({
 router.post("/", (req, res) => {
   const { job_id, user_id } = req.body;
 
+  // Get job information
   db.get(
     "SELECT company_email, jobName FROM jobs WHERE id = ?",
     [job_id],
     (err, job) => {
-      if (err || !job) return res.status(500).json({ error: "Job not found" });
+      if (err) {
+        console.error("Database error fetching job:", err);
+        return res.status(500).json({ error: "Database error fetching job" });
+      }
+
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      // Get resume information
       db.get(
-        "SELECT file_data, file_type FROM resumes WHERE user_id = ?",
+        "SELECT file_url FROM resumes WHERE user_id = ?",
         [user_id],
         (err, resume) => {
-          if (err || !resume)
-            return res.status(500).json({ error: "Resume not found" });
+          if (err) {
+            console.error("Database error fetching resume:", err);
+            return res
+              .status(500)
+              .json({ error: "Database error fetching resume" });
+          }
 
+          if (!resume) {
+            return res.status(404).json({ error: "Resume not found" });
+          }
+
+          // Get user information
           db.get(
             "SELECT user_name FROM users WHERE user_uid = ?",
             [user_id],
             (err, user) => {
-              if (err || !user)
-                return res.status(500).json({ error: "User not found" });
+              if (err) {
+                console.error("Database error fetching user:", err);
+                return res
+                  .status(500)
+                  .json({ error: "Database error fetching user" });
+              }
 
-              const tempFilePath = path.join(
-                __dirname,
-                `${user.user_name || "resume"}.${resume.file_type}`
-              );
-              fs.writeFileSync(tempFilePath, resume.file_data);
+              if (!user) {
+                return res.status(404).json({ error: "User not found" });
+              }
 
+              // Send email
               const mailOptions = {
                 from: "your-email@gmail.com",
                 to: job.company_email,
-                subject: `${job.jobName}`,
-                text: `ახალი CV გამოიგზავნა თქვენს ვაკანსიაზე: "${job.jobName}"`,
-                attachments: [
-                  {
-                    filename: `${user.user_name || "resume"}.${
-                      resume.file_type
-                    }`,
-                    path: tempFilePath,
-                  },
-                ],
+                subject: `New Application for ${job.jobName}`,
+                html: `<p>ახალი CV გამოიგზავნა თქვენს ვაკანსიაზე: "${job.jobName}".</p>
+                       <p>გადმოწერეთ სივი: <a href="${resume.file_url}">გადმოწერეთ CV</a></p>`,
               };
 
               transporter.sendMail(mailOptions, (error, info) => {
-                fs.unlinkSync(tempFilePath);
-                if (error)
-                  return res.status(500).json({ error: error.message });
+                // Remove the fs.unlinkSync since tempFilePath is not defined
+                if (error) {
+                  console.error("Email sending error:", error);
+                  return res
+                    .status(500)
+                    .json({ error: "Failed to send email: " + error.message });
+                }
 
-                res.json({ message: "CV sent successfully to company email" });
+                // Only send the response if all previous steps were successful
+                return res.json({
+                  message: "CV sent successfully to company email",
+                });
               });
             }
           );

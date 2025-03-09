@@ -56,9 +56,7 @@ db.serialize(() => {
     CREATE TABLE IF NOT EXISTS resumes (
       id INTEGER PRIMARY KEY AUTOINCREMENT, 
       user_id TEXT,
-      file_name TEXT,
-      file_type TEXT,
-      file_data BLOB,
+      file_url TEXT NOT NULL,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
