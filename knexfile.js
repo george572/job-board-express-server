@@ -1,23 +1,21 @@
 require("dotenv").config();
 
-const knexConfig = {
+module.exports = {
   development: {
     client: "pg",
     connection: {
-      host: "127.0.0.1",
-      user: "postgres",
-      password: "1234",
-      database: "samushao",
+      host: "ccaml3dimis7eh.cluster-czz5s0kz4scl.eu-west-1.rds.amazonaws.com",
+      user: "ubcc3d5l45k0qm",
+      password: "pc43eb9f4c1646292456193909598034d31ebd7170373e4d52522d695d29443aa",
+      database: "d6vma50v9o1pmr",
     },
   },
   production: {
     client: "pg",
-    connection: process.env.DATABASE_URL, // Use Heroku's DATABASE_URL
+    connection: process.env.DATABASE_URL,
     migrations: { tableName: "knex_migrations" },
     ssl: {
       rejectUnauthorized: false,
     },
   },
 };
-
-module.exports = knexConfig[process.env.NODE_ENV || 'development']; // Ensure correct environment-based config
