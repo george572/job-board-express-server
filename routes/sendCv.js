@@ -10,8 +10,8 @@ router.use(cors());
 const transporter = nodemailer.createTransport({
   service: "gmail", // or use SMTP settings
   auth: {
-    user: "tbilisiairporttransfers@gmail.com",
-    pass: "coco icgg nmwh pgsm",
+    user: "info@samushao.ge",
+    pass: "ozcg omye lxpo dkjd",
   },
 });
 
