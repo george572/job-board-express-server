@@ -1,31 +1,21 @@
-require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
+require("dotenv").config();
 
-// Try to read certificate file if it exists
-let ca;
-try {
-  ca = fs.readFileSync(path.join(__dirname, 'global-bundle.pem')).toString();
-} catch (e) {
-  ca = undefined;
-}
 module.exports = {
   development: {
-    client: 'pg',
+    client: "pg",
     connection: {
-      host: '127.0.0.1',
-      user: 'postgres',
-      password: '1234',
-      database: 'samushao',
+      host: "ccaml3dimis7eh.cluster-czz5s0kz4scl.eu-west-1.rds.amazonaws.com",
+      user: "ubcc3d5l45k0qm",
+      password: "pc43eb9f4c1646292456193909598034d31ebd7170373e4d52522d695d29443aa",
+      database: "d6vma50v9o1pmr",
     },
   },
   production: {
-    client: 'pg',
-    connection: process.env.DATABASE_URL + "?sslmode=require",
+    client: "pg",
+    connection: process.env.DATABASE_URL,
+    migrations: { tableName: "knex_migrations" },
     ssl: {
-      rejectUnauthorized: true,
+      rejectUnauthorized: false,
     },
-    pool: { min: 2, max: 10 },
-    migrations: { tableName: 'knex_migrations' },
   },
 };

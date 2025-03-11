@@ -3,7 +3,6 @@ const cors = require("cors");
 const cloudinary = require("cloudinary").v2;
 
 const app = express();
-const db = require("./dbSetup"); // Import dbSetup to run the DB initialization
 const port = process.env.PORT || 3000;
 
 app.use(cors()); // Allow all origins
