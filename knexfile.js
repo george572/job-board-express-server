@@ -1,5 +1,14 @@
 require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
 
+// Try to read certificate file if it exists
+let ca;
+try {
+  ca = fs.readFileSync(path.join(__dirname, 'global-bundle.pem')).toString();
+} catch (e) {
+  ca = undefined;
+}
 module.exports = {
   development: {
     client: 'pg',
@@ -14,9 +23,6 @@ module.exports = {
     client: 'pg',
     connection: process.env.DATABASE_URL + "?sslmode=require",
     pool: { min: 2, max: 10 },
-    ssl: {
-      rejectUnauthorized: false
-    },
     migrations: { tableName: 'knex_migrations' },
   },
 };
