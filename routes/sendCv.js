@@ -1,12 +1,10 @@
 const express = require("express");
-const sqlite3 = require("sqlite3").verbose();
+const knex = require("knex");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
-const fs = require("fs");
-const path = require("path");
 
 const router = express.Router();
-const db = new sqlite3.Database("./database.db");
+const db = knex(require("../knexfile").development); // assuming knexfile.js is configured correctly
 router.use(cors());
 
 const transporter = nodemailer.createTransport({
@@ -20,48 +18,29 @@ const transporter = nodemailer.createTransport({
 router.post("/", (req, res) => {
   const { job_id, user_id } = req.body;
 
-  // Get job information
-  db.get(
-    "SELECT company_email, jobName FROM jobs WHERE id = ?",
-    [job_id],
-    (err, job) => {
-      if (err) {
-        console.error("Database error fetching job:", err);
-        return res.status(500).json({ error: "Database error fetching job" });
-      }
-
+  // Get job information using Knex
+  db("jobs")
+    .where("id", job_id)
+    .first()
+    .then((job) => {
       if (!job) {
         return res.status(404).json({ error: "Job not found" });
       }
 
-      // Get resume information
-      db.get(
-        "SELECT file_url FROM resumes WHERE user_id = ?",
-        [user_id],
-        (err, resume) => {
-          if (err) {
-            console.error("Database error fetching resume:", err);
-            return res
-              .status(500)
-              .json({ error: "Database error fetching resume" });
-          }
-
+      // Get resume information using Knex
+      db("resumes")
+        .where("user_id", user_id)
+        .first()
+        .then((resume) => {
           if (!resume) {
             return res.status(404).json({ error: "Resume not found" });
           }
 
-          // Get user information
-          db.get(
-            "SELECT user_name FROM users WHERE user_uid = ?",
-            [user_id],
-            (err, user) => {
-              if (err) {
-                console.error("Database error fetching user:", err);
-                return res
-                  .status(500)
-                  .json({ error: "Database error fetching user" });
-              }
-
+          // Get user information using Knex
+          db("users")
+            .where("user_uid", user_id)
+            .first()
+            .then((user) => {
               if (!user) {
                 return res.status(404).json({ error: "User not found" });
               }
@@ -76,25 +55,30 @@ router.post("/", (req, res) => {
               };
 
               transporter.sendMail(mailOptions, (error, info) => {
-                // Remove the fs.unlinkSync since tempFilePath is not defined
                 if (error) {
                   console.error("Email sending error:", error);
-                  return res
-                    .status(500)
-                    .json({ error: "Failed to send email: " + error.message });
+                  return res.status(500).json({ error: "Failed to send email: " + error.message });
                 }
 
-                // Only send the response if all previous steps were successful
                 return res.json({
                   message: "CV sent successfully to company email",
                 });
               });
-            }
-          );
-        }
-      );
-    }
-  );
+            })
+            .catch((err) => {
+              console.error("Database error fetching user:", err);
+              return res.status(500).json({ error: "Database error fetching user" });
+            });
+        })
+        .catch((err) => {
+          console.error("Database error fetching resume:", err);
+          return res.status(500).json({ error: "Database error fetching resume" });
+        });
+    })
+    .catch((err) => {
+      console.error("Database error fetching job:", err);
+      return res.status(500).json({ error: "Database error fetching job" });
+    });
 });
 
 module.exports = router;

@@ -1,22 +1,24 @@
-const cors = require("cors");
 const express = require("express");
-const sqlite3 = require("sqlite3").verbose();
+const cors = require("cors");
+const knex = require("knex");
 const router = express.Router();
-const db = new sqlite3.Database("./database.db");
+
+// Set up knex for PostgreSQL
+const db = knex(require("../knexfile").development); // Assuming you're using 'development' from knexfile.js
+
 router.use(cors()); // Ensure CORS is applied to this router
 
-router.get("/", (req, res) => {
-  db.all("SELECT * FROM categories", [], (err, row) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
+router.get("/", async (req, res) => {
+  try {
+    const rows = await db("categories").select("*"); // Fetch categories from PostgreSQL
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ error: "Categories not found" });
     }
-
-    if (!row) {
-      return res.status(404).json({ error: "not found" });
-    }
-
-    res.json(row); // Return the matching user
-  });
+    res.json(rows);
+    console.log(rows) // Return the categories
+  } catch (err) {
+    return res.status(500).json({ error: err.message }); // Return error if query fails
+  }
 });
 
-module.exports = router
+module.exports = router;

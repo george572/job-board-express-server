@@ -1,13 +1,13 @@
 const cors = require("cors");
 const express = require("express");
-const sqlite3 = require("sqlite3").verbose();
+const knex = require("knex");
 const router = express.Router();
-const db = new sqlite3.Database("./database.db");
+const db = knex(require("../knexfile").development);  // assuming knexfile.js is correctly set up for PostgreSQL or any other database
 const multer = require("multer");
 const path = require("path");
+const cloudinary = require("cloudinary").v2;
 
 router.use(cors()); // Ensure CORS is applied to this router
-const cloudinary = require("cloudinary").v2;
 
 const storage = multer.diskStorage({
   filename: (req, file, cb) => {
@@ -22,22 +22,22 @@ const upload = multer({ storage });
 // get user CV
 router.get("/:id", (req, res) => {
   const { id } = req.params;
-  db.get("SELECT * FROM resumes WHERE user_id = ?", [id], (err, row) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    if (!row) {
-      return res.status(404).json({ error: "Order not found" });
-    }
-    // Set the appropriate headers for the file
 
-    // Send the row data (including file_data) as a JSON response
-    return res.json({
-      file_url: row.file_url,
-      user_id: row.user_id,
-      created_at: row.created_at,
-    });
-  });
+  db("resumes")
+    .where("user_id", id)
+    .first()
+    .then((row) => {
+      if (!row) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      // Send the row data (including file_url) as a JSON response
+      return res.json({
+        file_url: row.file_url,
+        user_id: row.user_id,
+        created_at: row.created_at,
+      });
+    })
+    .catch((err) => res.status(500).json({ error: err.message }));
 });
 
 // POST endpoint for file upload
@@ -48,7 +48,7 @@ router.post("/", upload.single("resume"), async (req, res) => {
 
   const user_id = String(req.body.user_uid);
 
-  // cloudinary
+  // cloudinary upload
   cloudinary.uploader.upload(
     req.file.path,
     {
@@ -67,43 +67,36 @@ router.post("/", upload.single("resume"), async (req, res) => {
           type: "upload",
           flags: "attachment",
         });
-        // Insert the filename into the database with the user_uid
-        // Insert the file into the SQLite database
-        db.run(
-          "INSERT INTO resumes (file_url, user_id) VALUES (?, ?)",
-          [downloadUrl, String(user_id)],
-          (err) => {
-            if (err) {
-              return res.status(500).json({ error: err.message });
-            }
+
+        // Insert the filename into the database with the user_uid using Knex
+        db("resumes")
+          .insert({
+            file_url: downloadUrl,
+            user_id: user_id,
+          })
+          .then(() => {
             res.json({ message: "File uploaded successfully" });
-          }
-        );
+          })
+          .catch((err) => res.status(500).json({ error: err.message }));
       }
     }
   );
 });
 
-// DELETE cv file
+// DELETE CV file
 router.delete("/:id", (req, res) => {
-  const userId = req.params.id; // Get the order ID from the URL parameter
+  const userId = req.params.id;
 
-  // Create the SQL query to delete the order
-  const query = `DELETE FROM resumes WHERE user_id = ?`;
-
-  // Execute the query
-  db.run(query, [userId], function (err) {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-
-    // If no rows were deleted, the order might not exist
-    if (this.changes === 0) {
-      return res.status(404).json({ error: "Order not found" });
-    }
-
-    // Respond with success
-    res.status(200).json({ message: "CV deleted successfully" });
-  });
+  db("resumes")
+    .where("user_id", userId)
+    .del()
+    .then((count) => {
+      if (count === 0) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      res.status(200).json({ message: "CV deleted successfully" });
+    })
+    .catch((err) => res.status(500).json({ error: err.message }));
 });
+
 module.exports = router;

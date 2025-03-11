@@ -1,139 +1,102 @@
 const cors = require("cors");
 const express = require("express");
-const sqlite3 = require("sqlite3").verbose();
+const knex = require("knex");  // Assuming knex.js is the config file
 const router = express.Router();
-const db = new sqlite3.Database("./database.db");
 router.use(cors()); // Ensure CORS is applied to this router
 const multer = require("multer");
 const path = require("path");
 
+const db = knex(require("../knexfile").development); // Assuming you're using 'development' from knexfile.js
+
 // get all jobs
 router.get("/", (req, res) => {
   const { category, company, page = 1, limit = 10 } = req.query;
-
   const offset = (page - 1) * limit;
-  let query = "SELECT * FROM jobs";
-  let params = [];
 
-  // If a company filter is provided, add to the query
+  let query = db("jobs").select("*");
+  let countQuery = db("jobs").count("id as totalItems");
+
   if (company) {
-    query += " WHERE companyName = ?";
-    params.push(company);
+    query.where("companyName", company);
+    countQuery.where("companyName", company);
   }
 
-  // If a category filter is provided, add to the query
   if (category) {
-    if (params.length > 0) {
-      query += " AND category_id = ?";
-    } else {
-      query += " WHERE category_id = ?";
-    }
-    params.push(category);
+    query.where("category_id", category);
+    countQuery.where("category_id", category);
   }
 
-  // Add sorting by created_at in descending order and pagination
-  query += " ORDER BY created_at DESC LIMIT ? OFFSET ?";
-  params.push(limit, offset);
+  query.orderBy("created_at", "desc").limit(limit).offset(offset);
 
-  db.all(query, params, (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
+  query
+    .then((rows) => {
+      countQuery
+        .first()
+        .then((result) => {
+          const totalItems = result.totalItems;
+          const totalPages = Math.ceil(totalItems / limit);
 
-    // Get total count of jobs (considering the company and category filters)
-    let countQuery = "SELECT COUNT(*) AS totalItems FROM jobs";
-    let countParams = [];
-
-    if (company) {
-      countQuery += " WHERE companyName = ?";
-      countParams.push(company);
-    }
-
-    if (category) {
-      if (countParams.length > 0) {
-        countQuery += " AND category_id = ?";
-      } else {
-        countQuery += " WHERE category_id = ?";
-      }
-      countParams.push(category);
-    }
-
-    db.get(countQuery, countParams, (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
-
-      const totalItems = result.totalItems;
-      const totalPages = Math.ceil(totalItems / limit);
-
-      res.json({
-        data: rows,
-        totalItems,
-        totalPages,
-        currentPage: page,
-      });
-    });
-  });
+          res.json({
+            data: rows,
+            totalItems,
+            totalPages,
+            currentPage: page,
+          });
+        })
+        .catch((err) => res.status(500).json({ error: err.message }));
+    })
+    .catch((err) => res.status(500).json({ error: err.message }));
 });
 
-//search jobs
+// search jobs
 router.get("/search", (req, res) => {
-  const searchTerm = req.query.q; // Query parameter 'q' for search
+  const searchTerm = req.query.q;
 
   if (!searchTerm) {
     return res.status(400).send("Search term is required");
   }
 
-  const query = `SELECT * FROM jobs WHERE jobName LIKE ?`;
-  const searchQuery = `%${searchTerm}%`; // SQL wildcards for partial match
-
-  db.all(query, [searchQuery], (err, rows) => {
-    if (err) {
-      return res.status(500).send("Error querying database");
-    }
-
-    res.json(rows); // Respond with search results
-  });
+  db("jobs")
+    .where("jobName", "like", `%${searchTerm}%`)
+    .then((rows) => res.json(rows))
+    .catch((err) => res.status(500).send("Error querying database"));
 });
 
 // get all jobs for particular company
 router.get("/company/:id", (req, res) => {
-  db.all(
-    "SELECT * FROM jobs where user_uid = ?",
-    [req.params.id],
-    (err, rows) => {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
-      return res.json(rows);
-    }
-  );
-});
-// Route to get a specific order by ID
-router.get("/:id", (req, res) => {
-  const { id } = req.params;
-  db.get("SELECT * FROM jobs WHERE id = ?", [id], (err, row) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    if (!row) {
-      return res.status(404).json({ error: "Order not found" });
-    }
-    res.json(row);
-  });
+  db("jobs")
+    .where("user_uid", req.params.id)
+    .then((rows) => res.json(rows))
+    .catch((err) => res.status(500).json({ error: err.message }));
 });
 
-// create new job
-// Configure multer for image uploads
+// get a specific job by ID
+router.get("/:id", (req, res) => {
+  db("jobs")
+    .where("id", req.params.id)
+    .first()
+    .then((row) => {
+      if (!row) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      res.json(row);
+    })
+    .catch((err) => res.status(500).json({ error: err.message }));
+});
+
+// create a new job
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "uploads/"); // Set the folder where images will be stored
+    cb(null, "uploads/");
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname)); // Unique filename
+    cb(null, Date.now() + path.extname(file.originalname));
   },
 });
 
 const upload = multer({ storage });
 
-// Handle the job post request
-router.post("/", upload.single("company_logo"), async (req, res) => {
+router.post("/", upload.single("company_logo"), (req, res) => {
   const {
     companyName,
     jobName,
@@ -149,11 +112,9 @@ router.post("/", upload.single("company_logo"), async (req, res) => {
     job_type,
   } = req.body;
 
-  // Validate input
   if (
     !companyName ||
     !jobName ||
-    !jobSalary ||
     !jobDescription ||
     jobIsUrgent === undefined ||
     !user_uid ||
@@ -163,24 +124,8 @@ router.post("/", upload.single("company_logo"), async (req, res) => {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
-  const query = `INSERT INTO jobs (
-                companyName,
-                jobName,
-                jobSalary,
-                jobDescription,
-                jobIsUrgent,
-                user_uid,
-                category_id,
-                company_email,
-                job_experience,
-                job_city,
-                job_address,
-                job_type)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-
-  db.run(
-    query,
-    [
+  db("jobs")
+    .insert({
       companyName,
       jobName,
       jobSalary,
@@ -193,100 +138,49 @@ router.post("/", upload.single("company_logo"), async (req, res) => {
       job_city,
       job_address,
       job_type,
-    ],
-    function (err) {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
-      res.status(201).json({ message: "Job created", jobId: this.lastID });
-    }
-  );
+    })
+    .returning("id")
+    .then((ids) => {
+      res.status(201).json({ message: "Job created", jobId: ids[0] });
+    })
+    .catch((err) => res.status(500).json({ error: err.message }));
 });
 
-// PATCH route to update an order
+// PATCH route to update a job
 router.patch("/:id", (req, res) => {
-  const orderId = req.params.id; // Get the order ID from the URL parameter
-  const orderData = req.body; // Get the updated data from the request body
+  const jobId = req.params.id;
+  const updateData = req.body;
 
-  // Validate that at least one field is provided for update
-  if (Object.keys(orderData).length === 0) {
+  if (Object.keys(updateData).length === 0) {
     return res.status(400).json({ error: "No fields provided to update" });
   }
 
-  // Dynamically build the update query
-  const columns = [];
-  const values = [];
-
-  // Define the fields you want to allow updates for
-  const updateFields = [
-    "companyName",
-    "jobName",
-    "jobSalary",
-    "jobDescription",
-    "jobIsUrgent",
-    "user_uid",
-    "company_email",
-    "job_experience",
-    "job_city",
-    "job_address",
-    "job_type",
-  ];
-
-  // Build dynamic columns and values for the query
-  updateFields.forEach((field) => {
-    if (orderData[field]) {
-      columns.push(`${field} = ?`);
-      values.push(orderData[field]);
-    }
-  });
-
-  // If no valid fields are provided, return an error
-  if (columns.length === 0) {
-    return res.status(400).json({ error: "No valid fields to update" });
-  }
-
-  // Add the order ID to the end of the values array for the WHERE clause
-  values.push(orderId);
-
-  // Create the dynamic SQL query
-  const query = `UPDATE jobs SET ${columns.join(", ")} WHERE id = ?`;
-
-  // Execute the query
-  db.run(query, values, function (err) {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-
-    // If no rows were updated, the order might not exist
-    if (this.changes === 0) {
-      return res.status(404).json({ error: "Order not found" });
-    }
-
-    // Respond with success
-    res.status(200).json({ message: "Order updated successfully" });
-  });
+  db("jobs")
+    .where("id", jobId)
+    .update(updateData)
+    .then((count) => {
+      if (count === 0) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      res.status(200).json({ message: "Job updated successfully" });
+    })
+    .catch((err) => res.status(500).json({ error: err.message }));
 });
 
-// DELETE route to remove an order
+// DELETE route to remove a job
 router.delete("/:id", (req, res) => {
-  const orderId = req.params.id; // Get the order ID from the URL parameter
+  const jobId = req.params.id;
 
-  // Create the SQL query to delete the order
-  const query = `DELETE FROM jobs WHERE id = ?`;
-
-  // Execute the query
-  db.run(query, [orderId], function (err) {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-
-    // If no rows were deleted, the order might not exist
-    if (this.changes === 0) {
-      return res.status(404).json({ error: "Order not found" });
-    }
-
-    // Respond with success
-    res.status(200).json({ message: "Order deleted successfully" });
-  });
+  db("jobs")
+    .where("id", jobId)
+    .del()
+    .then((count) => {
+      if (count === 0) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      res.status(200).json({ message: "Job deleted successfully" });
+    })
+    .catch((err) => res.status(500).json({ error: err.message }));
 });
+
 module.exports = router;
