@@ -3,7 +3,6 @@ const cors = require("cors");
 const cloudinary = require("cloudinary").v2;
 
 const app = express();
-const db = require("./dbSetup"); // Import dbSetup to run the DB initialization
 const port = process.env.PORT || 3000;
 
 const knex = require("knex");
@@ -73,7 +72,7 @@ const categories = [
   "სხვა",
 ];
 
-knex('categories')
+db('categories')
   .insert(categories.map(name => ({ name })))
   .then(() => console.log('Categories inserted successfully'))
   .catch((err) => console.error('Error inserting categories:', err));
