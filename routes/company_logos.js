@@ -47,12 +47,11 @@ router.post("/", upload.single("image"), async (req, res) => {
 });
 
 // GET route for fetching the latest logo by user_uid
-router.get("/:user_uid", (req, res) => {
-  const userUid = req.params.user_uid;
-
+router.get("/:job_id", (req, res) => {
+  const job_id = req.params.job_id;
   db("company_logos")
     .select("secure_url")
-    .where("user_uid", userUid)
+    .where("job_id", job_id)
     .orderBy("id", "desc")
     .limit(1)
     .then((rows) => {
