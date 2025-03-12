@@ -22,7 +22,7 @@ const upload = multer({ storage });
 router.post("/", upload.single("image"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
-  const userUid = req.body.user_uid; // Get the user_uid from the request body
+  const jobId = req.body.job_id; // Get the user_uid from the request body
 
   cloudinary.uploader.upload(req.file.path, function (error, result) {
     if (error) {
@@ -32,7 +32,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       db("company_logos")
         .insert({
           secure_url: result.secure_url,
-          user_uid: userUid,
+          job_id: jobId,
         })
         .returning("id")
         .then(([id]) => {
