@@ -50,6 +50,51 @@ router.get("/", (req, res) => {
     .catch((err) => res.status(500).json({ error: err.message }));
 });
 
+// admin only
+router.get("/adm", (req, res) => {
+  const { category, company, status, page = 1, limit = 10 } = req.query;
+  const offset = (page - 1) * limit;
+
+  let query = db("jobs").select("*");
+  let countQuery = db("jobs").count("id as totalItems");
+
+  if (status && ["pending", "approved", "hidden"].includes(status)) {
+    query.where("job_status", status);
+    countQuery.where("job_status", status);
+  }
+
+  if (company) {
+    query.where("companyName", company);
+    countQuery.where("companyName", company);
+  }
+
+  if (category) {
+    query.where("category_id", category);
+    countQuery.where("category_id", category);
+  }
+
+  query.orderBy("created_at", "desc").limit(limit).offset(offset);
+
+  query
+    .then((rows) => {
+      countQuery
+        .first()
+        .then((result) => {
+          const totalItems = result.totalItems;
+          const totalPages = Math.ceil(totalItems / limit);
+
+          res.json({
+            data: rows,
+            totalItems,
+            totalPages,
+            currentPage: page,
+          });
+        })
+        .catch((err) => res.status(500).json({ error: err.message }));
+    })
+    .catch((err) => res.status(500).json({ error: err.message }));
+});
+
 // search jobs
 router.get("/search", (req, res) => {
   const searchTerm = req.query.q;
@@ -185,49 +230,5 @@ router.delete("/:id", (req, res) => {
     .catch((err) => res.status(500).json({ error: err.message }));
 });
 
-// admin only
-router.get("/adm", (req, res) => {
-  const { category, company, status, page = 1, limit = 10 } = req.query;
-  const offset = (page - 1) * limit;
-
-  let query = db("jobs").select("*");
-  let countQuery = db("jobs").count("id as totalItems");
-
-  if (status && ["pending", "approved", "hidden"].includes(status)) {
-    query.where("job_status", status);
-    countQuery.where("job_status", status);
-  }
-
-  if (company) {
-    query.where("companyName", company);
-    countQuery.where("companyName", company);
-  }
-
-  if (category) {
-    query.where("category_id", category);
-    countQuery.where("category_id", category);
-  }
-
-  query.orderBy("created_at", "desc").limit(limit).offset(offset);
-
-  query
-    .then((rows) => {
-      countQuery
-        .first()
-        .then((result) => {
-          const totalItems = result.totalItems;
-          const totalPages = Math.ceil(totalItems / limit);
-
-          res.json({
-            data: rows,
-            totalItems,
-            totalPages,
-            currentPage: page,
-          });
-        })
-        .catch((err) => res.status(500).json({ error: err.message }));
-    })
-    .catch((err) => res.status(500).json({ error: err.message }));
-});
 
 module.exports = router;
