@@ -1,6 +1,6 @@
 const cors = require("cors");
 const express = require("express");
-const knex = require("knex");  // Assuming knex.js is the config file
+const knex = require("knex"); // Assuming knex.js is the config file
 const router = express.Router();
 router.use(cors()); // Ensure CORS is applied to this router
 const multer = require("multer");
@@ -14,7 +14,9 @@ router.get("/", (req, res) => {
   const offset = (page - 1) * limit;
 
   let query = db("jobs").select("*").where("job_status", "approved");
-  let countQuery = db("jobs").count("id as totalItems").where("job_status", "approved");
+  let countQuery = db("jobs")
+    .count("id as totalItems")
+    .where("job_status", "approved");
 
   if (company) {
     query.where("companyName", company);
@@ -179,6 +181,51 @@ router.delete("/:id", (req, res) => {
         return res.status(404).json({ error: "Job not found" });
       }
       res.status(200).json({ message: "Job deleted successfully" });
+    })
+    .catch((err) => res.status(500).json({ error: err.message }));
+});
+
+// admin only
+router.get("/adm", (req, res) => {
+  const { category, company, status, page = 1, limit = 10 } = req.query;
+  const offset = (page - 1) * limit;
+
+  let query = db("jobs").select("*");
+  let countQuery = db("jobs").count("id as totalItems");
+
+  if (status && ["pending", "approved", "hidden"].includes(status)) {
+    query.where("job_status", status);
+    countQuery.where("job_status", status);
+  }
+
+  if (company) {
+    query.where("companyName", company);
+    countQuery.where("companyName", company);
+  }
+
+  if (category) {
+    query.where("category_id", category);
+    countQuery.where("category_id", category);
+  }
+
+  query.orderBy("created_at", "desc").limit(limit).offset(offset);
+
+  query
+    .then((rows) => {
+      countQuery
+        .first()
+        .then((result) => {
+          const totalItems = result.totalItems;
+          const totalPages = Math.ceil(totalItems / limit);
+
+          res.json({
+            data: rows,
+            totalItems,
+            totalPages,
+            currentPage: page,
+          });
+        })
+        .catch((err) => res.status(500).json({ error: err.message }));
     })
     .catch((err) => res.status(500).json({ error: err.message }));
 });
