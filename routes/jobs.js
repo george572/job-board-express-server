@@ -13,8 +13,8 @@ router.get("/", (req, res) => {
   const { category, company, page = 1, limit = 10 } = req.query;
   const offset = (page - 1) * limit;
 
-  let query = db("jobs").select("*");
-  let countQuery = db("jobs").count("id as totalItems");
+  let query = db("jobs").select("*").where("job_status", "approved");
+  let countQuery = db("jobs").count("id as totalItems").where("job_status", "approved");
 
   if (company) {
     query.where("companyName", company);
