@@ -9,16 +9,16 @@ const path = require("path");
 const db = knex(require("../knexfile").development); // Assuming you're using 'development' from knexfile.js
 
 router.get("/", (req, res) => {
-  const { 
-    category, 
-    company, 
-    job_experience, 
-    job_city, 
+  const {
+    category,
+    company,
+    job_experience,
+    job_city,
     job_type,
-    page = 1, 
-    limit = 10 
+    page = 1,
+    limit = 10,
   } = req.query;
-  
+
   const offset = (page - 1) * limit;
 
   let query = db("jobs").select("*").where("job_status", "approved");
@@ -41,7 +41,9 @@ router.get("/", (req, res) => {
 
   // Filter by job experience
   if (job_experience) {
-    const experienceValues = Array.isArray(job_experience) ? job_experience : [job_experience];
+    const experienceValues = Array.isArray(job_experience)
+      ? job_experience
+      : [job_experience];
     query.whereIn("job_experience", experienceValues);
     countQuery.whereIn("job_experience", experienceValues);
   }
@@ -59,7 +61,11 @@ router.get("/", (req, res) => {
     query.whereIn("job_type", typeValues);
     countQuery.whereIn("job_type", typeValues);
   }
-
+  
+  if (req.query.hasSalary === "true") {
+    query.whereNotNull("jobSalary");
+    countQuery.whereNotNull("jobSalary");
+  }
   // Apply sorting, pagination
   query.orderBy("created_at", "desc").limit(limit).offset(offset);
 
@@ -79,8 +85,8 @@ router.get("/", (req, res) => {
           company,
           job_experience,
           job_city,
-          job_type
-        }
+          job_type,
+        },
       });
     })
     .catch((err) => res.status(500).json({ error: err.message }));
@@ -265,6 +271,5 @@ router.delete("/:id", (req, res) => {
     })
     .catch((err) => res.status(500).json({ error: err.message }));
 });
-
 
 module.exports = router;
