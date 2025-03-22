@@ -8,9 +8,17 @@ const path = require("path");
 
 const db = knex(require("../knexfile").development); // Assuming you're using 'development' from knexfile.js
 
-// get all jobs
 router.get("/", (req, res) => {
-  const { category, company, page = 1, limit = 10 } = req.query;
+  const { 
+    category, 
+    company, 
+    job_experience, 
+    job_city, 
+    job_type,
+    page = 1, 
+    limit = 10 
+  } = req.query;
+  
   const offset = (page - 1) * limit;
 
   let query = db("jobs").select("*").where("job_status", "approved");
@@ -18,34 +26,62 @@ router.get("/", (req, res) => {
     .count("id as totalItems")
     .where("job_status", "approved");
 
+  // Filter by company
   if (company) {
     query.where("companyName", company);
     countQuery.where("companyName", company);
   }
 
+  // Filter by category
   if (category) {
-    query.where("category_id", category);
-    countQuery.where("category_id", category);
+    const categoryValues = Array.isArray(category) ? category : [category];
+    query.whereIn("category_id", categoryValues);
+    countQuery.whereIn("category_id", categoryValues);
   }
 
+  // Filter by job experience
+  if (job_experience) {
+    const experienceValues = Array.isArray(job_experience) ? job_experience : [job_experience];
+    query.whereIn("job_experience", experienceValues);
+    countQuery.whereIn("job_experience", experienceValues);
+  }
+
+  // Filter by job city
+  if (job_city) {
+    const cityValues = Array.isArray(job_city) ? job_city : [job_city];
+    query.whereIn("job_city", cityValues);
+    countQuery.whereIn("job_city", cityValues);
+  }
+
+  // Filter by job type
+  if (job_type) {
+    const typeValues = Array.isArray(job_type) ? job_type : [job_type];
+    query.whereIn("job_type", typeValues);
+    countQuery.whereIn("job_type", typeValues);
+  }
+
+  // Apply sorting, pagination
   query.orderBy("created_at", "desc").limit(limit).offset(offset);
 
-  query
-    .then((rows) => {
-      countQuery
-        .first()
-        .then((result) => {
-          const totalItems = result.totalItems;
-          const totalPages = Math.ceil(totalItems / limit);
+  // Execute query and return results
+  Promise.all([query, countQuery.first()])
+    .then(([rows, countResult]) => {
+      const totalItems = countResult.totalItems;
+      const totalPages = Math.ceil(totalItems / limit);
 
-          res.json({
-            data: rows,
-            totalItems,
-            totalPages,
-            currentPage: page,
-          });
-        })
-        .catch((err) => res.status(500).json({ error: err.message }));
+      res.json({
+        data: rows,
+        totalItems,
+        totalPages,
+        currentPage: parseInt(page),
+        filters: {
+          category,
+          company,
+          job_experience,
+          job_city,
+          job_type
+        }
+      });
     })
     .catch((err) => res.status(500).json({ error: err.message }));
 });
