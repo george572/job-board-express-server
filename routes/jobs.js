@@ -8,88 +8,42 @@ const path = require("path");
 
 const db = knex(require("../knexfile").development); // Assuming you're using 'development' from knexfile.js
 
-router.get("/", (req, res) => {
-  const {
-    category,
-    company,
-    job_experience,
-    job_city,
-    job_type,
-    page = 1,
-    limit = 10,
-  } = req.query;
+router.get("/", async (req, res) => {
+  try {
+    const {
+      category,
+      company,
+      job_experience,
+      job_city,
+      job_type,
+      page = 1,
+      limit = 10,
+      hasSalary
+    } = req.query;
 
-  const offset = (page - 1) * limit;
+    const offset = (page - 1) * limit;
 
-  let query = db("jobs").select("*").where("job_status", "approved");
-  let countQuery = db("jobs")
-    .count("id as totalItems")
-    .where("job_status", "approved");
+    let query = db("jobs").select("*").where("job_status", "approved");
 
-  // Filter by company
-  if (company) {
-    query.where("companyName", company);
-    countQuery.where("companyName", company);
+    // Apply filters
+    if (company) query.where("companyName", company);
+    if (category) query.whereIn("category_id", Array.isArray(category) ? category : [category]);
+    if (job_experience) query.whereIn("job_experience", Array.isArray(job_experience) ? job_experience : [job_experience]);
+    if (job_city) query.whereIn("job_city", Array.isArray(job_city) ? job_city : [job_city]);
+    if (job_type) query.whereIn("job_type", Array.isArray(job_type) ? job_type : [job_type]);
+    if (hasSalary === "true") query.whereNotNull("jobSalary");
+
+    // Fetch jobs
+    const jobs = await query.orderBy("created_at", "desc").limit(limit + 1).offset(offset);
+    
+    // Determine if more jobs exist
+    const hasMore = jobs.length > limit;
+    if (hasMore) jobs.pop(); // Remove extra job if fetched
+
+    res.json({ data: jobs, hasMore, currentPage: parseInt(page) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  // Filter by category
-  if (category) {
-    const categoryValues = Array.isArray(category) ? category : [category];
-    query.whereIn("category_id", categoryValues);
-    countQuery.whereIn("category_id", categoryValues);
-  }
-
-  // Filter by job experience
-  if (job_experience) {
-    const experienceValues = Array.isArray(job_experience)
-      ? job_experience
-      : [job_experience];
-    query.whereIn("job_experience", experienceValues);
-    countQuery.whereIn("job_experience", experienceValues);
-  }
-
-  // Filter by job city
-  if (job_city) {
-    const cityValues = Array.isArray(job_city) ? job_city : [job_city];
-    query.whereIn("job_city", cityValues);
-    countQuery.whereIn("job_city", cityValues);
-  }
-
-  // Filter by job type
-  if (job_type) {
-    const typeValues = Array.isArray(job_type) ? job_type : [job_type];
-    query.whereIn("job_type", typeValues);
-    countQuery.whereIn("job_type", typeValues);
-  }
-  
-  if (req.query.hasSalary === "true") {
-    query.whereNotNull("jobSalary");
-    countQuery.whereNotNull("jobSalary");
-  }
-  // Apply sorting, pagination
-  query.orderBy("created_at", "desc").limit(limit).offset(offset);
-
-  // Execute query and return results
-  Promise.all([query, countQuery.first()])
-    .then(([rows, countResult]) => {
-      const totalItems = countResult.totalItems;
-      const totalPages = Math.ceil(totalItems / limit);
-
-      res.json({
-        data: rows,
-        totalItems,
-        totalPages,
-        currentPage: parseInt(page),
-        filters: {
-          category,
-          company,
-          job_experience,
-          job_city,
-          job_type,
-        },
-      });
-    })
-    .catch((err) => res.status(500).json({ error: err.message }));
 });
 
 // admin only
