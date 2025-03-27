@@ -17,7 +17,7 @@ router.get("/", async (req, res) => {
       job_city,
       job_type,
       page = 1,
-      limit = 3,
+      limit = 10,
       hasSalary
     } = req.query;
 

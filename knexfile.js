@@ -12,7 +12,7 @@ module.exports = {
   },
   production: {
     client: "pg",
-    connection: process.env.DATABASE_URL + "?sslmode=disable",
+    connection: process.env.DATABASE_URL,
     migrations: { tableName: "knex_migrations" },
     ssl: {
       rejectUnauthorized: false,
