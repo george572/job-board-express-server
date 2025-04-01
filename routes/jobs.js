@@ -60,8 +60,6 @@ router.get("/adm", (req, res) => {
         .first()
         .then((result) => {
           const totalItems = result.totalItems;
-          const totalPages = Math.ceil(totalItems / limit);
-
           res.json({
             data: rows,
             totalItems,
