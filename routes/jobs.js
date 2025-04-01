@@ -48,28 +48,11 @@ router.get("/", async (req, res) => {
 
 // admin only
 router.get("/adm", (req, res) => {
-  const { category, company, status, page = 1, limit = 10 } = req.query;
-  const offset = (page - 1) * limit;
 
   let query = db("jobs").select("*");
   let countQuery = db("jobs").count("id as totalItems");
 
-  if (status && ["pending", "approved", "hidden"].includes(status)) {
-    query.where("job_status", status);
-    countQuery.where("job_status", status);
-  }
-
-  if (company) {
-    query.where("companyName", company);
-    countQuery.where("companyName", company);
-  }
-
-  if (category) {
-    query.where("category_id", category);
-    countQuery.where("category_id", category);
-  }
-
-  query.orderBy("created_at", "desc").limit(limit).offset(offset);
+  query.orderBy("created_at", "desc")
 
   query
     .then((rows) => {
