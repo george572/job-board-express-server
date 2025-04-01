@@ -59,12 +59,8 @@ router.get("/adm", (req, res) => {
       countQuery
         .first()
         .then((result) => {
-          const totalItems = result.totalItems;
           res.json({
             data: rows,
-            totalItems,
-            totalPages,
-            currentPage: page,
           });
         })
         .catch((err) => res.status(500).json({ error: err.message }));
