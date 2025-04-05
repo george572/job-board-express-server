@@ -31,6 +31,7 @@ router.post("/", (req, res) => {
       return db("jobs")
         .where("id", job_id)
         .increment("cvs_sent", 1)
+        .returning("*")
         .then(() => job);
     })
     .then((job) => {
