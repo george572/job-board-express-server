@@ -15,6 +15,7 @@ const checkIfUserExists = (uid) => {
 router.get("/", (req, res) => {
   db("users")
     .select("*")
+    .orderBy("created_at", "desc")
     .then((rows) => {
       if (!rows) {
         return res.status(404).json({ error: "Users not found" });
