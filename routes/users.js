@@ -11,6 +11,19 @@ const checkIfUserExists = (uid) => {
   return db("users").where("user_uid", uid).first();
 };
 
+// Route to get all users
+router.get("/", (req, res) => {
+  db("users")
+    .select("*")
+    .then((rows) => {
+      if (!rows) {
+        return res.status(404).json({ error: "Users not found" });
+      }
+      res.json(rows); // Return all users
+    })
+    .catch((err) => res.status(500).json({ error: err.message }));
+});
+
 // Route to get a user
 router.get("/:id", (req, res) => {
   const { id } = req.params; // Get the `id` from the route parameter
