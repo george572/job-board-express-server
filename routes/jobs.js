@@ -18,7 +18,7 @@ router.get("/", async (req, res) => {
       job_type,
       page = 1,
       limit = 10,
-      hasSalary
+      hasSalary,
     } = req.query;
 
     const offset = (page - 1) * limit;
@@ -27,15 +27,34 @@ router.get("/", async (req, res) => {
 
     // Apply filters
     if (company) query.where("companyName", company);
-    if (category) query.whereIn("category_id", Array.isArray(category) ? category : [category]);
-    if (job_experience) query.whereIn("job_experience", Array.isArray(job_experience) ? job_experience : [job_experience]);
-    if (job_city) query.whereIn("job_city", Array.isArray(job_city) ? job_city : [job_city]);
-    if (job_type) query.whereIn("job_type", Array.isArray(job_type) ? job_type : [job_type]);
+    if (category)
+      query.whereIn(
+        "category_id",
+        Array.isArray(category) ? category : [category]
+      );
+    if (job_experience)
+      query.whereIn(
+        "job_experience",
+        Array.isArray(job_experience) ? job_experience : [job_experience]
+      );
+    if (job_city)
+      query.whereIn(
+        "job_city",
+        Array.isArray(job_city) ? job_city : [job_city]
+      );
+    if (job_type)
+      query.whereIn(
+        "job_type",
+        Array.isArray(job_type) ? job_type : [job_type]
+      );
     if (hasSalary === "true") query.whereNotNull("jobSalary");
 
     // Fetch jobs
-    const jobs = await query.orderBy("created_at", "desc").limit(limit + 1).offset(offset);
-    
+    const jobs = await query
+      .orderBy("created_at", "desc")
+      .limit(limit + 1)
+      .offset(offset);
+
     // Determine if more jobs exist
     const hasMore = jobs.length > limit;
     if (hasMore) jobs.pop(); // Remove extra job if fetched
@@ -48,11 +67,10 @@ router.get("/", async (req, res) => {
 
 // admin only
 router.get("/adm", (req, res) => {
-
   let query = db("jobs").select("*");
   let countQuery = db("jobs").count("id as totalItems");
 
-  query.orderBy("created_at", "desc")
+  query.orderBy("created_at", "desc");
 
   query
     .then((rows) => {
@@ -90,7 +108,6 @@ router.get("/company/:id", (req, res) => {
     .catch((err) => res.status(500).json({ error: err.message }));
 });
 
-
 // search qury save
 router.post("/searchquery", (req, res) => {
   const { searchTerm } = req.body;
@@ -98,10 +115,24 @@ router.post("/searchquery", (req, res) => {
     return res.status(400).json({ error: "Search term is required" });
   }
   db("searchterms")
-    .insert({
-      searchTerm,
+    .where({ searchTerm })
+    .first()
+    .then((existingTerm) => {
+      if (existingTerm) {
+        // If the search term exists, increment its count
+        return db("searchterms")
+          .where({ searchTerm })
+          .increment("count", 1)
+          .then(() =>
+            res.status(200).json({ message: "Search term count incremented" })
+          );
+      } else {
+        // If the search term doesn't exist, insert it
+        return db("searchterms")
+          .insert({ searchTerm, count: 1 })
+          .then(() => res.status(200).json({ message: "Search term saved" }));
+      }
     })
-    .then(() => res.status(200).json({ message: "Search term saved" }))
     .catch((err) => res.status(500).json({ error: err.message }));
 });
 
@@ -187,7 +218,6 @@ router.post("/", upload.single("company_logo"), (req, res) => {
     })
     .catch((err) => res.status(500).json({ error: err.message }));
 });
-
 
 // PATCH route to update a job
 router.patch("/:id", (req, res) => {
