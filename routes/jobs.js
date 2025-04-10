@@ -182,7 +182,7 @@ router.post("/search", (req, res) => {
 
 router.get("/searchterms", (req, res) => {
   db("searchterms")
-    .select("searchTerm")
+    .select("*")
     .then((rows) => res.json(rows))
     .catch((err) => res.status(500).json({ error: err.message }));
 });
