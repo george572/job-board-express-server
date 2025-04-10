@@ -167,7 +167,7 @@ router.post("/", upload.single("company_logo"), (req, res) => {
 });
 
 // search qury save
-router.post("/search", (req, res) => {
+router.post("/searchquery", (req, res) => {
   const { searchTerm } = req.body;
   if (!searchTerm) {
     return res.status(400).json({ error: "Search term is required" });
