@@ -26,21 +26,32 @@ router.get("/", async (req, res) => {
     let query = db("jobs").select("*").where("job_status", "approved");
 
     // Apply filters
-    if (company) query.where("companyName", company);
-    if (category) query.whereIn("category_id", Array.isArray(category) ? category : [category]);
-    if (job_experience) query.whereIn("job_experience", Array.isArray(job_experience) ? job_experience : [job_experience]);
-    if (job_city) query.whereIn("job_city", Array.isArray(job_city) ? job_city : [job_city]);
-    if (job_type) query.whereIn("job_type", Array.isArray(job_type) ? job_type : [job_type]);
-    if (hasSalary === "true") query.whereNotNull("jobSalary");
+    if (company) query = query.where("companyName", company);
+    if (category) query = query.whereIn("category_id", Array.isArray(category) ? category : [category]);
+    if (job_experience) query = query.whereIn("job_experience", Array.isArray(job_experience) ? job_experience : [job_experience]);
+    if (job_city) query = query.whereIn("job_city", Array.isArray(job_city) ? job_city : [job_city]);
+    if (job_type) query = query.whereIn("job_type", Array.isArray(job_type) ? job_type : [job_type]);
+    if (hasSalary === "true") query = query.whereNotNull("jobSalary");
 
-    // Fetch jobs
-    const jobs = await query.orderBy("created_at", "desc").limit(limit + 1).offset(offset);
-    
+    // Create a separate count query to get total filtered results
+    const countQuery = await query.clone().count('id as total');
+    const totalCount = countQuery[0].total;
+
+    // Fetch jobs with pagination
+    const jobs = await query
+      .orderBy("created_at", "desc")
+      .limit(limit)
+      .offset(offset);
+
     // Determine if more jobs exist
-    const hasMore = jobs.length > limit;
-    if (hasMore) jobs.pop(); // Remove extra job if fetched
+    const hasMore = offset + jobs.length < totalCount;
 
-    res.json({ data: jobs, hasMore, currentPage: parseInt(page) });
+    res.json({ 
+      data: jobs, 
+      hasMore, 
+      currentPage: parseInt(page),
+      totalCount 
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
