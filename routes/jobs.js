@@ -90,6 +90,28 @@ router.get("/company/:id", (req, res) => {
     .catch((err) => res.status(500).json({ error: err.message }));
 });
 
+
+// search qury save
+router.post("/search", (req, res) => {
+  const { searchTerm } = req.body;
+  if (!searchTerm) {
+    return res.status(400).json({ error: "Search term is required" });
+  }
+  db("searchterms")
+    .insert({
+      searchTerm,
+    })
+    .then(() => res.status(200).json({ message: "Search term saved" }))
+    .catch((err) => res.status(500).json({ error: err.message }));
+});
+
+router.get("/searchterms", (req, res) => {
+  db("searchterms")
+    .select("*")
+    .then((rows) => res.json(rows))
+    .catch((err) => res.status(500).json({ error: err.message }));
+});
+
 // get a specific job by ID
 router.get("/:id", (req, res) => {
   db("jobs")
@@ -166,26 +188,6 @@ router.post("/", upload.single("company_logo"), (req, res) => {
     .catch((err) => res.status(500).json({ error: err.message }));
 });
 
-// search qury save
-router.post("/search", (req, res) => {
-  const { searchTerm } = req.body;
-  if (!searchTerm) {
-    return res.status(400).json({ error: "Search term is required" });
-  }
-  db("searchterms")
-    .insert({
-      searchTerm,
-    })
-    .then(() => res.status(200).json({ message: "Search term saved" }))
-    .catch((err) => res.status(500).json({ error: err.message }));
-});
-
-router.get("/searchterms", (req, res) => {
-  db("searchterms")
-    .select("*")
-    .then((rows) => res.json(rows))
-    .catch((err) => res.status(500).json({ error: err.message }));
-});
 
 // PATCH route to update a job
 router.patch("/:id", (req, res) => {
