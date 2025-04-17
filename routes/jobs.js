@@ -21,7 +21,7 @@ router.get("/", async (req, res) => {
       hasSalary,
     } = req.query;
 
-    const offset = (page - 1) * limit;
+    const offset = (Number(page) - 1) * Number(limit);
 
     let query = db("jobs").select("*").where("job_status", "approved");
 
@@ -52,7 +52,7 @@ router.get("/", async (req, res) => {
     // Fetch jobs
     const jobs = await query
       .orderBy("created_at", "desc")
-      .limit(limit + 1)
+      .limit(Number(limit) + 1)
       .offset(offset);
 
     // Determine if more jobs exist
