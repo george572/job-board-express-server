@@ -11,55 +11,45 @@ const db = knex(require("../knexfile").development); // Assuming you're using 'd
 router.get("/", async (req, res) => {
   try {
     const {
-      category,
-      company,
-      job_experience,
-      job_city,
-      job_type,
-      page = 1,
-      limit = 10,
-      hasSalary,
+      category, company, job_experience, job_city,
+      job_type, page = 1, limit = 10, hasSalary,
     } = req.query;
+    const pg = Number(page);
+    const lim = Number(limit);
+    const offset = (pg - 1) * lim;
 
-    const offset = (Number(page) - 1) * Number(limit);
-
-    let query = db("jobs").select("*").where("job_status", "approved");
-
-    // Apply filters
-    if (company) query.where("companyName", company);
-    if (category)
-      query.whereIn(
-        "category_id",
-        Array.isArray(category) ? category : [category]
-      );
+    // Build base filter query
+    const baseQ = db("jobs").where("job_status","approved");
+    if (company)      baseQ.where("companyName", company);
+    if (category)     baseQ.whereIn("category_id", Array.isArray(category)?category:[category]);
     if (job_experience)
-      query.whereIn(
-        "job_experience",
-        Array.isArray(job_experience) ? job_experience : [job_experience]
-      );
-    if (job_city)
-      query.whereIn(
-        "job_city",
-        Array.isArray(job_city) ? job_city : [job_city]
-      );
-    if (job_type)
-      query.whereIn(
-        "job_type",
-        Array.isArray(job_type) ? job_type : [job_type]
-      );
-    if (hasSalary === "true") query.whereNotNull("jobSalary");
+                      baseQ.whereIn("job_experience", Array.isArray(job_experience)?job_experience:[job_experience]);
+    if (job_city)     baseQ.whereIn("job_city", Array.isArray(job_city)?job_city:[job_city]);
+    if (job_type)     baseQ.whereIn("job_type", Array.isArray(job_type)?job_type:[job_type]);
+    if (hasSalary==="true")
+                      baseQ.whereNotNull("jobSalary");
 
-    // Fetch jobs
-    const jobs = await query
-      .orderBy("created_at", "desc")
-      .limit(Number(limit) + 1)
+    // 1) Count total matching rows
+    const [{ count }] = await baseQ.clone().count("* as count");
+    const totalCount = parseInt(count, 10);
+
+    // 2) Fetch just this page’s rows
+    const jobs = await baseQ
+      .clone()
+      .select("*")
+      .orderBy("created_at","desc")
+      .limit(lim)
       .offset(offset);
 
-    // Determine if more jobs exist after applying filters
-    const hasMore = jobs.length > limit;
-    if (hasMore) jobs.pop(); // Remove extra job if fetched
+    // 3) Decide if there’s more
+    const hasMore = offset + jobs.length < totalCount;
 
-    res.json({ data: jobs, hasMore, currentPage: parseInt(page) });
+    res.json({
+      data: jobs,
+      totalItems: totalCount,
+      currentPage: pg,
+      hasMore,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
