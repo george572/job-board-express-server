@@ -49,25 +49,17 @@ router.get("/", async (req, res) => {
       );
     if (hasSalary === "true") query.whereNotNull("jobSalary");
 
-    // Get total count of matching jobs
-    const totalCount = await query.clone().count('* as count').first();
-    const totalJobs = parseInt(totalCount.count);
-
-    // Fetch jobs for current page
+    // Fetch jobs
     const jobs = await query
       .orderBy("created_at", "desc")
-      .limit(Number(limit))
+      .limit(Number(limit) + 1)
       .offset(offset);
 
-    // Calculate if there are more jobs
-    const hasMore = totalJobs > (offset + jobs.length);
+    // Determine if more jobs exist after applying filters
+    const hasMore = jobs.length > limit;
+    if (hasMore) jobs.pop(); // Remove extra job if fetched
 
-    res.json({ 
-      data: jobs, 
-      hasMore, 
-      currentPage: parseInt(page),
-      totalJobs 
-    });
+    res.json({ data: jobs, hasMore, currentPage: parseInt(page) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
