@@ -55,7 +55,7 @@ router.get("/", async (req, res) => {
       .limit(Number(limit) + 1)
       .offset(offset);
 
-    // Determine if more jobs exist
+    // Determine if more jobs exist after applying filters
     const hasMore = jobs.length > limit;
     if (hasMore) jobs.pop(); // Remove extra job if fetched
 
