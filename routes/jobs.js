@@ -19,41 +19,43 @@ router.get("/", async (req, res) => {
     const offset = (pg - 1) * lim;
 
     // Build base filter query
-    const baseQ = db("jobs").where("job_status","approved");
+    const baseQ = db("jobs").where("job_status", "approved");
     if (company)      baseQ.where("companyName", company);
-    if (category)     baseQ.whereIn("category_id", Array.isArray(category)?category:[category]);
-    if (job_experience)
-                      baseQ.whereIn("job_experience", Array.isArray(job_experience)?job_experience:[job_experience]);
-    if (job_city)     baseQ.whereIn("job_city", Array.isArray(job_city)?job_city:[job_city]);
-    if (job_type)     baseQ.whereIn("job_type", Array.isArray(job_type)?job_type:[job_type]);
-    if (hasSalary==="true")
-                      baseQ.whereNotNull("jobSalary");
+    if (category)     baseQ.whereIn("category_id", Array.isArray(category) ? category : [category]);
+    if (job_experience) baseQ.whereIn("job_experience", Array.isArray(job_experience) ? job_experience : [job_experience]);
+    if (job_city)     baseQ.whereIn("job_city", Array.isArray(job_city) ? job_city : [job_city]);
+    if (job_type)     baseQ.whereIn("job_type", Array.isArray(job_type) ? job_type : [job_type]);
+    if (hasSalary === "true") baseQ.whereNotNull("jobSalary");
 
-    // 1) Count total matching rows
-    const [{ count }] = await baseQ.clone().count("* as count");
-    const totalCount = parseInt(count, 10);
-
-    // 2) Fetch just this page’s rows
+    // Fetch one more item than needed to check for hasMore
     const jobs = await baseQ
       .clone()
       .select("*")
-      .orderBy("created_at","desc")
-      .limit(lim)
+      .orderBy("created_at", "desc")
+      .limit(lim + 1)  // Fetch lim + 1
       .offset(offset);
 
-    // 3) Decide if there’s more
-    const hasMore = offset + jobs.length < totalCount;
+    // Determine hasMore and adjust the results
+    const hasMore = jobs.length > lim;
+    if (hasMore) {
+      jobs.pop(); // Remove the extra item
+    }
+
+    // Optional: Count total items if needed for other purposes
+    // const [{ count }] = await baseQ.clone().count("* as count");
+    // const totalCount = parseInt(count, 10);
 
     res.json({
       data: jobs,
-      totalItems: totalCount,
       currentPage: pg,
       hasMore,
+      // totalItems: totalCount, // Optional if needed
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // admin only
 router.get("/adm", (req, res) => {
