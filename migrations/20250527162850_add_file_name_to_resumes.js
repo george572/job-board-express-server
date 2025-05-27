@@ -3,7 +3,9 @@
  * @returns { Promise<void> }
  */
 exports.up = function(knex) {
-  
+  return knex.schema.table('resumes', function(table) {
+    table.string('file_name');
+  });
 };
 
 /**
@@ -11,5 +13,7 @@ exports.up = function(knex) {
  * @returns { Promise<void> }
  */
 exports.down = function(knex) {
-  
+  return knex.schema.table('resumes', function(table) {
+    table.dropColumn('file_name');
+  });
 };
