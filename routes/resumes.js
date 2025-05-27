@@ -73,6 +73,7 @@ router.post("/", upload.single("resume"), async (req, res) => {
           .insert({
             file_url: downloadUrl,
             user_id: user_id,
+            file_name: req.file.originalname
           })
           .then(() => {
             res.json({ message: "File uploaded successfully" });
