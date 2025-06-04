@@ -8,13 +8,14 @@ const db = knex(require("../knexfile").development); // assuming knexfile.js is 
 router.use(cors());
 
 const transporter = nodemailer.createTransport({
-  service: "gmail", // or use SMTP settings
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true,
   auth: {
     user: "info@samushao.ge",
-    pass: "obuf bbuf htps uxhk",
+    pass: "obuf bbuf htps uxhk", // your app password with no extra spaces
   },
 });
-
 router.post("/", (req, res) => {
   const { job_id, user_id } = req.body;
 
