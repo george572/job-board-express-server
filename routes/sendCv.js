@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
   secure: true,
   auth: {
     user: "info@samushao.ge",
-    pass: "obuf bbuf htps uxhk", // your app password with no extra spaces
+    pass: "qehs tfmb tlkm krmd",
   },
 });
 router.post("/", (req, res) => {
