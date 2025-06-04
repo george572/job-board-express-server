@@ -2,6 +2,7 @@ const express = require("express");
 const knex = require("knex");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
+require("dotenv").config();
 
 const router = express.Router();
 const db = knex(require("../knexfile").development); // assuming knexfile.js is configured correctly
@@ -11,7 +12,7 @@ const transporter = nodemailer.createTransport({
   service: "gmail", // or use SMTP settings
   auth: {
     user: "info@samushao.ge",
-    pass: "qehs tfmb tlkm krmd",
+    pass: process.env.MAIL_PSW,
   },
 });
 
