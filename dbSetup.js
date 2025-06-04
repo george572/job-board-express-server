@@ -34,6 +34,7 @@ exports.up = function (knex) {
     .createTable('resumes', (table) => {
       table.increments('id').primary();
       table.string('user_id');
+      table.string('file_name');
       table.string('file_url').notNullable();
       table.timestamp('updated_at').defaultTo(knex.fn.now());
       table.timestamp('created_at').defaultTo(knex.fn.now());

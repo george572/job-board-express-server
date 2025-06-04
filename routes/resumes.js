@@ -35,6 +35,7 @@ router.get("/:id", (req, res) => {
         file_url: row.file_url,
         user_id: row.user_id,
         created_at: row.created_at,
+        file_name: row.file_name ? row.file_name : ''
       });
     })
     .catch((err) => res.status(500).json({ error: err.message }));
@@ -73,6 +74,7 @@ router.post("/", upload.single("resume"), async (req, res) => {
           .insert({
             file_url: downloadUrl,
             user_id: user_id,
+            file_name: req.file.originalname
           })
           .then(() => {
             res.json({ message: "File uploaded successfully" });
