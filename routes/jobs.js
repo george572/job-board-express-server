@@ -191,6 +191,7 @@ router.post("/", upload.single("company_logo"), (req, res) => {
     job_address,
     job_type,
     job_premium_status,
+    isHelio,
   } = req.body;
 
   if (
@@ -220,6 +221,7 @@ router.post("/", upload.single("company_logo"), (req, res) => {
       job_address,
       job_type,
       job_premium_status,
+      isHelio,
     })
     .returning("id")
     .then((ids) => {
