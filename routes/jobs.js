@@ -11,51 +11,66 @@ const db = knex(require("../knexfile").development); // Assuming you're using 'd
 router.get("/", async (req, res) => {
   try {
     const {
-      category, company, job_experience, job_city,
-      job_type, page = 1, limit = 10, hasSalary,
+      category,
+      company,
+      job_experience,
+      job_city,
+      job_type,
+      page = 1,
+      limit = 10,
+      hasSalary,
+      job_premium_status,
     } = req.query;
-    const pg = Number(page);
-    const lim = Number(limit);
-    const offset = (pg - 1) * lim;
 
-    // Build base filter query
-    const baseQ = db("jobs").where("job_status", "approved");
-    if (company)      baseQ.where("companyName", company);
-    if (category)     baseQ.whereIn("category_id", Array.isArray(category) ? category : [category]);
-    if (job_experience) baseQ.whereIn("job_experience", Array.isArray(job_experience) ? job_experience : [job_experience]);
-    if (job_city)     baseQ.whereIn("job_city", Array.isArray(job_city) ? job_city : [job_city]);
-    if (job_type)     baseQ.whereIn("job_type", Array.isArray(job_type) ? job_type : [job_type]);
-    if (hasSalary === "true") baseQ.whereNotNull("jobSalary");
+    const offset = (Number(page) - 1) * Number(limit);
 
-    // Fetch one more item than needed to check for hasMore
-    const jobs = await baseQ
-      .clone()
-      .select("*")
+    let query = db("jobs").select("*").where("job_status", "approved");
+
+    // Apply filters
+    if (company) query.where("companyName", company);
+    if (category)
+      query.whereIn(
+        "category_id",
+        Array.isArray(category) ? category : [category]
+      );
+    if (job_experience)
+      query.whereIn(
+        "job_experience",
+        Array.isArray(job_experience) ? job_experience : [job_experience]
+      );
+    if (job_city)
+      query.whereIn(
+        "job_city",
+        Array.isArray(job_city) ? job_city : [job_city]
+      );
+    if (job_type)
+      query.whereIn(
+        "job_type",
+        Array.isArray(job_type) ? job_type : [job_type]
+      );
+    if (hasSalary === "true") query.whereNotNull("jobSalary");
+    if (job_premium_status)
+      query.whereIn(
+        "job_premium_status",
+        Array.isArray(job_premium_status) ? job_premium_status : [job_premium_status]
+      );
+
+    // Fetch jobs with premium status priority
+    const jobs = await query
+      .orderByRaw("CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END")
       .orderBy("created_at", "desc")
-      .limit(lim + 1)  // Fetch lim + 1
+      .limit(Number(limit) + 1)
       .offset(offset);
 
-    // Determine hasMore and adjust the results
-    const hasMore = jobs.length > lim;
-    if (hasMore) {
-      jobs.pop(); // Remove the extra item
-    }
+    // Determine if more jobs exist after applying filters
+    const hasMore = jobs.length > limit;
+    if (hasMore) jobs.pop(); // Remove extra job if fetched
 
-    // Optional: Count total items if needed for other purposes
-    // const [{ count }] = await baseQ.clone().count("* as count");
-    // const totalCount = parseInt(count, 10);
-
-    res.json({
-      data: jobs,
-      currentPage: pg,
-      hasMore,
-      // totalItems: totalCount, // Optional if needed
-    });
+    res.json({ data: jobs, hasMore, currentPage: parseInt(page) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 // admin only
 router.get("/adm", (req, res) => {
@@ -175,6 +190,7 @@ router.post("/", upload.single("company_logo"), (req, res) => {
     job_city,
     job_address,
     job_type,
+    job_premium_status,
   } = req.body;
 
   if (
@@ -203,6 +219,7 @@ router.post("/", upload.single("company_logo"), (req, res) => {
       job_city,
       job_address,
       job_type,
+      job_premium_status,
     })
     .returning("id")
     .then((ids) => {
