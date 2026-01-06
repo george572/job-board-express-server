@@ -68,23 +68,24 @@ router.post("/", (req, res) => {
                    <p>კანდიდატის ელ-ფოსტა: ${user.user_email}</p>`,
           };
 
-          return new Promise((resolve, reject) => {
-            transporter.sendMail(mailOptions, (error, info) => {
-              if (error) {
-                console.error("Email sending error:", error);
-                return reject({
-                  error: "Failed to send email: " + error.message,
-                });
-              }
+      return new Promise((resolve, reject) => {
+        transporter.sendMail(mailOptions, (error, info) => {
+          if (error) {
+            console.error("Email sending error:", error);
+            // Wrap in a real Error so err.message is populated in the catch block
+            return reject(
+              new Error("Failed to send email: " + error.message)
+            );
+          }
 
-              resolve({
-                message: "CV sent successfully to company email",
-                job,
-                resume,
-                user,
-              });
-            });
+          resolve({
+            message: "CV sent successfully to company email",
+            job,
+            resume,
+            user,
           });
+        });
+      });
         });
     })
     .then((result) => {
@@ -92,9 +93,9 @@ router.post("/", (req, res) => {
     })
     .catch((err) => {
       console.error("Database or email error:", err);
-      return res
-        .status(500)
-        .json({ error: err.message || "An unexpected error occurred" });
+      // Prefer the error message, but fall back to any `error` field or a generic message
+      const message = err?.message || err?.error || "An unexpected error occurred";
+      return res.status(500).json({ error: message });
     });
 });
 
