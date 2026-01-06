@@ -13,6 +13,9 @@ module.exports = {
   development: {
     client: "pg",
     connection: {
+      ssl: { rejectUnauthorized: false } // THE CRITICAL LINE
+    },
+    connection: {
       host: "ceual2t8lkvosl.cluster-czz5s0kz4scl.eu-west-1.rds.amazonaws.com",
       user: "u2bfqm7k36k4lv",
       password: "p9f11fba4229eddb38a1d139cf31a68de6f7052bde4577d14a7e3f2f8401305b3",
@@ -21,6 +24,9 @@ module.exports = {
   },
   production: {
     client: "pg",
+    connection: {
+      ssl: { rejectUnauthorized: false } // THE CRITICAL LINE
+    },
     connection: {
       host: "ceual2t8lkvosl.cluster-czz5s0kz4scl.eu-west-1.rds.amazonaws.com",
       user: "u2bfqm7k36k4lv",
