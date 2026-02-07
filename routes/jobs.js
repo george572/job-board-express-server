@@ -264,8 +264,8 @@ router.post("/bulk", async (req, res) => {
         job_city: job.job_city,
         job_address: job.job_address,
         job_type: job.job_type,
-        job_status: "approved",
-        job_premium_status: job.job_premium_status || null,
+        job_status: "pending",
+        job_premium_status: 'regular',
         isHelio: job.isHelio || false,
         company_logo: job.company_logo || null
       });
