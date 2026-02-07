@@ -251,7 +251,7 @@ router.post("/bulk", async (req, res) => {
       job.category_id;
 
     if (hasRequiredFields) {
-      validJobs.append({
+      validJobs.push({
         companyName: job.companyName,
         jobName: job.jobName,
         jobSalary: job.jobSalary,
