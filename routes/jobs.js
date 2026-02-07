@@ -230,6 +230,89 @@ router.post("/", upload.single("company_logo"), (req, res) => {
     .catch((err) => res.status(500).json({ error: err.message }));
 });
 
+// bulk upload many jobs
+router.post("/bulk", async (req, res) => {
+  const jobsToInsert = req.body;
+
+  if (!Array.isArray(jobsToInsert)) {
+    console.error("❌ REJECTED: Payload is not an array.");
+    return res.status(400).json({ error: "Payload must be an array" });
+  }
+
+  const validJobs = [];
+  const failedJobs = [];
+
+  jobsToInsert.forEach((job, index) => {
+    // Define your "Deal Breakers" here
+    const hasRequiredFields = 
+      job.companyName && 
+      job.jobName && 
+      job.user_uid && 
+      job.category_id;
+
+    if (hasRequiredFields) {
+      validJobs.append({
+        companyName: job.companyName,
+        jobName: job.jobName,
+        jobSalary: job.jobSalary,
+        jobDescription: job.jobDescription,
+        jobIsUrgent: job.jobIsUrgent || false,
+        user_uid: job.user_uid,
+        category_id: job.category_id,
+        company_email: job.company_email,
+        job_experience: job.job_experience,
+        job_city: job.job_city,
+        job_address: job.job_address,
+        job_type: job.job_type,
+        job_premium_status: job.job_premium_status || null,
+        isHelio: job.isHelio || false,
+        company_logo: job.company_logo || null
+      });
+    } else {
+      // THE "FUCKING CONSOLE LOG" YOU REQUESTED
+      console.error(`⚠️ JOB FAILED VALIDATION (Index: ${index}):`, {
+        jobName: job.jobName || "UNKNOWN",
+        company: job.companyName || "UNKNOWN",
+        reason: "Missing required fields (companyName, jobName, user_uid, or category_id)"
+      });
+      
+      failedJobs.push({ 
+        index, 
+        jobName: job.jobName || "Unknown", 
+        error: "Missing required fields" 
+      });
+    }
+  });
+
+  // If everything failed validation, stop here
+  if (validJobs.length === 0) {
+    return res.status(400).json({ 
+      error: "No valid jobs to insert", 
+      failedCount: failedJobs.length 
+    });
+  }
+
+  try {
+    const ids = await db("jobs").insert(validJobs).returning("id");
+    
+    console.log(`✅ SUCCESS: Inserted ${ids.length} jobs.`);
+    if (failedJobs.length > 0) {
+      console.warn(`[!] Note: ${failedJobs.length} jobs were skipped due to errors.`);
+    }
+
+    res.status(201).json({ 
+      message: "Processing complete", 
+      insertedCount: ids.length,
+      failedCount: failedJobs.length,
+      failedJobs: failedJobs // Send this back so your Python script knows what to fix
+    });
+  } catch (err) {
+    // This catches DB-level crashes (e.g. unique constraint violations)
+    console.error("🔥 DATABASE CRITICAL ERROR:", err.message);
+    res.status(500).json({ error: "Database rejected the batch", details: err.message });
+  }
+});
+
 // PATCH route to update a job
 router.patch("/:id", (req, res) => {
   const jobId = req.params.id;
