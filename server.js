@@ -1,13 +1,26 @@
 const express = require("express");
 const cors = require("cors");
 const cloudinary = require("cloudinary").v2;
+const path = require("path");
 
 const app = express();
 const port = process.env.PORT || 3001;
 
+// Set up view engine
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
+
 app.use(cors()); // Allow all origins
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
+
+// Serve static files
+app.use(express.static(path.join(__dirname, "public")));
+
+// Home route
+app.get("/", (req, res) => {
+  res.render("index");
+});
 
 cloudinary.config({
   cloud_name: "dd7gz0aqv",
