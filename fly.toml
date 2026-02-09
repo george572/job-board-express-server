@@ -1,4 +1,4 @@
-# fly.toml app configuration file generated for samushaoge on 2026-02-09T21:31:11Z
+# fly.toml app configuration file generated for samushaoge on 2026-02-09T22:17:29Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
@@ -8,15 +8,8 @@ primary_region = 'fra'
 
 [build]
 
-[[mounts]]
-  source = 'data'
-  destination = '/data'
-  auto_extend_size_threshold = 80
-  auto_extend_size_increment = '1GB'
-  auto_extend_size_limit = '10GB'
-
 [http_service]
-  internal_port = 4000
+  internal_port = 8080
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
@@ -27,4 +20,4 @@ primary_region = 'fra'
   memory = '1gb'
   cpu_kind = 'shared'
   cpus = 1
-  memory_mb = 1024
+  memory_mb = 512
