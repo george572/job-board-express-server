@@ -1,7 +1,40 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-/* Tell Tailwind v4 where to find your classes */
-@source "../../views/**/*.ejs";
-@source "../../routes/**/*.js";
+@font-face {
+    font-family: "MarkGeo";
+    src: url("/fonts/MarkGEO-Medium.ttf") format("truetype");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "MarkGeo";
+    src: url("/fonts/MarkGEO-SemiBold.ttf") format("truetype");
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Mrgvlovani";
+    src: url("/fonts/bpg_mrgvlovani_caps_2010.ttf") format("truetype");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@layer base {
+    body {
+        font-family: "MarkGeo", sans-serif;
+    }
+}
+
+@theme {
+    --font-family-markgeo: "MarkGeo", sans-serif;
+    --font-family-mrgvlovani: "Mrgvlovani", sans-serif;
+    --color-primary: #315eff;
+    --color-secondary: #36454f;
+}
+
+@source "../../views";

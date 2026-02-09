@@ -55,20 +55,24 @@ router.get("/", async (req, res) => {
         Array.isArray(job_premium_status) ? job_premium_status : [job_premium_status]
       );
 
-    // Fetch jobs with premium status priority
     const jobs = await query
       .orderByRaw("CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END")
       .orderBy("created_at", "desc")
       .limit(Number(limit) + 1)
       .offset(offset);
 
-    // Determine if more jobs exist after applying filters
     const hasMore = jobs.length > limit;
-    if (hasMore) jobs.pop(); // Remove extra job if fetched
+    if (hasMore) jobs.pop();
 
-    res.json({ data: jobs, hasMore, currentPage: parseInt(page) });
+    // Render template instead of returning JSON
+    res.render('jobs', { 
+      jobs: jobs, 
+      hasMore: hasMore,
+      currentPage: parseInt(page),
+      filters: req.query 
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).send(err.message);
   }
 });
 

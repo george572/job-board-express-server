@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="ka">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- SEO Meta Tags (title, description, og:*, canonical) -->
+  <%- include('partials/head-meta', { seo }) %>
+
+  <!-- Structured Data for Google Jobs -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org/",
+      "@type": "JobPosting",
+      "title": "<%= job.jobName %>",
+      "description": "<%= job.job_description || '' %>",
+      "datePosted": "<%= job.created_at %>",
+      "employmentType": "<%= job.job_type || '' %>",
+      "hiringOrganization": {
+        "@type": "Organization",
+        "name": "<%= job.companyName %>"
+      },
+      "jobLocation": {
+        "@type": "Place",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "<%= job.job_city || '' %>",
+          "addressCountry": "GE"
+        }
+      }
+      <% if (job.jobSalary) { %>,
+      "baseSalary": {
+        "@type": "MonetaryAmount",
+        "currency": "GEL",
+        "value": {
+          "@type": "QuantitativeValue",
+          "value": <%= job.jobSalary %>
+        }
+      }
+      <% } %>
+    }
+  </script>
+
+  <!-- BreadcrumbList schema -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "მთავარი", "item": "https://samushao.ge/" },
+        { "@type": "ListItem", "position": 2, "name": "ვაკანსიები", "item": "https://samushao.ge/" },
+        { "@type": "ListItem", "position": 3, "name": "<%- typeof job !== 'undefined' && job.jobName ? job.jobName.replace(/\\/g, '\\\\').replace(/"/g, '\\"') : '' %>", "item": "<%= seo && seo.canonical ? seo.canonical : '' %>" }
+      ]
+    }
+  </script>
+
+  <!-- Your CSS here -->
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+  <style>
+    /* Prevent body scroll when dialog is open */
+    body.dialog-open {
+      overflow: hidden;
+    }
+
+    /* Dialog backdrop */
+    dialog.slide-dialog {
+      border: none;
+      padding: 0;
+      background: transparent;
+      width: 100%;
+      height: 100%;
+      max-width: 100%;
+      max-height: 100%;
+      position: fixed;
+      top: 0;
+      left: 0;
+      margin: 0;
+    }
+
+    /* Backdrop overlay */
+    dialog.slide-dialog::backdrop {
+      background: rgba(0, 0, 0, 0.5);
+    }
+
+    /* For browsers that don't support ::backdrop */
+    .dialog-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+    }
+
+    .dialog-backdrop.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Dialog content panel */
+    .dialog-panel {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 50vh;
+      background: white;
+      border-radius: 1rem 1rem 0 0;
+      transform: translateY(100%);
+      transition: transform 0.3s ease-out;
+      overflow-y: auto;
+    }
+
+    dialog.slide-dialog[open] .dialog-panel {
+      transform: translateY(0);
+    }
+  </style>
+
+</head>
+
+<body>
+  <%- include('partials/header') %>
+
+  <main class="pb-52 lg:pb-12">
+    <nav class="my-6 max-w-[1400px] mx-auto px-5" aria-label="Breadcrumb">
+      <ol class="flex items-center gap-2 text-sm text-gray-500">
+        <li class="flex items-center"><a href="/" class="hover:text-blue-600">ვაკანსიები</a></li>
+        <li class="flex items-center"><span class="mx-2">/</span><span class="text-gray-700" aria-current="page"><%= job.jobName %></span></li>
+      </ol>
+    </nav>
+    <article class="max-w-[1400px] mx-auto p-1 flex gap-1 flex-col lg:flex-row  relative">
+      <nav class="flex flex-col relative p-4">
+        <div class="flex items-center gap-2 mb-6"><a href="#!" onclick="history.back(); return false;" class="flex items-center gap-2 cursor-pointer"><svg width="5" height="8" viewBox="0 0 5 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3.86089 7.1124L1.14214 4.39365C1.07964 4.33115 1.03589 4.26865 1.01089 4.20615C0.985889 4.14365 0.973389 4.0749 0.973389 3.9999C0.973389 3.9249 0.985889 3.85615 1.01089 3.79365C1.03589 3.73115 1.07964 3.66865 1.14214 3.60615L3.86089 0.887402C3.89839 0.849902 3.93901 0.821777 3.98276 0.803027C4.02651 0.784277 4.07339 0.774902 4.12339 0.774902C4.22339 0.774902 4.31089 0.809277 4.38589 0.878027C4.46089 0.946777 4.49839 1.0374 4.49839 1.1499V6.8499C4.49839 6.9624 4.46089 7.05303 4.38589 7.12178C4.31089 7.19053 4.22339 7.2249 4.12339 7.2249C4.09839 7.2249 4.01089 7.1874 3.86089 7.1124Z" fill="#151515"></path>
+            </svg><span class="text-[14px]">ყველა ვაკანსია</span></a></div>
+        <section class="p-4 bg-white rounded-lg border border-[#EBEBEB] self-start w-full lg:min-w-[360px] p-8 relative">
+          <header>
+            <h1 class="mb-0 lg:mb-6"><span class="font-[400] text-[16px] text-[#151515]"><%= job.jobName %></span></h1>
+            <!---->
+            <div class="w-full text-sm flex justify-between">
+              <div class="gap-2 items-center hidden lg:flex">
+                <% if (job.company_logo) { %>
+                <div class="w-[50px] h-[50px] rounded-lg overflow-hidden">
+                  <img src="<%= job.company_logo %>" alt="<%= job.companyName %> — ლოგო" referrerpolicy="no-referrer" class="w-full h-full object-contain">
+                </div>
+                <% } %>
+                <div class="flex flex-col gap-1">
+                  <h2 class="text-[14px] text-[#3F3F3F] font-[300]"><%= job.companyName %></h2><time class="w-full text-[12px] text-start font-[300]">9 Feb - 11 Mar</time>
+                </div>
+              </div>
+            </div>
+          </header>
+          <div class="w-full h-[1px] bg-[#F0F0F0] my-6"></div>
+          <section class="flex gap-2 flex-col h-auto items-start justify-start">
+            <dl class="text-[14px] flex flex-col">
+              <dt class="font-[mrgvlovani] font-[400] text-[#3F3F3F]"> ანაზღაურება </dt>
+              <dd class="mt-1 font-[500]"> <%= job.jobSalary ? '₾' + job.jobSalary : '-' %></dd>
+            </dl>
+            <dl class="text-[14px] flex flex-col">
+              <dt class="font-[mrgvlovani] font-[400] text-[#3F3F3F]"> ლოკაცია </dt>
+              <dd class="mt-1 font-[500]"><%= job.job_address %></dd>
+            </dl>
+            <dl class="text-[14px] flex flex-col">
+              <dt class="font-[mrgvlovani] font-[400] text-[#3F3F3F]"> განაკვეთი </dt>
+              <dd class="mt-1 font-[500]"><%= job.job_type === 'full-time' ? 'სრული' : 'ნახევარი' %></dd>
+            </dl>
+            <dl class="text-[14px] flex flex-col">
+              <dt class="font-[mrgvlovani] font-[400] text-[#3F3F3F]"> გამოცდილება </dt>
+              <dd class="mt-1 font-[500]"><%= job.job_experience ? job.job_experience + ' წელი' : '-' %></dd>
+            </dl>
+          </section>
+          <% if (!user) { %>
+          <p class="mt-4 text-[12px] block text-center text-red-400 pb-1 mx-auto">
+            რეზიუმეს გასაგზავნად გაიარეთ ავტორიზაცია
+          </p>
+          <% } %>
+          <% if (typeof userAlreadyApplied !== 'undefined' && userAlreadyApplied) { %>
+          <div class="bg-gray-200 w-[296px] h-[52px] text-gray-600 rounded-lg my-8 mb-1 text-[16px] hidden lg:flex items-center justify-center mt-8 cursor-not-allowed">
+            თქვენ უკვე გაგზავნეთ CV
+          </div>
+          <% } else { %>
+          <button id="openDialogBtn" class="bg-[#315EFF] w-[296px] h-[52px] text-white rounded-lg my-8 mb-1 text-[16px] hidden lg:block mt-8 <% if (!user) { %>opacity-50 cursor-not-allowed<% } else { %>cursor-pointer<% } %>" <% if (!user) { %>disabled<% } %>> გააგზავნე რეზიუმე </button>
+          <% } %>
+        </section>
+      </nav>
+      <section class="px-4">
+        <div class="w-full bg-white rounded-lg w-full p-8 font-[300] border border-[#E5E5E5] mt-5">
+          <div id="jobDescription" class="break-words" aria-live="polite">Loading...</div>
+        </div>
+
+
+      </section>
+    </article>
+
+    <!-- Related jobs slider (same category) -->
+    <% if (typeof relatedJobs !== 'undefined' && relatedJobs && relatedJobs.length > 0) { %>
+    <section class="w-full mx-auto px-4 mt-8 mb-8">
+      <div class="max-w-[1400px] mx-auto">
+        <div class="flex items-center justify-between mb-4 gap-3">
+          <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1">
+            მსგავსი ვაკანსიები
+          </h2>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <button class="related-jobs-prev w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base" aria-label="Prev">←</button>
+            <button class="related-jobs-next w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base" aria-label="Next">→</button>
+          </div>
+        </div>
+        <div class="swiper related-jobs-swiper">
+          <div class="swiper-wrapper">
+            <% relatedJobs.forEach(function(relJob) { %>
+            <div class="swiper-slide" style="height: auto;">
+              <%- include('partials/jobItemCompact.ejs', { job: relJob, slugify }) %>
+            </div>
+            <% }); %>
+          </div>
+        </div>
+      </div>
+    </section>
+    <% } %>
+
+    <footer class="fixed h-[168px] bg-white bottom-0 left-0 right-0 w-full p-4 flex lg:hidden flex-col items-between justify-between border border-[#E5E5E5] z-40">
+      <div class="flex gap-2 items-center">
+        <% if (job.company_logo) { %>
+        <div class="w-[50px] h-[50px] rounded-lg overflow-hidden">
+          <img src="<%= job.company_logo %>" alt="<%= job.companyName %> — ლოგო" referrerpolicy="no-referrer" class="w-full h-full object-contain">
+        </div>
+        <% } %>
+        <div class="flex flex-col gap-1">
+          <h2 class="text-[14px] text-[#3F3F3F] font-[300]"><%= job.companyName %></h2><time class="w-full text-[12px] text-start font-[300]">9 Feb - 11 Mar</time>
+        </div>
+      </div>
+      <% if (!user) { %>
+      <p class="mt-4 text-[12px] block text-center text-red-400 pb-1 mx-auto">
+        რეზიუმეს გასაგზავნად გაიარეთ ავტორიზაცია
+      </p>
+      <% } %>
+      <% if (typeof userAlreadyApplied !== 'undefined' && userAlreadyApplied) { %>
+      <div class="bg-gray-200 w-full min-h-[52px] text-gray-600 rounded-lg my-8 mt-0 mb-1 text-[16px] flex items-center justify-center cursor-not-allowed">
+        თქვენ უკვე გაგზავნეთ CV
+      </div>
+      <% } else { %>
+      <button id="openDialogBtn2" class="bg-[#315EFF] w-full min-h-[52px] text-white rounded-lg my-8 mt-0 mb-1 text-[16px] <% if (!user) { %>opacity-50 cursor-not-allowed<% } else { %>cursor-pointer<% } %>" <% if (!user) { %>disabled<% } %>> გააგზავნე რეზიუმე </button>
+      <% } %>
+    </footer>
+
+    <!-- Job upload dialog -->
+    <dialog id="uploadDialog" class="slide-dialog">
+      <!-- Custom backdrop for click-to-close -->
+      <div class="dialog-backdrop" id="dialogBackdrop"></div>
+
+      <!-- Dialog content panel -->
+      <div class="dialog-panel p-8">
+        <div>
+          <!-- Header with close button -->
+          <div class="w-full flex justify-between items-center">
+            <span id="dialogHeaderText" class="text-[16px] font-[300]">ატვირთე რეზიუმე</span>
+            <button id="closeDialogBtn" class="cursor-pointer">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1.40098 14L0.000976562 12.6L5.60098 7L0.000976562 1.4L1.40098 0L7.00098 5.6L12.601 0L14.001 1.4L8.40098 7L14.001 12.6L12.601 14L7.00098 8.4L1.40098 14Z" fill="#151515"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- File input (hidden) -->
+          <input type="file" id="fileInput" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display: none;">
+
+          <!-- File upload area (shown when no file selected) -->
+          <div id="uploadArea" class="cursor-pointer border-2 border-dotted border-blue-500 h-[76px] rounded-lg mt-10 flex items-center justify-center gap-2">
+            <svg width="29" height="28" viewBox="0 0 29 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <mask id="mask0_222_5368" maskUnits="userSpaceOnUse" x="0" y="0" width="29" height="28" style="mask-type: alpha;">
+                <rect x="0.5" width="28" height="28" fill="#D9D9D9"></rect>
+              </mask>
+              <g mask="url(#mask0_222_5368)">
+                <path d="M8.66941 23.3333V10.4708C8.66941 9.8291 8.90274 9.28466 9.36941 8.83743C9.83608 8.39021 10.3902 8.1666 11.0319 8.1666H23.8361C24.4777 8.1666 25.027 8.39507 25.484 8.85202C25.9409 9.30896 26.1694 9.85827 26.1694 10.4999V19.8333L20.3361 25.6666H11.0027C10.3611 25.6666 9.81177 25.4381 9.35483 24.9812C8.89788 24.5242 8.66941 23.9749 8.66941 23.3333ZM2.86524 7.2916C2.74858 6.64993 2.87496 6.07146 3.24441 5.55618C3.61385 5.04091 4.11941 4.72493 4.76108 4.60827L17.4194 2.36243C18.0611 2.24577 18.6395 2.37216 19.1548 2.7416C19.6701 3.11105 19.9861 3.6166 20.1027 4.25827L20.3944 5.83327H11.0027C9.71941 5.83327 8.6208 6.29021 7.70691 7.2041C6.79302 8.11799 6.33608 9.2166 6.33608 10.4999V21.6416C6.02496 21.4666 5.7576 21.2333 5.53399 20.9416C5.31038 20.6499 5.16941 20.3194 5.11108 19.9499L2.86524 7.2916ZM23.8361 18.6666H19.1694V23.3333L23.8361 18.6666Z" fill="#315EFF"></path>
+              </g>
+            </svg>
+            <span class="underline font-[300]">აირჩიე ფაილი</span>
+          </div>
+
+          <div id="uploadFormatText" class="text-[14px] font-[300] mt-2">
+            <span>ფორმატი:</span>
+            <span class="text-[#315EFF] font-[400] pl-2">.PDF .DOC .DOCX</span>
+          </div>
+
+          <!-- Selected file (shown when a file is chosen OR an existing CV is found) -->
+          <div id="selectedFileBox" class="hidden p-4 mt-6 min-h-[94px] rounded-lg border border-[#E5E5E5] flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 font-[300] min-w-0 flex-1">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="flex-shrink-0 text-[#315EFF]">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm0 2l5 5h-5V4zM8 13h8v2H8v-2zm0 4h8v2H8v-2z" fill="currentColor"/>
+              </svg>
+              <span id="selectedFileName" class="overflow-hidden text-ellipsis whitespace-nowrap">ჩემი CV</span>
+            </div>
+            <button type="button" id="clearFileBtn" class="flex-shrink-0 text-[12px] text-red-500 underline cursor-pointer">წაშლა</button>
+          </div>
+
+          <!-- When user has an existing CV, allow switching to upload a new one -->
+          <button type="button" id="uploadNewCvBtn" class="hidden mt-2 text-[12px] text-[#315EFF] underline cursor-pointer">
+            ატვირთე ახალი CV
+          </button>
+
+          <!-- Upload progress -->
+          <div id="uploadProgressBox" class="hidden mt-4">
+            <div class="flex justify-between text-[14px] font-[300] mb-1">
+              <span>იტვირთება...</span>
+              <span id="uploadProgressPercent">0%</span>
+            </div>
+            <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div id="uploadProgressBar" class="h-full bg-[#315EFF] rounded-full transition-all duration-200" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Submit button -->
+          <% if (!user) { %>
+          <p class="mt-4 text-[12px] block text-center text-red-400 pb-1 mx-auto">
+            რეზიუმეს გასაგზავნად გაიარეთ ავტორიზაცია
+          </p>
+          <% } %>
+          <button type="button" id="submitBtn" class="bg-[#315EFF] w-full max-w-[296px] h-[52px] text-white rounded-lg my-8 mb-1 text-[16px] mx-auto block opacity-50 cursor-not-allowed" disabled>
+            <span id="submitBtnText">გააგზავნე რეზიუმე</span>
+          </button>
+        </div>
+      </div>
+    </dialog>
+  </main>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const descEl = document.getElementById('jobDescription');
+      const raw = <%- JSON.stringify(job.jobDescription || '') %>;
+
+      const isHtml = function(str) {
+        if (!str) return false;
+        return /<[a-z][\s\S]*>/i.test(str);
+      };
+
+      const formattedDisplay = function(content) {
+        if (isHtml(content)) {
+          return content.replace(/style="[^"]*"/g, '');
+        }
+        return content;
+      };
+
+      if (isHtml(raw)) {
+        // render sanitized html (only stripping inline styles here)
+        descEl.classList.remove('whitespace-pre-wrap');
+        descEl.innerHTML = formattedDisplay(raw);
+      } else {
+        // plain text — preserve whitespace and line breaks
+        descEl.classList.add('whitespace-pre-wrap');
+        descEl.textContent = formattedDisplay(raw);
+      }
+    });
+  </script>
+  <script>
+    const dialog = document.getElementById('uploadDialog');
+    const openBtn = document.getElementById('openDialogBtn');
+    const openBtn2 = document.getElementById('openDialogBtn2');
+    const closeBtn = document.getElementById('closeDialogBtn');
+    const backdrop = document.getElementById('dialogBackdrop');
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const submitBtn = document.getElementById('submitBtn');
+    const submitBtnText = document.getElementById('submitBtnText');
+    const selectedFileBox = document.getElementById('selectedFileBox');
+    const selectedFileName = document.getElementById('selectedFileName');
+    const clearFileBtn = document.getElementById('clearFileBtn');
+    const uploadNewCvBtn = document.getElementById('uploadNewCvBtn');
+    const uploadFormatText = document.getElementById('uploadFormatText');
+    const dialogHeaderText = document.getElementById('dialogHeaderText');
+    const uploadProgressBox = document.getElementById('uploadProgressBox');
+    const uploadProgressPercent = document.getElementById('uploadProgressPercent');
+    const uploadProgressBar = document.getElementById('uploadProgressBar');
+
+    const jobId = <%- JSON.stringify(job.id) %>;
+    const userUid = <%- user ? JSON.stringify(user.uid) : 'null' %>;
+
+    // State: does user already have a CV saved, and are we using it instead of uploading a new one?
+    let hasExistingResume = false;
+    let useExistingResume = false;
+
+    // Open dialog
+    if (openBtn) openBtn.addEventListener('click', openDialog);
+    if (openBtn2) openBtn2.addEventListener('click', openDialog);
+
+    function openDialog() {
+      dialog.showModal();
+      document.body.classList.add('dialog-open');
+      backdrop.classList.add('active');
+
+      // When dialog opens, if user is logged in, try to load an already uploaded CV
+      if (userUid && !hasExistingResume) {
+        fetch('/resumes/' + userUid)
+          .then(function (r) {
+            if (r.status === 404) return null;
+            return r.json();
+          })
+          .then(function (data) {
+            if (!data) return;
+            hasExistingResume = true;
+            useExistingResume = true;
+            selectedFileName.textContent = data.file_name || 'ჩემი CV';
+            selectedFileBox.classList.remove('hidden');
+            uploadArea.classList.add('hidden');
+            uploadProgressBox.classList.add('hidden');
+            if (uploadFormatText) {
+              uploadFormatText.classList.add('hidden');
+            }
+            if (dialogHeaderText) {
+              dialogHeaderText.classList.add('hidden');
+            }
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            submitBtn.classList.add('cursor-pointer');
+            if (uploadNewCvBtn) {
+              uploadNewCvBtn.classList.remove('hidden');
+            }
+          })
+          .catch(function (err) {
+            console.log('Failed to load existing CV', err);
+          });
+      }
+    }
+
+    // Close dialog function
+    function closeDialog() {
+      backdrop.classList.remove('active');
+      dialog.close();
+      document.body.classList.remove('dialog-open');
+    }
+
+    if (closeBtn) closeBtn.addEventListener('click', closeDialog);
+    if (backdrop) backdrop.addEventListener('click', closeDialog);
+
+    dialog.querySelector('.dialog-panel').addEventListener('click', (e) => e.stopPropagation());
+
+    // Trigger file input
+    uploadArea.addEventListener('click', () => fileInput.click());
+
+    function clearFile() {
+      fileInput.value = '';
+      selectedFileName.textContent = 'ჩემი CV';
+      selectedFileBox.classList.add('hidden');
+      uploadArea.classList.remove('hidden');
+      uploadProgressBox.classList.add('hidden');
+      if (uploadFormatText) {
+        uploadFormatText.classList.remove('hidden');
+      }
+      if (dialogHeaderText) {
+        dialogHeaderText.classList.remove('hidden');
+      }
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      submitBtn.classList.remove('cursor-pointer');
+      submitBtnText.textContent = 'გააგზავნე რეზიუმე';
+    }
+
+    // File selection: only store locally; nothing is sent until user clicks "გააგზავნე რეზიუმე"
+    fileInput.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      selectedFileName.textContent = file.name;
+      selectedFileBox.classList.remove('hidden');
+      uploadArea.classList.add('hidden');
+      uploadProgressBox.classList.add('hidden');
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      submitBtn.classList.add('cursor-pointer');
+      // Once user picks a new file, we're no longer using the existing saved CV
+      useExistingResume = false;
+    });
+
+    if (clearFileBtn) clearFileBtn.addEventListener('click', clearFile);
+
+    // Allow switching from saved CV to uploading a new one
+    if (uploadNewCvBtn) {
+      uploadNewCvBtn.addEventListener('click', function () {
+        useExistingResume = false;
+        fileInput.value = '';
+        // Show upload area so user can pick a new file
+        uploadArea.classList.remove('hidden');
+        if (uploadFormatText) {
+          uploadFormatText.classList.remove('hidden');
+        }
+        if (dialogHeaderText) {
+          dialogHeaderText.classList.remove('hidden');
+        }
+        selectedFileBox.classList.add('hidden');
+        uploadNewCvBtn.classList.add('hidden');
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        submitBtn.classList.remove('cursor-pointer');
+        submitBtnText.textContent = 'გააგზავნე რეზიუმე';
+      });
+    }
+
+    // Upload file with progress (if needed), then send CV to job
+    submitBtn.addEventListener('click', function() {
+      if (!userUid) return;
+      const file = fileInput.files[0];
+
+      // Case 1: user already has a CV and didn't choose to upload a new one -> just send CV (no upload)
+      if (hasExistingResume && useExistingResume && !file) {
+        submitBtn.disabled = true;
+        submitBtnText.textContent = 'იგზავნება...';
+        uploadProgressBox.classList.add('hidden');
+
+        fetch('/send-cv', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ job_id: jobId, user_id: userUid })
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.error) throw new Error(data.error);
+            submitBtnText.textContent = 'გაიგზავნა';
+
+            // Immediately reflect \"already sent\" state in UI
+            var topBtn = document.getElementById('openDialogBtn');
+            if (topBtn) {
+              topBtn.textContent = 'თქვენ უკვე გაგზავნეთ CV';
+              topBtn.disabled = true;
+              topBtn.classList.remove('bg-[#315EFF]', 'cursor-pointer');
+              topBtn.classList.add('bg-gray-200', 'text-gray-600', 'cursor-not-allowed');
+            }
+            var bottomBtn = document.getElementById('openDialogBtn2');
+            if (bottomBtn) {
+              bottomBtn.textContent = 'თქვენ უკვე გაგზავნეთ CV';
+              bottomBtn.disabled = true;
+              bottomBtn.classList.remove('bg-[#315EFF]', 'cursor-pointer');
+              bottomBtn.classList.add('bg-gray-200', 'text-gray-600', 'cursor-not-allowed');
+            }
+
+            setTimeout(function () {
+              clearFile();
+              closeDialog();
+            }, 800);
+          })
+          .catch(function (err) {
+            submitBtn.disabled = false;
+            submitBtnText.textContent = 'გააგზავნე რეზიუმე';
+            console.log('შეცდომა: ' + (err.message || 'რეზიუმეს გაგზავნა ვერ მოხერხდა'));
+          });
+
+        return;
+      }
+
+      // Case 2: user selected a new file -> upload then send as before
+      if (!file) return;
+
+      submitBtn.disabled = true;
+      submitBtnText.textContent = 'იტვირთება...';
+      uploadProgressBox.classList.remove('hidden');
+      uploadProgressPercent.textContent = '0%';
+      uploadProgressBar.style.width = '0%';
+
+      const formData = new FormData();
+      formData.append('resume', file);
+      formData.append('user_uid', userUid);
+
+      const xhr = new XMLHttpRequest();
+
+      xhr.upload.addEventListener('progress', function(e) {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 100);
+          uploadProgressPercent.textContent = percent + '%';
+          uploadProgressBar.style.width = percent + '%';
+        }
+      });
+
+      xhr.addEventListener('load', function() {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          submitBtnText.textContent = 'იგზავნება...';
+          // CV uploaded; now send to this job
+          fetch('/send-cv', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ job_id: jobId, user_id: userUid })
+          })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              if (data.error) throw new Error(data.error);
+              submitBtnText.textContent = 'გაიგზავნა';
+              uploadProgressBox.classList.add('hidden');
+
+              // Immediately reflect \"already sent\" state in UI (no page refresh needed)
+              var topBtn = document.getElementById('openDialogBtn');
+              if (topBtn) {
+                topBtn.textContent = 'თქვენ უკვე გაგზავნეთ CV';
+                topBtn.disabled = true;
+                topBtn.classList.remove('bg-[#315EFF]', 'cursor-pointer');
+                topBtn.classList.add('bg-gray-200', 'text-gray-600', 'cursor-not-allowed');
+              }
+              var bottomBtn = document.getElementById('openDialogBtn2');
+              if (bottomBtn) {
+                bottomBtn.textContent = 'თქვენ უკვე გაგზავნეთ CV';
+                bottomBtn.disabled = true;
+                bottomBtn.classList.remove('bg-[#315EFF]', 'cursor-pointer');
+                bottomBtn.classList.add('bg-gray-200', 'text-gray-600', 'cursor-not-allowed');
+              }
+
+              setTimeout(function() {
+                clearFile();
+                closeDialog();
+              }, 800);
+            })
+            .catch(function(err) {
+              submitBtn.disabled = false;
+              submitBtnText.textContent = 'გააგზავნე რეზიუმე';
+              uploadProgressBox.classList.add('hidden');
+              console.log('შეცდომა: ' + (err.message || 'რეზიუმეს გაგზავნა ვერ მოხერხდა'));
+            });
+        } else {
+          var err = {};
+          try { err = JSON.parse(xhr.responseText); } catch (_) {}
+          submitBtn.disabled = false;
+          submitBtnText.textContent = 'გააგზავნე რეზიუმე';
+          uploadProgressBox.classList.add('hidden');
+          console.log('შეცდომა: ' + (err.error || 'ატვირთვა ვერ მოხერხდა'));
+        }
+      });
+
+      xhr.addEventListener('error', function() {
+        submitBtn.disabled = false;
+        submitBtnText.textContent = 'გააგზავნე რეზიუმე';
+        uploadProgressBox.classList.add('hidden');
+        console.log('შეცდომა: ქსელის შეცდომა');
+      });
+
+      xhr.open('POST', '/resumes/');
+      xhr.send(formData);
+    });
+  </script>
+
+  <!-- Related jobs Swiper: equal-height slides + init (same logic as category swiper) -->
+  <style>
+    .related-jobs-swiper .swiper-wrapper { display: flex; align-items: stretch; }
+    .related-jobs-swiper .swiper-slide { height: auto; display: flex; }
+    .related-jobs-swiper .swiper-slide > article { width: 100%; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var el = document.querySelector('.related-jobs-swiper');
+      if (!el || typeof Swiper === 'undefined') return;
+      new Swiper(el, {
+        slidesPerView: 1.1,
+        spaceBetween: 12,
+        centeredSlides: false,
+        loop: false,
+        autoHeight: false,
+        navigation: {
+          nextEl: '.related-jobs-next',
+          prevEl: '.related-jobs-prev',
+        },
+        breakpoints: {
+          640: { slidesPerView: 3.2, spaceBetween: 16 },
+          1024: { slidesPerView: 4.2, spaceBetween: 16 },
+        },
+      });
+    });
+  </script>
+</body>
+
+</html>

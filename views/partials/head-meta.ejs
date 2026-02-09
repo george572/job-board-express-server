@@ -1,0 +1,22 @@
+<% 
+  var siteName = 'Samushao.ge';
+  var title = (seo && seo.title) ? seo.title : (siteName + ' - ვაკანსიები');
+  var description = (seo && seo.description) ? seo.description : 'ვაკანსიები საქართველოში. იპოვე სამუშაო და გაგზავნე CV პირდაპირ კომპანიებში.';
+  var ogImage = (seo && seo.ogImage) ? seo.ogImage : 'https://res.cloudinary.com/dd7gz0aqv/image/upload/v1743605652/export_l1wpwr.png';
+  var canonical = (seo && seo.canonical) ? seo.canonical : '';
+%>
+<title><%= title %></title>
+<meta name="description" content="<%= description %>">
+<meta property="og:title" content="<%= title %>">
+<meta property="og:description" content="<%= description %>">
+<meta property="og:image" content="<%= ogImage %>">
+<meta property="og:type" content="website">
+<% if (canonical) { %>
+<meta property="og:url" content="<%= canonical %>">
+<link rel="canonical" href="<%= canonical %>">
+<% } %>
+<!-- Twitter Card (fallback to OG when not set) -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="<%= title %>">
+<meta name="twitter:description" content="<%= description %>">
+<meta name="twitter:image" content="<%= ogImage %>">

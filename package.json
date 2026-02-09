@@ -7,10 +7,11 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon server.js",
-    "start": "node server.js",
-    "build:css": "tailwindcss -i ./public/css/input.css -o ./public/css/style.css",
-    "watch:css": "tailwindcss -i ./public/css/input.css -o ./public/css/style.css --watch"
+    "start:server": "nodemon server.js",
+    "start:css": "npx tailwindcss -i ./public/css/input.css -o ./public/css/style.css --watch",
+    "start:browser": "browser-sync start --proxy localhost:4000 --files 'public/**/*' 'views/**/*' --port 4001 --no-open",
+    "dev": "concurrently \"npm:start:server\" \"npm:start:css\" \"npm:start:browser\"",
+    "build:css": "npx tailwindcss -i ./public/css/input.css -o ./public/css/style.css"
   },
   "dependencies": {
     "@tailwindcss/cli": "^4.1.18",
@@ -20,13 +21,21 @@
     "dotenv": "^16.4.7",
     "ejs": "^4.0.1",
     "express": "^4.21.2",
+    "express-session": "^1.19.0",
     "jsonwebtoken": "^9.0.2",
     "knex": "^3.1.0",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.10.0",
     "nodemon": "^3.1.9",
     "pg": "^8.14.0",
-    "sqlite3": "^5.1.7",
-    "tailwindcss": "^4.1.18"
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "autoprefixer": "^10.4.24",
+    "browser-sync": "^3.0.4",
+    "concurrently": "^9.2.1",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.0.0"
   }
 }

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <%- include('partials/head-meta', { seo }) %>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="font-markgeo text-secondary bg-[#F8F9FA]">
+<%- include('partials/header') %>
+<main class="w-full flex justify-center flex-col items-center px-4 pb-12 pt-4">
+  <h2 class="text-2xl">ფასები</h2>
+
+  <!-- რეგულარი -->
+  <div class="w-full max-w-[744px] min-h-[242px] rounded-lg border border-[#EBEBEB] mt-8 bg-white">
+    <div class="w-full h-[30px] rounded-t-lg bg-[#F0F0F0] flex items-center">
+      <span class="font-[mrgvlovani] text-black pl-8 text-[14px]">რეგულარი</span>
+    </div>
+    <div class="p-8">
+      <span class="text-[28px]">₾25.00</span>
+      <div class="w-full h-[1px] bg-[#F0F0F0] mt-6"></div>
+      <div class="flex items-center gap-2 mt-6 font-[300]">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" class="flex-shrink-0 text-green-600">
+          <path d="M16.667 5L7.5 14.167 3.333 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>ჩვეულებრივი პრიორიტეტი</span>
+      </div>
+      <div class="flex items-center gap-2 mt-4 font-[300]">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" class="flex-shrink-0 text-green-600">
+          <path d="M16.667 5L7.5 14.167 3.333 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>ერთი ვაკანსია ერთ დღეში</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- პრემიუმი -->
+  <div class="w-full max-w-[744px] min-h-[242px] rounded-lg border border-[#EBEBEB] mt-8 bg-white">
+    <div class="w-full h-[30px] rounded-t-lg bg-[#315EFF] flex items-center">
+      <span class="font-[mrgvlovani] text-white pl-8 text-[14px]">პრემიუმი</span>
+    </div>
+    <div class="p-8">
+      <span class="text-[28px]">₾70.00</span>
+      <div class="w-full h-[1px] bg-[#F0F0F0] mt-6"></div>
+      <div class="flex items-center gap-2 mt-6 font-[300]">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" class="flex-shrink-0 text-green-600">
+          <path d="M16.667 5L7.5 14.167 3.333 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>10 დღე მთავარ გვერდზე</span>
+      </div>
+      <div class="flex items-center gap-2 mt-4 font-[300]">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" class="flex-shrink-0 text-green-600">
+          <path d="M16.667 5L7.5 14.167 3.333 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>მაღალი ხილვადობა</span>
+      </div>
+      <div class="mt-4 italic text-[12px]">პრემიუმ განცხადების დასადებად მოგვწერეთ მეილზე <a href="mailto:info@samushao.ge" class="underline">info@samushao.ge</a></div>
+    </div>
+  </div>
+
+  <!-- პრემიუმ პლიუსი -->
+  <div class="w-full max-w-[744px] min-h-[242px] rounded-lg border border-[#EBEBEB] mt-8 bg-white">
+    <div class="w-full h-[30px] rounded-t-lg bg-[#FF5B0F] flex items-center">
+      <span class="font-[mrgvlovani] text-white pl-8 text-[14px]">პრემიუმ+</span>
+    </div>
+    <div class="p-8">
+      <span class="text-[28px]">₾100.00</span>
+      <div class="w-full h-[1px] bg-[#F0F0F0] mt-6"></div>
+      <div class="flex items-center gap-2 mt-6 font-[300]">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" class="flex-shrink-0 text-green-600">
+          <path d="M16.667 5L7.5 14.167 3.333 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>30 დღე მთავარ გვერდზე</span>
+      </div>
+      <div class="flex items-center gap-2 mt-4 font-[300]">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" class="flex-shrink-0 text-green-600">
+          <path d="M16.667 5L7.5 14.167 3.333 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>ყველაზე მაღალი ხილვადობა</span>
+      </div>
+      <div class="mt-4 italic text-[12px]">პრემიუმ განცხადების დასადებად მოგვწერეთ მეილზე <a href="mailto:info@samushao.ge" class="underline">info@samushao.ge</a></div>
+    </div>
+  </div>
+</main>
+</body>
+</html>

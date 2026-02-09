@@ -2,17 +2,25 @@ const express = require("express");
 const knex = require("knex");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
-require("dotenv").config();
+const path = require("path");
+
+// Load .env from project root (reliable when app is started from any cwd)
+require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
 const router = express.Router();
-const db = knex(require("../knexfile").development); // assuming knexfile.js is configured correctly
+const db = knex(require("../knexfile").development);
 router.use(cors());
 
+const MAIL_USER = "info@samushao.ge";
+const MAIL_PASS = (process.env.MAIL_PSW || "").trim();
+
 const transporter = nodemailer.createTransport({
-  service: "gmail", // or use SMTP settings
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
   auth: {
-    user: "info@samushao.ge",
-    pass: process.env.MAIL_PSW,
+    user: MAIL_USER,
+    pass: MAIL_PASS,
   },
 });
 
@@ -57,9 +65,13 @@ router.post("/", (req, res) => {
             return res.status(404).json({ error: "User not found" });
           }
 
-          // Send email
+          if (!MAIL_PASS) {
+            return reject(new Error("MAIL_PSW is not set in .env"));
+          }
+
+          // Send email (from must match auth user for Gmail)
           const mailOptions = {
-            from: "your-email@gmail.com",
+            from: MAIL_USER,
             to: job.company_email,
             subject: `New Application for ${job.jobName}`,
             html: `<p>ახალი CV გამოიგზავნა თქვენს ვაკანსიაზე: "${job.jobName}".</p>
@@ -72,18 +84,32 @@ router.post("/", (req, res) => {
         transporter.sendMail(mailOptions, (error, info) => {
           if (error) {
             console.error("Email sending error:", error);
-            // Wrap in a real Error so err.message is populated in the catch block
             return reject(
               new Error("Failed to send email: " + error.message)
             );
           }
 
-          resolve({
-            message: "CV sent successfully to company email",
-            job,
-            resume,
-            user,
-          });
+          // Record that this user applied to this job (so we can disable "Send CV" on job page)
+          db("job_applications")
+            .insert({ user_id: user_id, job_id: job.id })
+            .then(() =>
+              resolve({
+                message: "CV sent successfully to company email",
+                job,
+                resume,
+                user,
+              })
+            )
+            .catch((insertErr) => {
+              console.error("job_applications insert error:", insertErr);
+              // Still resolve success - email was sent
+              resolve({
+                message: "CV sent successfully to company email",
+                job,
+                resume,
+                user,
+              });
+            });
         });
       });
         });
