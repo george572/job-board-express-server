@@ -6,7 +6,9 @@
   "author": "",
   "type": "commonjs",
   "main": "index.js",
-  "scripts": {
+"scripts": {
+    "start": "node server.js",
+    "build": "npm run build:css",
     "start:server": "nodemon server.js",
     "start:css": "npx tailwindcss -i ./public/css/input.css -o ./public/css/style.css --watch",
     "start:browser": "browser-sync start --proxy localhost:4000 --files 'public/**/*' 'views/**/*' --port 4001 --no-open",
