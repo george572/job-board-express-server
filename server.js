@@ -411,7 +411,6 @@ app.get("/vakansia/:slug", async (req, res) => {
         title: job.jobName + " | Samushao.ge",
         description: "vakansia - " + jobDescription,
         ogImage:
-          job.company_logo ||
           "https://res.cloudinary.com/dd7gz0aqv/image/upload/v1743605652/export_l1wpwr.png",
         canonical: jobCanonical,
       },

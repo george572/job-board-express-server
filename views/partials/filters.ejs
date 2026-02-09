@@ -198,6 +198,7 @@
           setFiltersFromUrl();
           renderActiveFilters();
           updateTopSalarySliderVisibility();
+          window.scrollTo(0, 0);
         })
         .catch(function (err) {
           console.error('Filter fetch error:', err);
@@ -416,6 +417,7 @@
           setFiltersFromUrl();
           renderActiveFilters();
           updateTopSalarySliderVisibility();
+          window.scrollTo(0, 0);
         })
         .catch(function () { window.location.reload(); });
     });

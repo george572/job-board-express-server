@@ -70,11 +70,10 @@
 
   <!-- Jobs area (replaced without reload when filters change) -->
   <div id="jobs-area" data-current-page="<%= currentPage || 1 %>" data-total-pages="<%= totalPages || 1 %>">
-  <!-- Jobs Container -->
-  <div class="w-full relative mx-auto px-4 " id="jobs-container">
-    <h2 id="all-vacancies-heading" class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1 pb-4" style="<%= filtersActive ? 'display:none' : '' %>">
-      ყველა ვაკანსია
-    </h2>
+  <h2 id="all-vacancies-heading" class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1 pb-4 w-full mx-auto px-4" style="<%= filtersActive ? 'display:none' : '' %>">
+    ყველა ვაკანსია
+  </h2>
+  <div class="w-full relative mx-auto px-4" id="jobs-container">
     <% if (jobs && jobs.length > 0) { %>
     <% jobs.forEach(job => { %>
     <%- include('partials/jobItem.ejs', { job, slugify }) %>
