@@ -6,7 +6,7 @@
   "author": "",
   "type": "commonjs",
   "main": "index.js",
-"scripts": {
+  "scripts": {
     "start": "node server.js",
     "build": "npm run build:css",
     "start:server": "nodemon server.js",
@@ -19,6 +19,7 @@
     "@tailwindcss/cli": "^4.1.18",
     "aa-sqlite": "^1.0.29",
     "cloudinary": "^2.5.1",
+    "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "ejs": "^4.0.1",

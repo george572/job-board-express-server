@@ -10,6 +10,7 @@ const { slugify, extractIdFromSlug } = require("./utils/slugify"); // ← Add th
 const app = express();
 const port = process.env.PORT || 4000;
 const session = require("express-session");
+const pgSession = require("connect-pg-simple")(session);
 
 // Base URL for SEO (sitemap, robots, canonicals)
 const SITE_BASE_URL = process.env.SITE_BASE_URL || "https://samushao.ge";
@@ -19,21 +20,29 @@ if (process.env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
 }
 
+// Session options: Postgres store in production, memory in dev
+const sessionOptions = {
+  resave: false,
+  secret: process.env.SESSION_SECRET || "askmdaksdhjkqjqkqkkq1",
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: true,
+    maxAge: 365 * 24 * 60 * 60 * 1000,
+    sameSite: "lax",
+  },
+};
+
+if (process.env.NODE_ENV === "production") {
+  sessionOptions.store = new pgSession({
+    conString: process.env.DATABASE_URL,
+    tableName: "session",
+    createTableIfMissing: true,
+  });
+}
+
 // Session middleware MUST come before the route
-app.use(
-  session({
-    resave: false,
-    secret: process.env.SESSION_SECRET,
-    saveUninitialized: false,
-    cookie: {
-      // Only mark cookies secure in production; on localhost we use http
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-      maxAge: 365 * 24 * 60 * 60 * 1000,
-      sameSite: "lax",
-    },
-  }),
-);
+app.use(session(sessionOptions));
 
 // Then your res.locals middleware
 app.use((req, res, next) => {
