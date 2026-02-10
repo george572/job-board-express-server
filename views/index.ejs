@@ -138,7 +138,9 @@
             try {
               window.amplitude.track('Normal Job Clicked', {
                 job_id: this.getAttribute('data-job-id'),
-                title: this.getAttribute('data-job-title'),
+                job_category: this.getAttribute('data-job-category'),
+                job_title: this.getAttribute('data-job-title'),
+                salary_range: this.getAttribute('data-salary-range'),
                 company: this.getAttribute('data-job-company'),
                 location: this.getAttribute('data-job-location')
               });
@@ -257,6 +259,9 @@
             if (window.amplitude) {
               window.amplitude.track('Highest Paid Job Clicked', {
                 job_id: this.getAttribute('data-job-id'),
+                job_category: this.getAttribute('data-job-category'),
+                job_title: this.getAttribute('data-job-title'),
+                salary_range: this.getAttribute('data-salary-range'),
                 title: this.getAttribute('data-job-title'),
                 company: this.getAttribute('data-job-company'),
                 location: this.getAttribute('data-job-location')

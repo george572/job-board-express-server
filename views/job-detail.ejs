@@ -370,6 +370,9 @@
               if (window.amplitude) {
                 window.amplitude.track('Similar Job Clicked', {
                   job_id: this.getAttribute('data-job-id'),
+                  job_category: this.getAttribute('data-job-category'),
+                  job_title: this.getAttribute('data-job-title'),
+                  salary_range: this.getAttribute('data-salary-range'),
                   title: this.getAttribute('data-job-title'),
                   company: this.getAttribute('data-job-company'),
                   location: this.getAttribute('data-job-location'),
@@ -403,6 +406,11 @@
     const uploadProgressBar = document.getElementById('uploadProgressBar');
 
     const jobId = <%- JSON.stringify(job.id) %>;
+    const jobCategory = <%- JSON.stringify(job.category_id || null) %>;
+    const jobTitle = <%- JSON.stringify(job.jobName || '') %>;
+    const jobSalaryRange = <%- JSON.stringify(job.jobSalary || '') %>;
+    const jobCompany = <%- JSON.stringify(job.companyName || '') %>;
+    const jobLocation = <%- JSON.stringify(job.job_city || '') %>;
     const userUid = <%- user ? JSON.stringify(user.uid) : 'null' %>;
 
     // State: does user already have a CV saved, and are we using it instead of uploading a new one?
@@ -423,6 +431,11 @@
         if (window.amplitude) {
           window.amplitude.track('Job Apply Clicked', {
             job_id: jobId,
+            job_category: jobCategory,
+            job_title: jobTitle,
+            salary_range: jobSalaryRange,
+            company: jobCompany,
+            location: jobLocation,
             method: 'cv_dialog'
           });
         }
@@ -505,6 +518,11 @@
         if (window.amplitude) {
           window.amplitude.track('CV Uploaded', {
             job_id: jobId,
+            job_category: jobCategory,
+            job_title: jobTitle,
+            salary_range: jobSalaryRange,
+            company: jobCompany,
+            location: jobLocation,
             file_name: file.name,
             file_type: file.type,
             file_size_bytes: file.size
@@ -572,6 +590,11 @@
               if (window.amplitude) {
                 window.amplitude.track('CV Sent', {
                   job_id: jobId,
+                  job_category: jobCategory,
+                  job_title: jobTitle,
+                  salary_range: jobSalaryRange,
+                  company: jobCompany,
+                  location: jobLocation,
                   success: true,
                   method: 'existing_resume'
                 });
@@ -651,6 +674,11 @@
                 if (window.amplitude) {
                   window.amplitude.track('CV Sent', {
                     job_id: jobId,
+                    job_category: jobCategory,
+                    job_title: jobTitle,
+                    salary_range: jobSalaryRange,
+                    company: jobCompany,
+                    location: jobLocation,
                     success: true,
                     method: 'new_upload'
                   });

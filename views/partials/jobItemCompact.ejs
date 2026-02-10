@@ -6,6 +6,8 @@
     data-job-title="<%- job.jobName.replace(/\"/g, '&quot;') %>"
     data-job-company="<%- job.companyName.replace(/\"/g, '&quot;') %>"
     data-job-location="<%- (job.job_city || '').replace(/\"/g, '&quot;') %>"
+    data-job-category="<%- (job.category_id || '').toString().replace(/\"/g, '&quot;') %>"
+    data-salary-range="<%- (job.jobSalary || '').replace(/\"/g, '&quot;') %>"
   >
     <header class="w-full text-sm flex justify-between">
       <div class="flex gap-2 items-center">
