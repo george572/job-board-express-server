@@ -226,16 +226,6 @@
       jobCards.forEach(card => {
         card.addEventListener('click', function () {
           sessionStorage.setItem('topSalarySliderIndex', swiper.activeIndex.toString());
-          try {
-            if (window.amplitude) {
-              window.amplitude.track('Highest Paid Job Clicked', {
-                job_id: this.getAttribute('data-job-id'),
-                title: this.getAttribute('data-job-title'),
-                company: this.getAttribute('data-job-company'),
-                location: this.getAttribute('data-job-location')
-              });
-            }
-          } catch (e) {}
         });
       });
     });
