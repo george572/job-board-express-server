@@ -126,6 +126,28 @@
     const container = document.getElementById('jobs-container');
     let isLoading = false;
 
+    function bindNormalJobClicks(root) {
+      try {
+        if (!window.amplitude) return;
+        const scope = root || document;
+        const links = scope.querySelectorAll('#jobs-container a[data-job-id]');
+        links.forEach(function (link) {
+          if (link.__normalJobBound) return;
+          link.__normalJobBound = true;
+          link.addEventListener('click', function () {
+            try {
+              window.amplitude.track('Normal Job Clicked', {
+                job_id: this.getAttribute('data-job-id'),
+                title: this.getAttribute('data-job-title'),
+                company: this.getAttribute('data-job-company'),
+                location: this.getAttribute('data-job-location')
+              });
+            } catch (e) {}
+          });
+        });
+      } catch (e) {}
+    }
+
     async function loadMoreJobs() {
       var jobsArea = document.getElementById('jobs-area');
       var currentPage = parseInt(jobsArea.dataset.currentPage || '1', 10);
@@ -149,9 +171,11 @@
 
         var parser = new DOMParser();
         var doc = parser.parseFromString(html, 'text/html');
-        var newJobs = doc.getElementById('jobs-container').innerHTML;
+        var newJobsHtml = doc.getElementById('jobs-container').innerHTML;
 
-        document.getElementById('jobs-container').insertAdjacentHTML('beforeend', newJobs);
+        document.getElementById('jobs-container').insertAdjacentHTML('beforeend', newJobsHtml);
+        // Bind tracking to newly added normal job cards
+        bindNormalJobClicks(container);
 
         // Hide loading indicator
         document.getElementById('loading-indicator').style.display = 'none';
@@ -172,6 +196,9 @@
         loadMoreJobs();
       }
     });
+
+    // Initial bind for jobs rendered on first page load
+    bindNormalJobClicks(container);
 
   </script>
 
@@ -226,6 +253,16 @@
       jobCards.forEach(card => {
         card.addEventListener('click', function () {
           sessionStorage.setItem('topSalarySliderIndex', swiper.activeIndex.toString());
+          try {
+            if (window.amplitude) {
+              window.amplitude.track('Highest Paid Job Clicked', {
+                job_id: this.getAttribute('data-job-id'),
+                title: this.getAttribute('data-job-title'),
+                company: this.getAttribute('data-job-company'),
+                location: this.getAttribute('data-job-location')
+              });
+            }
+          } catch (e) {}
         });
       });
     });
