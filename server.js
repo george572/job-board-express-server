@@ -184,14 +184,11 @@ app.get("/", async (req, res) => {
     const offset = (Number(page) - 1) * Number(limit);
 
     // Top salary jobs slider (independent from filters)
-    // jobSalary can be "3500", "3500-4500", "4500+" etc. We sort by the first number.
-    const topSalaryOrderExpr =
-      "CAST(NULLIF(REGEXP_REPLACE(COALESCE(??::text, ''), '[^0-9].*', ''), '') AS INTEGER)";
     const topSalaryJobs = await db("jobs")
       .select("*")
       .where("job_status", "approved")
-      .whereNotNull("jobSalary")
-      .orderByRaw(`${topSalaryOrderExpr} DESC NULLS LAST`, ["jobSalary"])
+      .whereNotNull("jobSalary_min")
+      .orderBy("jobSalary_min", "desc")
       .limit(20);
 
     let query = db("jobs").select("*").where("job_status", "approved");
@@ -219,11 +216,9 @@ app.get("/", async (req, res) => {
     if (min_salary) {
       const min = parseInt(min_salary, 10);
       if (!isNaN(min)) {
-        // jobSalary can be "3500", "3500-4500", "4500+" etc. Use first number as min.
-        const salaryCondition =
-          "CAST(NULLIF(REGEXP_REPLACE(COALESCE(??::text, ''), '[^0-9].*', ''), '') AS INTEGER) >= ?";
-        query.whereRaw(salaryCondition, ["jobSalary", min]);
-        countQuery.whereRaw(salaryCondition, ["jobSalary", min]);
+        // Use precomputed numeric minimum salary for filtering
+        query.where("jobSalary_min", ">=", min);
+        countQuery.where("jobSalary_min", ">=", min);
       }
     }
     if (job_type) {
