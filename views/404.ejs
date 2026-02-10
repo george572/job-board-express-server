@@ -23,6 +23,31 @@
     })();
   </script>
   <!-- End Matomo Code -->
+
+  <!-- Amplitude -->
+  <script src="https://cdn.amplitude.com/script/80195a7a80425609b3760c948db9fec2.js"></script>
+  <script>
+    window.amplitude.add(window.sessionReplay.plugin({sampleRate: 1}));
+    window.amplitude.init('80195a7a80425609b3760c948db9fec2', {
+      fetchRemoteConfig: true,
+      autocapture: {
+        attribution: true,
+        fileDownloads: true,
+        formInteractions: true,
+        pageViews: true,
+        sessions: true,
+        elementInteractions: true,
+        networkTracking: true,
+        webVitals: true,
+        frustrationInteractions: {
+          errorClicks: true,
+          deadClicks: true,
+          rageClicks: true
+        }
+      }
+    });
+  </script>
+  <!-- End Amplitude -->
 </head>
 <body class="font-markgeo text-secondary bg-[#F8F9FA] min-h-screen flex flex-col">
   <%- include('partials/header') %>

@@ -190,7 +190,7 @@
       </nav>
       <section class="px-4">
         <div class="w-full bg-white rounded-lg w-full p-8 font-[300] border border-[#E5E5E5] mt-5">
-          <div id="jobDescription" class="break-words" aria-live="polite">Loading...</div>
+          <div id="jobDescription" class="break-words desc-text" aria-live="polite">იტვირთება...</div>
         </div>
 
 
@@ -340,6 +340,7 @@
 
       const formattedDisplay = function(content) {
         if (isHtml(content)) {
+          // Only strip inline styles, keep all <br> tags exactly as they are
           return content.replace(/style="[^"]*"/g, '');
         }
         return content;
