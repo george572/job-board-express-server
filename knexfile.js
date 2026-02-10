@@ -4,9 +4,9 @@ module.exports = {
   development: {
     client: "pg",
     connection: {
-      host: "ep-lingering-mountain-aimgqw30-pooler.c-4.us-east-1.aws.neon.tech",
+      host: "ep-frosty-mode-aglu6csx-pooler.c-2.eu-central-1.aws.neon.tech",
       user: "neondb_owner",
-      password: "npg_PVh3t2qkNvoU",
+      password: "npg_dtCoyp2jBh7H",
       database: "neondb",
       ssl: { rejectUnauthorized: false }  // Now properly included
     }
