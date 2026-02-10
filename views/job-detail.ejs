@@ -138,6 +138,31 @@
         <div class="flex items-center gap-2 mb-6"><a href="#!" onclick="history.back(); return false;" class="flex items-center gap-2 cursor-pointer"><svg width="5" height="8" viewBox="0 0 5 8" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M3.86089 7.1124L1.14214 4.39365C1.07964 4.33115 1.03589 4.26865 1.01089 4.20615C0.985889 4.14365 0.973389 4.0749 0.973389 3.9999C0.973389 3.9249 0.985889 3.85615 1.01089 3.79365C1.03589 3.73115 1.07964 3.66865 1.14214 3.60615L3.86089 0.887402C3.89839 0.849902 3.93901 0.821777 3.98276 0.803027C4.02651 0.784277 4.07339 0.774902 4.12339 0.774902C4.22339 0.774902 4.31089 0.809277 4.38589 0.878027C4.46089 0.946777 4.49839 1.0374 4.49839 1.1499V6.8499C4.49839 6.9624 4.46089 7.05303 4.38589 7.12178C4.31089 7.19053 4.22339 7.2249 4.12339 7.2249C4.09839 7.2249 4.01089 7.1874 3.86089 7.1124Z" fill="#151515"></path>
             </svg><span class="text-[14px]">ყველა ვაკანსია</span></a></div>
+                <!-- Related jobs slider (same category) -->
+    <% if (typeof relatedJobs !== 'undefined' && relatedJobs && relatedJobs.length > 0) { %>
+      <section class="w-full mx-auto px-4 mt-8 mb-8">
+        <div class="max-w-[1400px] mx-auto">
+          <div class="flex items-center justify-between mb-4 gap-3">
+            <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1">
+              მსგავსი ვაკანსიები
+            </h2>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <button class="related-jobs-prev w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base" aria-label="Prev">←</button>
+              <button class="related-jobs-next w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base" aria-label="Next">→</button>
+            </div>
+          </div>
+          <div class="swiper related-jobs-swiper">
+            <div class="swiper-wrapper">
+              <% relatedJobs.forEach(function(relJob) { %>
+              <div class="swiper-slide" style="height: auto;">
+                <%- include('partials/jobItemCompact.ejs', { job: relJob, slugify }) %>
+              </div>
+              <% }); %>
+            </div>
+          </div>
+        </div>
+      </section>
+      <% } %>
         <section class="p-4 bg-white rounded-lg border border-[#EBEBEB] self-start w-full lg:min-w-[360px] p-8 relative">
           <header>
             <h1 class="mb-0 lg:mb-6"><span class="font-[400] text-[16px] text-[#151515]"><%= job.jobName %></span></h1>
@@ -196,32 +221,6 @@
 
       </section>
     </article>
-
-    <!-- Related jobs slider (same category) -->
-    <% if (typeof relatedJobs !== 'undefined' && relatedJobs && relatedJobs.length > 0) { %>
-    <section class="w-full mx-auto px-4 mt-8 mb-8">
-      <div class="max-w-[1400px] mx-auto">
-        <div class="flex items-center justify-between mb-4 gap-3">
-          <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1">
-            მსგავსი ვაკანსიები
-          </h2>
-          <div class="flex items-center gap-2 flex-shrink-0">
-            <button class="related-jobs-prev w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base" aria-label="Prev">←</button>
-            <button class="related-jobs-next w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base" aria-label="Next">→</button>
-          </div>
-        </div>
-        <div class="swiper related-jobs-swiper">
-          <div class="swiper-wrapper">
-            <% relatedJobs.forEach(function(relJob) { %>
-            <div class="swiper-slide" style="height: auto;">
-              <%- include('partials/jobItemCompact.ejs', { job: relJob, slugify }) %>
-            </div>
-            <% }); %>
-          </div>
-        </div>
-      </div>
-    </section>
-    <% } %>
 
     <footer class="fixed h-[168px] bg-white bottom-0 left-0 right-0 w-full p-4 flex lg:hidden flex-col items-between justify-between border border-[#E5E5E5] z-40">
       <div class="flex gap-2 items-center">
