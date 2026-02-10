@@ -12,19 +12,19 @@ const port = process.env.PORT || 4000;
 const session = require("express-session");
 
 // Base URL for SEO (sitemap, robots, canonicals)
-const SITE_BASE_URL =
-  process.env.SITE_BASE_URL || "https://samushao.ge";
+const SITE_BASE_URL = process.env.SITE_BASE_URL || "https://samushao.ge";
 
 // Session middleware MUST come before the route
 app.use(
   session({
     resave: false,
-    secret: "askmdaksdhjkqjqkqkkq1", // Change this to a random string
+    secret: process.env.SESSION_SECRET || "askmdaksdhjkqjqkqkkq1", // Use environment variable
     saveUninitialized: false,
     cookie: {
-      secure: false, // Set to true only if using HTTPS
+      secure: true, // Your site uses HTTPS
       httpOnly: true,
-      maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year (essentially "never" expires)
+      maxAge: 365 * 24 * 60 * 60 * 1000,
+      sameSite: "lax", // Prevents CSRF attacks
     },
   }),
 );
@@ -35,13 +35,16 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(cors()); // Allow all origins
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 
 app.use(
   cors({
-    origin: ["http://localhost:4000", "http://localhost:4001"],
+    origin: [
+      "http://localhost:4000",
+      "http://localhost:4001",
+      "https://samushao.ge",
+    ],
     credentials: true,
   }),
 );
@@ -64,7 +67,7 @@ Allow: /
 Disallow: /my-applications
 
 Sitemap: ${SITE_BASE_URL}/sitemap.xml
-`
+`,
   );
 });
 
@@ -125,9 +128,11 @@ app.get("/sitemap.xml", async (req, res) => {
           (u) =>
             `  <url>\n    <loc>${escapeXml(u.loc)}</loc>\n` +
             (u.lastmod ? `    <lastmod>${u.lastmod}</lastmod>\n` : "") +
-            (u.changefreq ? `    <changefreq>${u.changefreq}</changefreq>\n` : "") +
+            (u.changefreq
+              ? `    <changefreq>${u.changefreq}</changefreq>\n`
+              : "") +
             (u.priority ? `    <priority>${u.priority}</priority>\n` : "") +
-            "  </url>"
+            "  </url>",
         )
         .join("\n") +
       "\n</urlset>";
@@ -225,7 +230,10 @@ app.get("/", async (req, res) => {
 
     // Search: job name, company name, or job description (case-insensitive)
     if (searchQuery && typeof searchQuery === "string" && searchQuery.trim()) {
-      const term = "%" + searchQuery.trim().replace(/%/g, "\\%").replace(/_/g, "\\_") + "%";
+      const term =
+        "%" +
+        searchQuery.trim().replace(/%/g, "\\%").replace(/_/g, "\\_") +
+        "%";
       const searchCondition = function () {
         this.where("jobName", "ilike", term)
           .orWhere("companyName", "ilike", term)
@@ -255,8 +263,7 @@ app.get("/", async (req, res) => {
       .offset(offset);
 
     const baseUrl = "https://samushao.ge";
-    const canonical =
-      baseUrl + (Number(page) === 1 ? "/" : "/?page=" + page);
+    const canonical = baseUrl + (Number(page) === 1 ? "/" : "/?page=" + page);
     const filterParamKeys = [
       "category",
       "company",
@@ -311,7 +318,8 @@ app.get("/pricing", (req, res) => {
   res.render("pricing", {
     seo: {
       title: "ფასები | Samushao.ge",
-      description: "Samushao.ge ფასები და პაკეტები ვაკანსიების გამოქვეყნებისთვის.",
+      description:
+        "Samushao.ge ფასები და პაკეტები ვაკანსიების გამოქვეყნებისთვის.",
       canonical: "https://samushao.ge/pricing",
     },
   });
@@ -398,10 +406,7 @@ app.get("/vakansia/:slug", async (req, res) => {
         ? job.job_description.substring(0, 155)
         : job.jobName + " at " + job.companyName;
     const jobCanonical =
-      "https://samushao.ge/vakansia/" +
-      slugify(job.jobName) +
-      "-" +
-      job.id;
+      "https://samushao.ge/vakansia/" + slugify(job.jobName) + "-" + job.id;
     res.render("job-detail", {
       job,
       relatedJobs,
