@@ -46,7 +46,7 @@ exports.up = async function (knex) {
     CREATE OR REPLACE FUNCTION update_salary_min()
     RETURNS TRIGGER AS $$
     BEGIN
-      NEW.jobSalary_min := extract_min_salary(NEW.jobSalary);
+      NEW."jobSalary_min" := extract_min_salary(NEW."jobSalary");
       RETURN NEW;
     END;
     $$ LANGUAGE plpgsql;

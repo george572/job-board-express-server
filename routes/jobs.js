@@ -1,12 +1,15 @@
 const cors = require("cors");
 const express = require("express");
-const knex = require("knex"); // Assuming knex.js is the config file
+const knex = require("knex");
 const router = express.Router();
 router.use(cors()); // Ensure CORS is applied to this router
 const multer = require("multer");
 const path = require("path");
 
-const db = knex(require("../knexfile").development); // Assuming you're using 'development' from knexfile.js
+// Use the same environment-based Knex config as the main app
+const knexConfig = require("../knexfile");
+const environment = process.env.NODE_ENV || "development";
+const db = knex(knexConfig[environment]);
 
 router.get("/", async (req, res) => {
   try {
