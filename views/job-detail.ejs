@@ -189,7 +189,7 @@
         </section>
       </nav>
       <section class="px-4">
-        <div class="w-full bg-white rounded-lg w-full p-8 font-[300] border border-[#E5E5E5] mt-5">
+        <div class="w-full bg-white rounded-lg p-8 font-[300] border border-[#E5E5E5] mt-5">
           <div id="jobDescription" class="break-words desc-text" aria-live="polite">იტვირთება...</div>
         </div>
 
@@ -355,6 +355,31 @@
         descEl.classList.add('whitespace-pre-wrap');
         descEl.textContent = formattedDisplay(raw);
       }
+    });
+  </script>
+  <script>
+    // Similar job clicks (inside job detail)
+    document.addEventListener('DOMContentLoaded', function () {
+      try {
+        var relatedSwiper = document.querySelector('.related-jobs-swiper');
+        if (!relatedSwiper) return;
+        var links = relatedSwiper.querySelectorAll('a[data-job-id]');
+        links.forEach(function (link) {
+          link.addEventListener('click', function () {
+            try {
+              if (window.amplitude) {
+                window.amplitude.track('Similar Job Clicked', {
+                  job_id: this.getAttribute('data-job-id'),
+                  title: this.getAttribute('data-job-title'),
+                  company: this.getAttribute('data-job-company'),
+                  location: this.getAttribute('data-job-location'),
+                  referrer_job_id: '<%= job.id %>'
+                });
+              }
+            } catch (e) {}
+          });
+        });
+      } catch (e) {}
     });
   </script>
   <script>

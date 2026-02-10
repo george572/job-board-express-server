@@ -1,5 +1,12 @@
 <article class="h-full">
-  <a href="/vakansia/<%= slugify(job.jobName) %>-<%= job.id %>" class="block h-full rounded-lg cursor-pointer p-4 text-sm border border-[#EBEBEB] text-secondary bg-white hover:shadow-sm transition-shadow flex flex-col">
+  <a 
+    href="/vakansia/<%= slugify(job.jobName) %>-<%= job.id %>" 
+    class="block h-full rounded-lg cursor-pointer p-4 text-sm border border-[#EBEBEB] text-secondary bg-white hover:shadow-sm transition-shadow flex flex-col"
+    data-job-id="<%= job.id %>"
+    data-job-title="<%- job.jobName.replace(/\"/g, '&quot;') %>"
+    data-job-company="<%- job.companyName.replace(/\"/g, '&quot;') %>"
+    data-job-location="<%- (job.job_city || '').replace(/\"/g, '&quot;') %>"
+  >
     <header class="w-full text-sm flex justify-between">
       <div class="flex gap-2 items-center">
         <% if (job.company_logo) { %>

@@ -1,6 +1,15 @@
 <article>
   <!-- badges -->
-  <a href="/vakansia/<%= slugify(job.jobName) %>-<%= job.id %>" class="mx-auto my-4 mt-0 rounded-lg cursor-pointer p-6 sm:pb-6 text-sm flex flex-col sm:flex-row justify-center items-start md:items-center gap-8 border border-[#EBEBEB] text-secondary relative bg-white">
+  <a 
+    href="/vakansia/<%= slugify(job.jobName) %>-<%= job.id %>" 
+    class="mx-auto my-4 mt-0 rounded-lg cursor-pointer p-6 sm:pb-6 text-sm flex flex-col sm:flex-row justify-center items-start md:items-center gap-8 border border-[#EBEBEB] text-secondary relative bg-white"
+    onclick="try { if (window.amplitude) { window.amplitude.track('Normal Job Clicked', {
+      job_id: '<%= job.id %>',
+      title: '<%- job.jobName.replace(/'/g, \"\\'\") %>',
+      company: '<%- job.companyName.replace(/'/g, \"\\'\") %>',
+      location: '<%- (job.job_city || '').replace(/'/g, \"\\'\") %>'
+    }); } } catch (e) {}"
+  >
     <header class="w-full md:w-1/3 text-sm flex justify-between">
       <div class="flex gap-2 items-center">
         <% if (job.company_logo) { %>
