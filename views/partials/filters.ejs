@@ -157,6 +157,13 @@
       if (heading) heading.style.display = hide ? 'none' : '';
     }
 
+    // Show/hide loading indicator inside jobs area
+    function setJobsLoading(isLoading) {
+      var loadingEl = document.getElementById('loading-indicator');
+      if (!loadingEl) return;
+      loadingEl.style.display = isLoading ? 'block' : 'none';
+    }
+
     // Build URL string from filters (no page jump – used for fetch + pushState)
     function buildUrlFromFilters(filters) {
       const params = new URLSearchParams();
@@ -182,6 +189,8 @@
     function updateUrl(filters) {
       const newUrl = buildUrlFromFilters(filters);
 
+      setJobsLoading(true);
+
       fetch(newUrl, { headers: { 'Accept': 'text/html' } })
         .then(function (res) { return res.text(); })
         .then(function (html) {
@@ -199,9 +208,11 @@
           renderActiveFilters();
           updateTopSalarySliderVisibility();
           window.scrollTo(0, 0);
+          setJobsLoading(false);
         })
         .catch(function (err) {
           console.error('Filter fetch error:', err);
+          setJobsLoading(false);
           window.location.href = newUrl;
         });
     }

@@ -3,8 +3,9 @@ const cors = require("cors");
 const cloudinary = require("cloudinary").v2;
 const path = require("path");
 const knex = require("knex");
-const knexfile = require("./knexfile"); // <-- just the file
-const db = knex(knexfile.development);
+const knexfile = require("./knexfile");
+const environment = process.env.NODE_ENV || "development";
+const db = knex(knexfile[environment]);
 const { slugify, extractIdFromSlug } = require("./utils/slugify"); // ← Add this
 
 const app = express();
@@ -162,11 +163,6 @@ app.get("/sitemap.xml", async (req, res) => {
 
 // Home route
 app.get("/", async (req, res) => {
-  console.log("GET / called:", {
-    query: req.query,
-    page: req.query.page,
-    headers: req.headers.referer,
-  });
   try {
     const {
       category,
@@ -181,15 +177,34 @@ app.get("/", async (req, res) => {
       q: searchQuery,
     } = req.query;
 
+    const filterParamKeys = [
+      "category",
+      "company",
+      "job_experience",
+      "job_type",
+      "hasSalary",
+      "job_premium_status",
+      "min_salary",
+      "q",
+    ];
+    const filtersActive = filterParamKeys.some((key) => {
+      const v = req.query[key];
+      if (v === undefined || v === "") return false;
+      return Array.isArray(v) ? v.length > 0 : true;
+    });
+
     const offset = (Number(page) - 1) * Number(limit);
 
-    // Top salary jobs slider (independent from filters)
-    const topSalaryJobs = await db("jobs")
-      .select("*")
-      .where("job_status", "approved")
-      .whereNotNull("jobSalary_min")
-      .orderBy("jobSalary_min", "desc")
-      .limit(20);
+    // Top salary jobs slider – skip when any filters are active
+    let topSalaryJobs = [];
+    if (!filtersActive) {
+      topSalaryJobs = await db("jobs")
+        .select("*")
+        .where("job_status", "approved")
+        .whereNotNull("jobSalary_min")
+        .orderBy("jobSalary_min", "desc")
+        .limit(20);
+    }
 
     let query = db("jobs").select("*").where("job_status", "approved");
     let countQuery = db("jobs")
@@ -274,21 +289,6 @@ app.get("/", async (req, res) => {
 
     const baseUrl = "https://samushao.ge";
     const canonical = baseUrl + (Number(page) === 1 ? "/" : "/?page=" + page);
-    const filterParamKeys = [
-      "category",
-      "company",
-      "job_experience",
-      "job_type",
-      "hasSalary",
-      "job_premium_status",
-      "min_salary",
-      "q",
-    ];
-    const filtersActive = filterParamKeys.some((key) => {
-      const v = req.query[key];
-      if (v === undefined || v === "") return false;
-      return Array.isArray(v) ? v.length > 0 : true;
-    });
     res.render("index", {
       jobs,
       topSalaryJobs,
