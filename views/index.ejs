@@ -123,6 +123,30 @@
   <% } %>
   </div>
   <script>
+    // Category ID to name mapping
+    const categoryNames = {
+      '1': 'საოფისე',
+      '2': 'მომხმარებელთან ურთიერთობები',
+      '3': 'გაყიდვები',
+      '4': 'საბანკო-საფინანსო',
+      '5': 'საწყობი და წარმოება',
+      '6': 'საცალო ვაჭრობა',
+      '7': 'მზარეული',
+      '8': 'აზარტული',
+      '9': 'მენეჯმენტი',
+      '10': 'ფარმაცია',
+      '11': 'მიმტანი',
+      '12': 'ინჟინერია',
+      '13': 'ლოჯისტიკა',
+      '14': 'სამედიცინო',
+      '15': 'უსაფრთხოება',
+      '16': 'დისტრიბუცია',
+      '17': 'ინფორმაციული ტექნოლოგიები',
+      '18': 'დიასახლისი',
+      '19': 'სხვა',
+      '20': 'ბუღალტერია'
+    };
+
     const container = document.getElementById('jobs-container');
     let isLoading = false;
 
@@ -136,9 +160,10 @@
           link.__normalJobBound = true;
           link.addEventListener('click', function () {
             try {
+              const categoryId = this.getAttribute('data-job-category');
               window.amplitude.track('Normal Job Clicked', {
                 job_id: this.getAttribute('data-job-id'),
-                job_category: this.getAttribute('data-job-category'),
+                job_category: categoryNames[categoryId] || categoryId,
                 job_title: this.getAttribute('data-job-title'),
                 salary_range: this.getAttribute('data-salary-range'),
                 company: this.getAttribute('data-job-company'),
@@ -257,9 +282,10 @@
           sessionStorage.setItem('topSalarySliderIndex', swiper.activeIndex.toString());
           try {
             if (window.amplitude) {
+              const categoryId = this.getAttribute('data-job-category');
               window.amplitude.track('Highest Paid Job Clicked', {
                 job_id: this.getAttribute('data-job-id'),
-                job_category: this.getAttribute('data-job-category'),
+                job_category: categoryNames[categoryId] || categoryId,
                 job_title: this.getAttribute('data-job-title'),
                 salary_range: this.getAttribute('data-salary-range'),
                 title: this.getAttribute('data-job-title'),

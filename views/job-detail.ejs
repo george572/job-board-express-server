@@ -358,6 +358,30 @@
     });
   </script>
   <script>
+    // Category ID to name mapping
+    const categoryNames = {
+      '1': 'საოფისე',
+      '2': 'მომხმარებელთან ურთიერთობები',
+      '3': 'გაყიდვები',
+      '4': 'საბანკო-საფინანსო',
+      '5': 'საწყობი და წარმოება',
+      '6': 'საცალო ვაჭრობა',
+      '7': 'მზარეული',
+      '8': 'აზარტული',
+      '9': 'მენეჯმენტი',
+      '10': 'ფარმაცია',
+      '11': 'მიმტანი',
+      '12': 'ინჟინერია',
+      '13': 'ლოჯისტიკა',
+      '14': 'სამედიცინო',
+      '15': 'უსაფრთხოება',
+      '16': 'დისტრიბუცია',
+      '17': 'ინფორმაციული ტექნოლოგიები',
+      '18': 'დიასახლისი',
+      '19': 'სხვა',
+      '20': 'ბუღალტერია'
+    };
+
     // Similar job clicks (inside job detail)
     document.addEventListener('DOMContentLoaded', function () {
       try {
@@ -368,9 +392,10 @@
           link.addEventListener('click', function () {
             try {
               if (window.amplitude) {
+                const categoryId = this.getAttribute('data-job-category');
                 window.amplitude.track('Similar Job Clicked', {
                   job_id: this.getAttribute('data-job-id'),
-                  job_category: this.getAttribute('data-job-category'),
+                  job_category: categoryNames[categoryId] || categoryId,
                   job_title: this.getAttribute('data-job-title'),
                   salary_range: this.getAttribute('data-salary-range'),
                   title: this.getAttribute('data-job-title'),
@@ -386,6 +411,30 @@
     });
   </script>
   <script>
+    // Category ID to name mapping
+    const categoryNames = {
+      '1': 'საოფისე',
+      '2': 'მომხმარებელთან ურთიერთობები',
+      '3': 'გაყიდვები',
+      '4': 'საბანკო-საფინანსო',
+      '5': 'საწყობი და წარმოება',
+      '6': 'საცალო ვაჭრობა',
+      '7': 'მზარეული',
+      '8': 'აზარტული',
+      '9': 'მენეჯმენტი',
+      '10': 'ფარმაცია',
+      '11': 'მიმტანი',
+      '12': 'ინჟინერია',
+      '13': 'ლოჯისტიკა',
+      '14': 'სამედიცინო',
+      '15': 'უსაფრთხოება',
+      '16': 'დისტრიბუცია',
+      '17': 'ინფორმაციული ტექნოლოგიები',
+      '18': 'დიასახლისი',
+      '19': 'სხვა',
+      '20': 'ბუღალტერია'
+    };
+
     const dialog = document.getElementById('uploadDialog');
     const openBtn = document.getElementById('openDialogBtn');
     const openBtn2 = document.getElementById('openDialogBtn2');
@@ -406,7 +455,8 @@
     const uploadProgressBar = document.getElementById('uploadProgressBar');
 
     const jobId = <%- JSON.stringify(job.id) %>;
-    const jobCategory = <%- JSON.stringify(job.category_id || null) %>;
+    const jobCategoryId = <%- JSON.stringify(job.category_id || null) %>;
+    const jobCategory = categoryNames[String(jobCategoryId)] || jobCategoryId;
     const jobTitle = <%- JSON.stringify(job.jobName || '') %>;
     const jobSalaryRange = <%- JSON.stringify(job.jobSalary || '') %>;
     const jobCompany = <%- JSON.stringify(job.companyName || '') %>;
