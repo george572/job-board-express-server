@@ -431,6 +431,7 @@ app.post("/api/auth/google", async (req, res) => {
   const { access_token } = req.body;
 
   try {
+    // 1) Verify token with Google
     const response = await fetch(
       "https://www.googleapis.com/oauth2/v3/userinfo",
       {
@@ -440,7 +441,11 @@ app.post("/api/auth/google", async (req, res) => {
 
     const userInfo = await response.json();
 
-    const authResponse = await fetch("http://localhost:4001/users/auth", {
+    // 2) Create / update user in our own users service / API
+    const USERS_SERVICE_URL =
+      process.env.USERS_SERVICE_URL || "http://localhost:4001";
+
+    const authResponse = await fetch(`${USERS_SERVICE_URL}/users/auth`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

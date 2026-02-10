@@ -11,9 +11,9 @@ primary_region = 'ams'
 [http_service]
   internal_port = 4000
   force_https = true
-  auto_stop_machines = 'stop'
+  auto_stop_machines = "off"   # Stop killing the process
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1    # Keep at least one instance alive at all times
   processes = ['app']
 
 [[vm]]
