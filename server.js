@@ -14,17 +14,23 @@ const session = require("express-session");
 // Base URL for SEO (sitemap, robots, canonicals)
 const SITE_BASE_URL = process.env.SITE_BASE_URL || "https://samushao.ge";
 
+// Behind Fly/Heroku we must trust the proxy so secure cookies work
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
 // Session middleware MUST come before the route
 app.use(
   session({
     resave: false,
-    secret: process.env.SESSION_SECRET || "askmdaksdhjkqjqkqkkq1", // Use environment variable
+    secret: process.env.SESSION_SECRET,
     saveUninitialized: false,
     cookie: {
-      secure: true, // Your site uses HTTPS
+      // Only mark cookies secure in production; on localhost we use http
+      secure: process.env.NODE_ENV === "production",
       httpOnly: true,
       maxAge: 365 * 24 * 60 * 60 * 1000,
-      sameSite: "lax", // Prevents CSRF attacks
+      sameSite: "lax",
     },
   }),
 );
