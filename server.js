@@ -175,12 +175,18 @@ app.get("/", async (req, res) => {
       job_experience,
       job_type,
       page = 1,
-      limit = 10,
+      limit: limitParam = 10,
       hasSalary,
       job_premium_status,
       min_salary,
       q: searchQuery,
+      append,
     } = req.query;
+
+    const limit = Number(limitParam);
+    const pageNum = Number(page);
+    const isDocNav = req.get("Sec-Fetch-Dest") === "document";
+    const isAppendRequest = append === "1" && !isDocNav;
 
     const filterParamKeys = [
       "category",
@@ -198,7 +204,12 @@ app.get("/", async (req, res) => {
       return Array.isArray(v) ? v.length > 0 : true;
     });
 
-    const offset = (Number(page) - 1) * Number(limit);
+    const offset = isAppendRequest
+      ? (pageNum - 1) * limit
+      : 0;
+    const fetchLimit = isAppendRequest
+      ? limit
+      : pageNum * limit;
 
     // Top salary jobs slider – skip when any filters are active
     let topSalaryJobs = [];
@@ -289,15 +300,15 @@ app.get("/", async (req, res) => {
       `,
       )
       .orderBy("created_at", "desc")
-      .limit(Number(limit))
+      .limit(fetchLimit)
       .offset(offset);
 
     const baseUrl = "https://samushao.ge";
-    const canonical = baseUrl + (Number(page) === 1 ? "/" : "/?page=" + page);
+    const canonical = baseUrl + (pageNum === 1 ? "/" : "/?page=" + pageNum);
     res.render("index", {
       jobs,
       topSalaryJobs,
-      currentPage: Number(page),
+      currentPage: pageNum,
       totalPages,
       totalJobs: total,
       filters: req.query,

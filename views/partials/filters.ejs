@@ -204,6 +204,7 @@
             currentJobsArea.dataset.totalPages = fetchedJobsArea.dataset.totalPages || '1';
           }
           history.pushState({ filters: filters }, '', newUrl);
+          if (window.reinitInfiniteScroll) window.reinitInfiniteScroll();
           setFiltersFromUrl();
           renderActiveFilters();
           updateTopSalarySliderVisibility();
@@ -412,7 +413,7 @@
 
     // Back/forward: update content from current URL without full reload
     window.addEventListener('popstate', function () {
-      if (sessionStorage.getItem('jobListScrollPosition')) return;
+      if (document.referrer && document.referrer.indexOf('/vakansia/') !== -1) return;
       var url = window.location.pathname + (window.location.search || '');
       fetch(url, { headers: { 'Accept': 'text/html' } })
         .then(function (res) { return res.text(); })

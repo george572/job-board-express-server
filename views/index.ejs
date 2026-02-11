@@ -86,13 +86,13 @@
   </div>
 
   <!-- Loading indicator -->
-  <div id="loading-indicator" style="display: none; text-align: center; padding: 20px; color: #999; font-size: 14px;">
+  <div id="loading-indicator flex justify-center" style=" text-align: center; padding: 20px; color: #999; font-size: 14px;">
     იტვირთება...
   </div>
 
 
   <% if (totalPages > 1) { %>
-  <nav class="pagination-small w-full flex justify-center items-center gap-2 py-4 transform scale-0">
+  <nav class="pagination pagination-small w-full flex justify-center items-center gap-2 py-4" style="display:none">
     <% if (currentPage > 1) { %>
     <a href="/?page=<%= currentPage - 1 %>" class="p-2 bg-primary text-white rounded-xl">← წინა</a>
     <% } %>
@@ -122,13 +122,10 @@
   </nav>
   <% } %>
   </div>
+  <script src="https://unpkg.com/infinite-scroll@5/dist/infinite-scroll.pkgd.min.js"></script>
   <script>
-    // Disable browser's automatic scroll restoration for all devices
-    if ('scrollRestoration' in history) {
-      history.scrollRestoration = 'manual';
-    }
+    if ('scrollRestoration' in history) history.scrollRestoration = 'auto';
 
-    // Category ID to name mapping
     const categoryNames = {
       '1': 'საოფისე',
       '2': 'მომხმარებელთან ურთიერთობები',
@@ -153,204 +150,68 @@
     };
 
     const container = document.getElementById('jobs-container');
-    let isLoading = false;
-    
-    // Cache for loaded pages to avoid re-fetching from server
-    const pageCache = new Map();
+    const jobsArea = document.getElementById('jobs-area');
 
     function bindNormalJobClicks(root) {
       try {
+        if (!window.amplitude) return;
         const scope = root || document;
         const links = scope.querySelectorAll('#jobs-container a[data-job-id]');
         links.forEach(function (link) {
           if (link.__normalJobBound) return;
           link.__normalJobBound = true;
-          link.addEventListener('click', function (e) {
-            // Save scroll position and current page before navigating
-            sessionStorage.setItem('jobListScrollPosition', window.scrollY.toString());
-            sessionStorage.setItem('jobListCurrentPage', document.getElementById('jobs-area').dataset.currentPage);
-            
-            // Cache current HTML before leaving
-            const jobsArea = document.getElementById('jobs-area');
-            const currentPage = parseInt(jobsArea.dataset.currentPage || '1', 10);
-            for (let i = 1; i <= currentPage; i++) {
-              if (!pageCache.has(i)) {
-                const pageHtml = document.getElementById('jobs-container').innerHTML;
-                sessionStorage.setItem('cachedJobsHtml_' + currentPage, pageHtml);
-              }
-            }
-            
+          link.addEventListener('click', function () {
             try {
-              if (window.amplitude) {
-                const categoryId = this.getAttribute('data-job-category');
-                window.amplitude.track('Normal Job Clicked', {
-                  job_id: this.getAttribute('data-job-id'),
-                  job_category: categoryNames[categoryId] || categoryId,
-                  job_title: this.getAttribute('data-job-title'),
-                  salary_range: this.getAttribute('data-salary-range'),
-                  company: this.getAttribute('data-job-company'),
-                  location: this.getAttribute('data-job-location')
-                });
-              }
+              const categoryId = this.getAttribute('data-job-category');
+              window.amplitude.track('Normal Job Clicked', {
+                job_id: this.getAttribute('data-job-id'),
+                job_category: categoryNames[categoryId] || categoryId,
+                job_title: this.getAttribute('data-job-title'),
+                salary_range: this.getAttribute('data-salary-range'),
+                company: this.getAttribute('data-job-company'),
+                location: this.getAttribute('data-job-location')
+              });
             } catch (e) {}
           });
         });
       } catch (e) {}
     }
 
-    async function loadMoreJobs() {
-      var jobsArea = document.getElementById('jobs-area');
-      var currentPage = parseInt(jobsArea.dataset.currentPage || '1', 10);
-      var totalPages = parseInt(jobsArea.dataset.totalPages || '1', 10);
-      if (isLoading || currentPage >= totalPages) return;
-
-      isLoading = true;
-
-      // Show loading indicator
-      document.getElementById('loading-indicator').style.display = 'block';
-
-      currentPage++;
-      
-      // Check cache first
-      const cached = pageCache.get(currentPage);
-      if (cached) {
-        document.getElementById('jobs-container').insertAdjacentHTML('beforeend', cached);
-        jobsArea.dataset.currentPage = currentPage;
-        bindNormalJobClicks(container);
-        document.getElementById('loading-indicator').style.display = 'none';
-        isLoading = false;
-        return;
+    function initInfiniteScroll() {
+      const cont = document.getElementById('jobs-area');
+      if (!cont || typeof InfiniteScroll === 'undefined') return;
+      if (window.jobsInfScroll) {
+        try { window.jobsInfScroll.destroy(); } catch (e) {}
       }
-
-      try {
-        var params = new URLSearchParams(window.location.search);
-        params.set('page', currentPage);
-
-        var response = await fetch(`/?${params.toString()}`);
-        var html = await response.text();
-
-        var parser = new DOMParser();
-        var doc = parser.parseFromString(html, 'text/html');
-        var newJobsHtml = doc.getElementById('jobs-container').innerHTML;
-
-        // Cache the page
-        pageCache.set(currentPage, newJobsHtml);
-
-        document.getElementById('jobs-container').insertAdjacentHTML('beforeend', newJobsHtml);
-        jobsArea.dataset.currentPage = currentPage;
-        
-        // Bind tracking to newly added normal job cards
-        bindNormalJobClicks(container);
-
-        // Hide loading indicator
-        document.getElementById('loading-indicator').style.display = 'none';
-
-        isLoading = false;
-      } catch (error) {
-        console.error('Error loading jobs:', error);
-        document.getElementById('loading-indicator').style.display = 'none';
-        isLoading = false;
-      }
+      window.jobsInfScroll = new InfiniteScroll('#jobs-container', {
+        path: function() {
+          const tp = parseInt(document.getElementById('jobs-area')?.dataset.totalPages || '1', 10);
+          const nextPage = this.loadCount + 2;
+          if (nextPage > tp) return;
+          const params = new URLSearchParams(window.location.search);
+          params.set('page', nextPage);
+          params.set('append', '1');
+          return '/?' + params.toString();
+        },
+        append: '#jobs-container article',
+        history: 'push',
+        hideNav: '.pagination',
+        status: '.page-load-status',
+        prefill: true,
+        scrollThreshold: 400,
+        on: {
+          append: function() {
+            const p = parseInt(jobsArea?.dataset.currentPage || '1', 10) + 1;
+            if (jobsArea) jobsArea.dataset.currentPage = String(p);
+            bindNormalJobClicks(container);
+          }
+        }
+      });
     }
 
-// Reliable restore: disable bfcache if needed, then force-scroll
-let isRestoring = false;
-
-function checkAndRestoreScroll() {
-  const savedScrollPosition = sessionStorage.getItem('jobListScrollPosition');
-  const savedPage = sessionStorage.getItem('jobListCurrentPage');
-  
-  if (!savedScrollPosition || !savedPage || isRestoring) return;
-  
-  isRestoring = true;
-  
-  const targetPage = parseInt(savedPage, 10);
-  const targetScroll = parseInt(savedScrollPosition, 10);
-  const jobsArea = document.getElementById('jobs-area');
-  const initialPage = parseInt(jobsArea.dataset.currentPage || '1', 10);
-  
-  // DISABLE BFCACHE if scroll restore needed (fixes mobile intermittency) [web:11]
-  window.addEventListener('beforeunload', disableBFCache);
-  function disableBFCache() {
-    // Minimal handler evicts bfcache next back
-    console.log('BFCache disabled for restore');
-  }
-  
-  document.documentElement.style.scrollBehavior = 'auto';
-  
-  async function ensurePagesLoaded() {
-    for (let page = initialPage + 1; page <= targetPage; page++) {
-      let newJobsHtml = pageCache.get(page) || sessionStorage.getItem('cachedJobsHtml_' + page);
-      if (!newJobsHtml) {
-        const params = new URLSearchParams(window.location.search);
-        params.set('page', page);
-        const response = await fetch(`/?${params.toString()}`);
-        const html = await response.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        newJobsHtml = doc.getElementById('jobs-container').innerHTML;
-        pageCache.set(page, newJobsHtml);
-      }
-      document.getElementById('jobs-container').insertAdjacentHTML('beforeend', newJobsHtml);
-      jobsArea.dataset.currentPage = page;
-    }
     bindNormalJobClicks(container);
-  }
-  
-  const loadPromise = targetPage > initialPage ? ensurePagesLoaded() : Promise.resolve();
-  
-  loadPromise.then(() => {
-    // Aggressive retry: 40 attempts over 4s (covers all mobile/desktop)
-    let attempts = 0;
-    function tryScroll() {
-      attempts++;
-      window.scrollTo(0, targetScroll);
-      
-      if (Math.abs(window.scrollY - targetScroll) <= 15 || attempts >= 40) {
-        // Success: clear data + cleanup
-        sessionStorage.removeItem('jobListScrollPosition');
-        sessionStorage.removeItem('jobListCurrentPage');
-        window.removeEventListener('beforeunload', disableBFCache);
-        document.documentElement.style.scrollBehavior = 'smooth';
-        isRestoring = false;
-        return;
-      }
-      
-      // Fast retries first, then slower (mobile paint cycles)
-      const delay = attempts < 10 ? 30 : Math.min(100 + (attempts * 10), 300);
-      setTimeout(() => requestAnimationFrame(tryScroll), delay);
-    }
-    
-    // Double initial delay for mobile layout
-    setTimeout(() => requestAnimationFrame(tryScroll), 500);
-  }).catch(err => {
-    console.error('Restore failed:', err);
-    isRestoring = false;
-  });
-}
-
-// Events: Comprehensive coverage
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', checkAndRestoreScroll);
-} else {
-  checkAndRestoreScroll();
-}
-window.addEventListener('pageshow', checkAndRestoreScroll);
-window.addEventListener('load', checkAndRestoreScroll);
-
-
-window.addEventListener('scroll', () => {
-      const scrollTop = window.scrollY;
-      const windowHeight = window.innerHeight;
-      const documentHeight = document.documentElement.scrollHeight;
-
-      if (scrollTop + windowHeight >= documentHeight - 300) {
-        loadMoreJobs();
-      }
-    });
-
-    // Initial bind for jobs rendered on first page load
-    bindNormalJobClicks(container);
+    initInfiniteScroll();
+    window.reinitInfiniteScroll = initInfiniteScroll;
 
   </script>
 
@@ -391,10 +252,6 @@ window.addEventListener('scroll', () => {
       jobCards.forEach(function (card) {
         card.addEventListener('click', function () {
           sessionStorage.setItem('topSalarySliderIndex', swiper.activeIndex.toString());
-          // Also save scroll position for top salary jobs
-          sessionStorage.setItem('jobListScrollPosition', window.scrollY.toString());
-          sessionStorage.setItem('jobListCurrentPage', document.getElementById('jobs-area').dataset.currentPage);
-          
           try {
             if (window.amplitude) {
               const categoryId = this.getAttribute('data-job-category');
