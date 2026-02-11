@@ -11,6 +11,8 @@
  */
 
 require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const knex = require("knex");
 const knexfile = require("../knexfile");
@@ -27,16 +29,19 @@ const BATCH_DELAY_MS = 1000; // 1 second between API calls to respect rate limit
 
 const CLEAN_PROMPT = `You are cleaning a job posting description. The text is in Georgian.
 
-TASKS:
-- Remove promotional boilerplate (e.g. "Apply now!", "Send your CV to...", "We look forward to hearing from you")
-- Remove excessive marketing language and keyword stuffing
-- Remove redundant contact info if the same details appear elsewhere
-- Simplify repetitive phrases
-- Keep structure: responsibilities, requirements, qualifications, salary/benefits, location
-- Output valid HTML: use <p>, <ul>, <li>, <br> for formatting. No inline styles.
-- Keep the Georgian language and professional tone
+STRICTLY REMOVE (must not appear in output):
+- Job type (სრული განაკვეთი, ნახევარი განაკვეთი, full-time, part-time, etc.)
+- Job location, city, address
+- Job position/title name
+- Salary, ანაზღაურება, ₾, GEL, any payment info
+- Contact info: phone, email, fax
+- "გამოგზავნეთ CV", "Apply now", "Send your CV", "დაგვიკავშირდით"
+- Personal traits: reliable, punctual, team player, etc.
+- Marketing fluff, keyword stuffing
 
-Return ONLY the cleaned HTML. No explanation, no markdown code blocks, no extra text.`;
+KEEP: Job responsibilities, requirements, qualifications, duties (ინდივიდუალური სამუშაოს აღწერა). Use <p>, <ul>, <li>, <br> only. No inline styles.
+
+CRITICAL: Output RAW HTML only. NO markdown. NO \`\`\`html or \`\`\` around the output. NO backticks. Just the HTML tags.`;
 
 async function cleanWithGemini(text) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -44,14 +49,17 @@ async function cleanWithGemini(text) {
     throw new Error("GEMINI_API_KEY is missing in .env");
   }
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
   const prompt = CLEAN_PROMPT + "\n\n---\n\n" + text;
   const result = await model.generateContent(prompt);
   const response = result.response;
   if (!response || !response.text) {
     throw new Error("Empty response from Gemini");
   }
-  return response.text().trim();
+  let html = response.text().trim();
+  // Strip markdown code blocks if Gemini still adds them
+  html = html.replace(/^```(?:html)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+  return html;
 }
 
 function delay(ms) {
@@ -63,7 +71,7 @@ async function main() {
   if (LIMIT) console.log(`Limit: ${LIMIT} jobs`);
 
   const query = db("jobs")
-    .select("id", "jobName", "companyName", "jobDescription", "jobDescriptionOriginal")
+    .select("id", "jobName", "companyName", "jobDescription")
     .where("job_status", "approved");
   const jobs = LIMIT ? await query.limit(LIMIT) : await query;
 
@@ -71,6 +79,7 @@ async function main() {
 
   let updated = 0;
   let failed = 0;
+  const results = [];
 
   for (let i = 0; i < jobs.length; i++) {
     const job = jobs[i];
@@ -89,11 +98,16 @@ async function main() {
       }
 
       if (APPLY) {
-        const hasOriginal = job.jobDescriptionOriginal != null && job.jobDescriptionOriginal !== "";
-        const updates = { jobDescription: cleaned };
-        if (!hasOriginal) updates.jobDescriptionOriginal = desc;
-        await db("jobs").where("id", job.id).update(updates);
+        await db("jobs").where("id", job.id).update({ jobDescription: cleaned });
         updated++;
+      } else {
+        results.push({
+          id: job.id,
+          jobName: job.jobName,
+          companyName: job.companyName,
+          original: desc,
+          cleaned: cleaned,
+        });
       }
 
       console.log(`[${i + 1}/${jobs.length}] Job ${job.id} (${job.jobName}): OK`);
@@ -103,6 +117,12 @@ async function main() {
     }
 
     if (i < jobs.length - 1) await delay(BATCH_DELAY_MS);
+  }
+
+  if (!APPLY && results.length > 0) {
+    const outputPath = path.join(process.cwd(), "clean-job-results.json");
+    fs.writeFileSync(outputPath, JSON.stringify(results, null, 2), "utf8");
+    console.log(`\nResults written to: ${outputPath}`);
   }
 
   console.log(`\nDone. Updated: ${updated}, Failed: ${failed}`);

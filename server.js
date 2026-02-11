@@ -91,8 +91,9 @@ Sitemap: ${SITE_BASE_URL}/sitemap.xml
   );
 });
 
-// --- sitemap.xml (dynamic)
+// --- sitemap.xml (dynamic, no cache so it reflects new jobs)
 app.get("/sitemap.xml", async (req, res) => {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
   try {
     const jobs = await db("jobs")
       .select("id", "jobName", "updated_at", "created_at")

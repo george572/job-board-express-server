@@ -963,6 +963,9 @@
     --tw-outline-style: none;
     outline-style: none;
   }
+  .\[web\:11\] {
+    web: 11;
+  }
   .hover\:bg-\[\#F5F8FF\] {
     &:hover {
       @media (hover: hover) {

@@ -412,6 +412,7 @@
 
     // Back/forward: update content from current URL without full reload
     window.addEventListener('popstate', function () {
+      if (sessionStorage.getItem('jobListScrollPosition')) return;
       var url = window.location.pathname + (window.location.search || '');
       fetch(url, { headers: { 'Accept': 'text/html' } })
         .then(function (res) { return res.text(); })

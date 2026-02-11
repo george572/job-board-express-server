@@ -229,6 +229,7 @@ router.post("/", upload.single("company_logo"), (req, res) => {
       job_type,
       job_premium_status,
       isHelio,
+      job_status: "approved",
     })
     .returning("id")
     .then((ids) => {
