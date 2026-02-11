@@ -11,35 +11,39 @@
   <!-- Structured Data for Google Jobs -->
   <script type="application/ld+json">
   <% 
-    const desc = (job.jobDescription || job.job_description || '').trim() || (job.jobName + ' at ' + job.companyName);
-    let validThrough = '';
-    if (job.created_at) {
-      const d = new Date(job.created_at);
-      d.setDate(d.getDate() + 30);
-      validThrough = d.toISOString().split('T')[0];
-    }
+    const rawDesc = (job.jobDescription || job.job_description || '').trim() || (job.jobName + ' at ' + job.companyName);
+    const desc = /<[a-z][\s\S]*>/i.test(rawDesc) ? rawDesc : '<p>' + rawDesc.replace(/\n/g, '</p><p>') + '</p>';
 
+    const baseDate = job.created_at ? new Date(job.created_at) : new Date();
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() + 30);
+    const validThrough = d.toISOString().split('T')[0] + 'T00:00';
+
+    const loc = job.job_city || job.job_address || 'Georgia';
+    const empType = job.job_type === 'part-time' ? 'PART_TIME' : 'FULL_TIME';
     const jobPostingSchema = {
       "@context": "https://schema.org/",
       "@type": "JobPosting",
+      identifier: { "@type": "PropertyValue", name: "Samushao.ge", value: String(job.id) },
       title: job.jobName,
       description: desc,
       datePosted: job.created_at,
-      validThrough: validThrough || undefined,
-      employmentType: job.job_type || 'FULL_TIME',
+      validThrough: validThrough,
+      employmentType: empType,
       hiringOrganization: {
         "@type": "Organization",
         name: job.companyName
       },
       jobLocation: {
         "@type": "Place",
-        address: (function() {
-          const addr = { "@type": "PostalAddress", addressCountry: "GE" };
-          if (job.job_address) addr.streetAddress = job.job_address;
-          addr.addressLocality = job.job_city || job.job_address || "Georgia";
-          if (job.job_city) addr.addressRegion = job.job_city;
-          return addr;
-        })()
+        address: {
+          "@type": "PostalAddress",
+          streetAddress: job.job_address || loc,
+          addressLocality: loc,
+          addressRegion: job.job_city || "Georgia",
+          postalCode: "",
+          addressCountry: "GE"
+        }
       }
     };
 
@@ -54,8 +58,6 @@
         }
       };
     }
-
-    if (!jobPostingSchema.validThrough) delete jobPostingSchema.validThrough;
   %>
     <%- JSON.stringify(jobPostingSchema) %>
   </script>
