@@ -43,25 +43,31 @@
       var ampScript = document.createElement('script');
       ampScript.src = 'https://cdn.amplitude.com/script/80195a7a80425609b3760c948db9fec2.js';
       ampScript.onload = function() {
-        window.amplitude.add(window.sessionReplay.plugin({sampleRate: 1}));
-        window.amplitude.init('80195a7a80425609b3760c948db9fec2', {
-          fetchRemoteConfig: true,
-          autocapture: {
-            attribution: true,
-            fileDownloads: true,
-            formInteractions: true,
-            pageViews: true,
-            sessions: true,
-            elementInteractions: true,
-            networkTracking: true,
-            webVitals: true,
-            frustrationInteractions: {
-              errorClicks: true,
-              deadClicks: true,
-              rageClicks: true
+        var engagementScript = document.createElement('script');
+        engagementScript.src = 'https://cdn.amplitude.com/script/80195a7a80425609b3760c948db9fec2.engagement.js';
+        engagementScript.onload = function() {
+          window.amplitude.add(window.sessionReplay.plugin({sampleRate: 1}));
+          window.amplitude.init('80195a7a80425609b3760c948db9fec2', {
+            fetchRemoteConfig: true,
+            autocapture: {
+              attribution: true,
+              fileDownloads: true,
+              formInteractions: true,
+              pageViews: true,
+              sessions: true,
+              elementInteractions: true,
+              networkTracking: true,
+              webVitals: true,
+              frustrationInteractions: {
+                errorClicks: true,
+                deadClicks: true,
+                rageClicks: true
+              }
             }
-          }
-        });
+          });
+          window.amplitude.add(window.engagement.plugin());
+        };
+        document.head.appendChild(engagementScript);
       };
       document.head.appendChild(ampScript);
     };
