@@ -185,8 +185,7 @@ app.get("/", async (req, res) => {
 
     const limit = Number(limitParam);
     const pageNum = Number(page);
-    const isDocNav = req.get("Sec-Fetch-Dest") === "document";
-    const isAppendRequest = append === "1" && !isDocNav;
+    const isAppendRequest = append === "1";
 
     const filterParamKeys = [
       "category",
