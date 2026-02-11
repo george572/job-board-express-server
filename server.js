@@ -500,7 +500,7 @@ app.post("/api/auth/google", async (req, res) => {
       email: userInfo.email,
       name: userInfo.name,
       picture: userInfo.picture,
-      user_type: authData.user?.user_type || authData.user_type || "pending", // Add this
+      user_type: authData.user?.user_type || authData.user_type || "pending",
     };
 
     res.json({ success: true });

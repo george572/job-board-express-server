@@ -143,7 +143,7 @@
 
 </head>
 
-<body>
+<body data-user-uid="<%= user && user.uid ? user.uid : '' %>">
   <%- include('partials/header') %>
 
   <main class="pb-52 lg:pb-12">
@@ -789,7 +789,7 @@
   </style>
   <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
   <script>
-    var similarJobsUserUid = <%- typeof user !== 'undefined' && user ? JSON.stringify(user.uid) : 'null' %>;
+    var similarJobsUserUid = document.body.getAttribute('data-user-uid') || null;
     document.addEventListener('DOMContentLoaded', function () {
       var el = document.querySelector('.related-jobs-swiper');
       if (!el || typeof Swiper === 'undefined') return;
@@ -815,7 +815,7 @@
                 job_category: link?.getAttribute('data-job-category'),
                 slide_index: this.activeIndex,
                 total_slides: this.slides.length,
-                user_id: similarJobsUserUid,
+                user_uid: similarJobsUserUid,
               });
             }
           },
