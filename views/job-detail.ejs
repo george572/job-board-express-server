@@ -77,7 +77,6 @@
 
   <!-- Your CSS here -->
   <link rel="stylesheet" href="/css/style.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
   <style>
     /* Prevent body scroll when dialog is open */
     body.dialog-open {
@@ -236,18 +235,16 @@
             მსგავსი ვაკანსიები
           </h2>
           <div class="flex items-center gap-2 flex-shrink-0">
-            <button class="related-jobs-prev w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base" aria-label="Prev">←</button>
-            <button class="related-jobs-next w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base" aria-label="Next">→</button>
+            <button type="button" class="related-jobs-prev w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Prev">←</button>
+            <button type="button" class="related-jobs-next w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Next">→</button>
           </div>
         </div>
-        <div class="swiper related-jobs-swiper">
-          <div class="swiper-wrapper">
-            <% relatedJobs.forEach(function(relJob) { %>
-            <div class="swiper-slide" style="height: auto;">
-              <%- include('partials/jobItemCompact.ejs', { job: relJob, slugify }) %>
-            </div>
-            <% }); %>
+        <div id="related-jobs-scroll" class="related-jobs-scroll flex w-full items-stretch gap-3 sm:gap-4 overflow-x-auto pb-4 pl-6 pr-4 snap-x snap-mandatory" style="scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;">
+          <% relatedJobs.forEach(function(relJob) { %>
+          <div class="related-jobs-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col">
+            <%- include('partials/jobItemCompact.ejs', { job: relJob, slugify }) %>
           </div>
+          <% }); %>
         </div>
       </div>
     </section>
@@ -406,9 +403,9 @@
     // Similar job clicks (inside job detail)
     document.addEventListener('DOMContentLoaded', function () {
       try {
-        var relatedSwiper = document.querySelector('.related-jobs-swiper');
-        if (!relatedSwiper) return;
-        var links = relatedSwiper.querySelectorAll('a[data-job-id]');
+        var relatedContainer = document.getElementById('related-jobs-scroll');
+        if (!relatedContainer) return;
+        var links = relatedContainer.querySelectorAll('a[data-job-id]');
         links.forEach(function (link) {
           link.addEventListener('click', function () {
             try {
@@ -781,45 +778,17 @@
     });
   </script>
 
-  <!-- Related jobs Swiper -->
-  <style>
-    .related-jobs-swiper .swiper-wrapper { display: flex; align-items: stretch; }
-    .related-jobs-swiper .swiper-slide { height: auto; display: flex; }
-    .related-jobs-swiper .swiper-slide > article { width: 100%; }
-  </style>
-  <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+  <!-- Related jobs scroll (prev/next buttons) -->
   <script>
-    var similarJobsUserUid = document.body.getAttribute('data-user-uid') || null;
     document.addEventListener('DOMContentLoaded', function () {
-      var el = document.querySelector('.related-jobs-swiper');
-      if (!el || typeof Swiper === 'undefined') return;
-      new Swiper(el, {
-        slidesPerView: 1.1,
-        spaceBetween: 12,
-        centeredSlides: false,
-        loop: false,
-        autoHeight: false,
-        navigation: { nextEl: '.related-jobs-next', prevEl: '.related-jobs-prev' },
-        breakpoints: {
-          640: { slidesPerView: 3.2, spaceBetween: 16 },
-          1024: { slidesPerView: 4.2, spaceBetween: 16 },
-        },
-        on: {
-          slideChange: function () {
-            if (window.amplitude) {
-              var slide = this.slides[this.activeIndex];
-              var link = slide?.querySelector('[data-job-id]');
-              window.amplitude.track('Similar Jobs Swipe', {
-                job_id: link?.getAttribute('data-job-id'),
-                job_title: link?.getAttribute('data-job-title'),
-                job_category: link?.getAttribute('data-job-category'),
-                slide_index: this.activeIndex,
-                total_slides: this.slides.length,
-                user_uid: similarJobsUserUid,
-              });
-            }
-          },
-        },
+      var scrollEl = document.getElementById('related-jobs-scroll');
+      var prevBtn = document.querySelector('.related-jobs-prev');
+      var nextBtn = document.querySelector('.related-jobs-next');
+      if (scrollEl && prevBtn) prevBtn.addEventListener('click', function () {
+        scrollEl.scrollBy({ left: -320, behavior: 'smooth' });
+      });
+      if (scrollEl && nextBtn) nextBtn.addEventListener('click', function () {
+        scrollEl.scrollBy({ left: 320, behavior: 'smooth' });
       });
     });
   </script>

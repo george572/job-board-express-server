@@ -24,7 +24,6 @@
     {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"მთავარი","item":"https://samushao.ge/"},{"@type":"ListItem","position":2,"name":"ვაკანსიები","item":"<%= (seo && seo.canonical) ? seo.canonical : 'https://samushao.ge/' %>"}]}
   </script>
   <link rel="stylesheet" href="/css/style.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
   <% if (currentPage > 1) { %>
   <link rel="prev" href="https://samushao.ge/<%= currentPage === 2 ? '' : '?page=' + (currentPage - 1) %>">
   <% } %>
@@ -37,34 +36,26 @@
   <%- include('partials/header') %>
   <%- include('partials/filters') %>
 
-  <!-- Top salary jobs slider (hidden when any filter is active; JS toggles visibility on filter change) -->
+  <!-- Top salary jobs (scrollable, hidden when any filter is active) -->
   <% if (topSalaryJobs && topSalaryJobs.length > 0) { %>
   <section id="top-salary-slider-section" class="w-full mx-auto px-4 mt-6 mb-4" style="<%= filtersActive ? 'display:none' : '' %>">
-    <div class="mx-auto">
-      <div class="flex items-center justify-between mb-4 gap-3">
-        <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1">
-          ყველაზე მაღალანაზღაურებადი ვაკანსიები
-        </h2>
-        <div class="flex items-center gap-2 flex-shrink-0">
-          <button class="top-salary-prev w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base" aria-label="Prev">
-            ←
-          </button>
-          <button class="top-salary-next w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base" aria-label="Next">
-            →
-          </button>
-        </div>
-      </div>
-
-      <div class="swiper top-salary-swiper">
-        <div class="swiper-wrapper">
-          <% topSalaryJobs.forEach(job => { %>
-          <div class="swiper-slide" style="height: auto;">
-            <%- include('partials/jobItemCompact.ejs', { job, slugify }) %>
-          </div>
-          <% }) %>
-        </div>
+    <div class="flex items-center justify-between mb-4 gap-3">
+      <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1">
+        ყველაზე მაღალანაზღაურებადი ვაკანსიები
+      </h2>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <button type="button" class="top-salary-prev w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Prev">←</button>
+        <button type="button" class="top-salary-next w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Next">→</button>
       </div>
     </div>
+    <div id="top-salary-scroll" class="top-salary-scroll flex w-full items-stretch gap-3 sm:gap-4 overflow-x-auto pb-4 pr-4 snap-x snap-mandatory" 
+    style="scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;">
+    <% topSalaryJobs.forEach(job => { %>
+   <div class="top-salary-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col">
+     <%- include('partials/jobItemCompact.ejs', { job, slugify }) %>
+   </div>
+ <% }) %>
+</div>
   </section>
   <% } %>
 
@@ -215,43 +206,21 @@
 
   </script>
 
-  <style>
-    .top-salary-swiper .swiper-wrapper { display: flex; align-items: stretch; }
-    .top-salary-swiper .swiper-slide { height: auto; display: flex; }
-    .top-salary-swiper .swiper-slide > article { width: 100%; }
-  </style>
-  <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
-      const el = document.querySelector('.top-salary-swiper');
-      if (!el || typeof Swiper === 'undefined') return;
-
-      const savedSlideIndex = sessionStorage.getItem('topSalarySliderIndex');
-      const initialSlide = savedSlideIndex ? parseInt(savedSlideIndex, 10) : 0;
-
-      const swiper = new Swiper(el, {
-        slidesPerView: 1.1,
-        spaceBetween: 12,
-        centeredSlides: false,
-        loop: false,
-        autoHeight: false,
-        initialSlide: initialSlide,
-        navigation: { nextEl: '.top-salary-next', prevEl: '.top-salary-prev' },
-        breakpoints: {
-          640: { slidesPerView: 3.2, spaceBetween: 16 },
-          1024: { slidesPerView: 4.2, spaceBetween: 16 },
-        },
-        on: {
-          slideChange: function () {
-            sessionStorage.setItem('topSalarySliderIndex', this.activeIndex.toString());
-          },
-        },
+      var scrollEl = document.getElementById('top-salary-scroll');
+      var prevBtn = document.querySelector('.top-salary-prev');
+      var nextBtn = document.querySelector('.top-salary-next');
+      if (scrollEl && prevBtn) prevBtn.addEventListener('click', function () {
+        scrollEl.scrollBy({ left: -320, behavior: 'smooth' });
+      });
+      if (scrollEl && nextBtn) nextBtn.addEventListener('click', function () {
+        scrollEl.scrollBy({ left: 320, behavior: 'smooth' });
       });
 
-      const jobCards = el.querySelectorAll('.swiper-slide a');
-      jobCards.forEach(function (card) {
+      const cards = document.querySelectorAll('.top-salary-card a[data-job-id]');
+      cards.forEach(function (card) {
         card.addEventListener('click', function () {
-          sessionStorage.setItem('topSalarySliderIndex', swiper.activeIndex.toString());
           try {
             if (window.amplitude) {
               const categoryId = this.getAttribute('data-job-category');
