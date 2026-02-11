@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@sentry/node": "^10.38.0",
     "@tailwindcss/cli": "^4.1.18",
     "aa-sqlite": "^1.0.29",
     "cloudinary": "^2.5.1",

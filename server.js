@@ -1,4 +1,7 @@
+require("dotenv").config();
+require("./instrument");
 const express = require("express");
+const Sentry = require("@sentry/node");
 const cors = require("cors");
 const cloudinary = require("cloudinary").v2;
 const path = require("path");
@@ -324,6 +327,12 @@ app.get("/privacy-policy", (req, res) => {
   });
 });
 
+// Test route to verify Sentry (remove in production if desired)
+app.get("/debug-sentry", function mainHandler(req, res) {
+  Sentry.captureException(new Error("My first Sentry error!"));
+  throw new Error("My first Sentry error!");
+});
+
 // Pricing page
 app.get("/pricing", (req, res) => {
   res.render("pricing", {
@@ -539,6 +548,15 @@ app.use("/uploads", express.static("uploads"));
 app.use((req, res) => {
   res.status(404).render("404", { message: "გვერდი ვერ მოიძებნა." });
 });
+
+// Sentry error handler (only if DSN is configured)
+Sentry.setupExpressErrorHandler(app);
+  app.use(function onError(err, req, res, next) {
+    // The error id is attached to `res.sentry` to be returned
+    // and optionally displayed to the user for support.
+    res.statusCode = 500;
+    res.end(res.sentry + "\n");
+  });
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
