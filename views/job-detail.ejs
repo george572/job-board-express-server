@@ -11,7 +11,6 @@
   <!-- Structured Data for Google Jobs -->
   <script type="application/ld+json">
   <% 
-    const loc = job.job_city || job.job_address || '';
     const desc = (job.jobDescription || job.job_description || '').trim() || (job.jobName + ' at ' + job.companyName);
     let validThrough = '';
     if (job.created_at) {
@@ -34,14 +33,13 @@
       },
       jobLocation: {
         "@type": "Place",
-        address: {
-          "@type": "PostalAddress",
-          streetAddress: job.job_address || '',
-          addressLocality: loc,
-          addressRegion: job.job_city || '',
-          postalCode: '',
-          addressCountry: "GE"
-        }
+        address: (function() {
+          const addr = { "@type": "PostalAddress", addressCountry: "GE" };
+          if (job.job_address) addr.streetAddress = job.job_address;
+          addr.addressLocality = job.job_city || job.job_address || "Georgia";
+          if (job.job_city) addr.addressRegion = job.job_city;
+          return addr;
+        })()
       }
     };
 
