@@ -230,17 +230,9 @@
   </script>
 
   <style>
-    .top-salary-swiper .swiper-wrapper {
-      display: flex;
-      align-items: stretch;
-    }
-    .top-salary-swiper .swiper-slide {
-      height: auto;
-      display: flex;
-    }
-    .top-salary-swiper .swiper-slide > article {
-      width: 100%;
-    }
+    .top-salary-swiper .swiper-wrapper { display: flex; align-items: stretch; }
+    .top-salary-swiper .swiper-slide { height: auto; display: flex; }
+    .top-salary-swiper .swiper-slide > article { width: 100%; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
   <script>
@@ -248,36 +240,30 @@
       const el = document.querySelector('.top-salary-swiper');
       if (!el || typeof Swiper === 'undefined') return;
 
-      // Restore previous slide position if available
       const savedSlideIndex = sessionStorage.getItem('topSalarySliderIndex');
       const initialSlide = savedSlideIndex ? parseInt(savedSlideIndex, 10) : 0;
 
       const swiper = new Swiper(el, {
-        slidesPerView: 1.1, // mobile: 1 slide + ~10% peek
+        slidesPerView: 1.1,
         spaceBetween: 12,
         centeredSlides: false,
         loop: false,
-        autoHeight: false, // Disable autoHeight to ensure equal heights
-        initialSlide: initialSlide, // Restore saved position
-        navigation: {
-          nextEl: '.top-salary-next',
-          prevEl: '.top-salary-prev',
-        },
+        autoHeight: false,
+        initialSlide: initialSlide,
+        navigation: { nextEl: '.top-salary-next', prevEl: '.top-salary-prev' },
         breakpoints: {
-          640: { slidesPerView: 3.2, spaceBetween: 16 }, // desktop-ish: 3+ visible
-          1024: { slidesPerView: 4.2, spaceBetween: 16 }, // large: 4+ visible
+          640: { slidesPerView: 3.2, spaceBetween: 16 },
+          1024: { slidesPerView: 4.2, spaceBetween: 16 },
         },
         on: {
           slideChange: function () {
-            // Save current slide index whenever it changes
             sessionStorage.setItem('topSalarySliderIndex', this.activeIndex.toString());
           },
         },
       });
 
-      // Store slide index when clicking on a job card (before navigation)
       const jobCards = el.querySelectorAll('.swiper-slide a');
-      jobCards.forEach(card => {
+      jobCards.forEach(function (card) {
         card.addEventListener('click', function () {
           sessionStorage.setItem('topSalarySliderIndex', swiper.activeIndex.toString());
           try {

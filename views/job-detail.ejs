@@ -10,36 +10,56 @@
 
   <!-- Structured Data for Google Jobs -->
   <script type="application/ld+json">
-    {
+  <% 
+    const loc = job.job_city || job.job_address || '';
+    const desc = (job.jobDescription || job.job_description || '').trim() || (job.jobName + ' at ' + job.companyName);
+    let validThrough = '';
+    if (job.created_at) {
+      const d = new Date(job.created_at);
+      d.setDate(d.getDate() + 30);
+      validThrough = d.toISOString().split('T')[0];
+    }
+
+    const jobPostingSchema = {
       "@context": "https://schema.org/",
       "@type": "JobPosting",
-      "title": "<%= job.jobName %>",
-      "description": "<%= job.job_description || '' %>",
-      "datePosted": "<%= job.created_at %>",
-      "employmentType": "<%= job.job_type || '' %>",
-      "hiringOrganization": {
+      title: job.jobName,
+      description: desc,
+      datePosted: job.created_at,
+      validThrough: validThrough || undefined,
+      employmentType: job.job_type || 'FULL_TIME',
+      hiringOrganization: {
         "@type": "Organization",
-        "name": "<%= job.companyName %>"
+        name: job.companyName
       },
-      "jobLocation": {
+      jobLocation: {
         "@type": "Place",
-        "address": {
+        address: {
           "@type": "PostalAddress",
-          "addressLocality": "<%= job.job_city || '' %>",
-          "addressCountry": "GE"
+          streetAddress: job.job_address || '',
+          addressLocality: loc,
+          addressRegion: job.job_city || '',
+          postalCode: '',
+          addressCountry: "GE"
         }
       }
-      <% if (job.jobSalary) { %>,
-      "baseSalary": {
+    };
+
+    if (job.jobSalary) {
+      jobPostingSchema.baseSalary = {
         "@type": "MonetaryAmount",
-        "currency": "GEL",
-        "value": {
+        currency: "GEL",
+        value: {
           "@type": "QuantitativeValue",
-          "value": <%= job.jobSalary %>
+          value: job.jobSalary,
+          unitText: "MONTH"
         }
-      }
-      <% } %>
+      };
     }
+
+    if (!jobPostingSchema.validThrough) delete jobPostingSchema.validThrough;
+  %>
+    <%- JSON.stringify(jobPostingSchema) %>
   </script>
 
   <!-- BreadcrumbList schema -->
@@ -784,7 +804,7 @@
     });
   </script>
 
-  <!-- Related jobs Swiper: equal-height slides + init (same logic as category swiper) -->
+  <!-- Related jobs Swiper -->
   <style>
     .related-jobs-swiper .swiper-wrapper { display: flex; align-items: stretch; }
     .related-jobs-swiper .swiper-slide { height: auto; display: flex; }
@@ -801,10 +821,7 @@
         centeredSlides: false,
         loop: false,
         autoHeight: false,
-        navigation: {
-          nextEl: '.related-jobs-next',
-          prevEl: '.related-jobs-prev',
-        },
+        navigation: { nextEl: '.related-jobs-next', prevEl: '.related-jobs-prev' },
         breakpoints: {
           640: { slidesPerView: 3.2, spaceBetween: 16 },
           1024: { slidesPerView: 4.2, spaceBetween: 16 },
