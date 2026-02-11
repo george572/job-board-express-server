@@ -803,6 +803,22 @@
           640: { slidesPerView: 3.2, spaceBetween: 16 },
           1024: { slidesPerView: 4.2, spaceBetween: 16 },
         },
+        on: {
+          slideChange: function () {
+            if (window.amplitude) {
+              var slide = this.slides[this.activeIndex];
+              var jobId = slide?.querySelector('[data-job-id]')?.getAttribute('data-job-id');
+              var jobTitle = slide?.querySelector('[data-job-title]')?.getAttribute('data-job-title');
+              window.amplitude.track('Similar Jobs Swipe', {
+                job_id: jobId,
+                job_title: jobTitle,
+                job_category: jobCategory,
+                slide_index: this.activeIndex,
+                total_slides: this.slides.length,
+              });
+            }
+          },
+        },
       });
     });
   </script>
