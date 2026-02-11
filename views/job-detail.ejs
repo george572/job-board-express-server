@@ -789,6 +789,7 @@
   </style>
   <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
   <script>
+    var similarJobsUserUid = <%- typeof user !== 'undefined' && user ? JSON.stringify(user.uid) : 'null' %>;
     document.addEventListener('DOMContentLoaded', function () {
       var el = document.querySelector('.related-jobs-swiper');
       if (!el || typeof Swiper === 'undefined') return;
@@ -807,14 +808,14 @@
           slideChange: function () {
             if (window.amplitude) {
               var slide = this.slides[this.activeIndex];
-              var jobId = slide?.querySelector('[data-job-id]')?.getAttribute('data-job-id');
-              var jobTitle = slide?.querySelector('[data-job-title]')?.getAttribute('data-job-title');
+              var link = slide?.querySelector('[data-job-id]');
               window.amplitude.track('Similar Jobs Swipe', {
-                job_id: jobId,
-                job_title: jobTitle,
-                job_category: jobCategory,
+                job_id: link?.getAttribute('data-job-id'),
+                job_title: link?.getAttribute('data-job-title'),
+                job_category: link?.getAttribute('data-job-category'),
                 slide_index: this.activeIndex,
                 total_slides: this.slides.length,
+                user_id: similarJobsUserUid,
               });
             }
           },
