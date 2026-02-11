@@ -13,9 +13,12 @@
     "start:css": "npx tailwindcss -i ./public/css/input.css -o ./public/css/style.css --watch",
     "start:browser": "browser-sync start --proxy localhost:4000 --files 'public/**/*' 'views/**/*' --port 4001 --no-open",
     "dev": "concurrently \"npm:start:server\" \"npm:start:css\" \"npm:start:browser\"",
-    "build:css": "npx tailwindcss -i ./public/css/input.css -o ./public/css/style.css"
+    "build:css": "npx tailwindcss -i ./public/css/input.css -o ./public/css/style.css",
+    "clean-descriptions": "node scripts/clean-job-descriptions.js",
+    "clean-descriptions:apply": "node scripts/clean-job-descriptions.js --apply"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@tailwindcss/cli": "^4.1.18",
     "aa-sqlite": "^1.0.29",
     "cloudinary": "^2.5.1",
