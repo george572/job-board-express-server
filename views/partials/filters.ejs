@@ -203,8 +203,9 @@
             currentJobsArea.dataset.currentPage = fetchedJobsArea.dataset.currentPage || '1';
             currentJobsArea.dataset.totalPages = fetchedJobsArea.dataset.totalPages || '1';
           }
+          if (window.removeDuplicateJobs) window.removeDuplicateJobs();
           history.pushState({ filters: filters }, '', newUrl);
-          if (window.reinitInfiniteScroll) window.reinitInfiniteScroll();
+          if (window.reinitLoadMore) window.reinitLoadMore();
           setFiltersFromUrl();
           renderActiveFilters();
           updateTopSalarySliderVisibility();
@@ -411,11 +412,13 @@
 
     clearAllFiltersBtn.addEventListener('click', clearAllFilters);
 
-    // Back/forward: update content from current URL without full reload
     window.addEventListener('popstate', function () {
-      if (document.referrer && document.referrer.indexOf('/vakansia/') !== -1) return;
-      var url = window.location.pathname + (window.location.search || '');
-      fetch(url, { headers: { 'Accept': 'text/html' } })
+      var savedY = sessionStorage.getItem('scrollPos');
+      var savedPage = sessionStorage.getItem('currentPage');
+      var params = new URLSearchParams(window.location.search || '');
+      if (savedPage) params.set('page', savedPage);
+      var url = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+      fetch(url, { headers: { 'Accept': 'text/html' }, cache: 'no-store' })
         .then(function (res) { return res.text(); })
         .then(function (html) {
           var parser = new DOMParser();
@@ -427,10 +430,20 @@
             currentJobsArea.dataset.currentPage = fetchedJobsArea.dataset.currentPage || '1';
             currentJobsArea.dataset.totalPages = fetchedJobsArea.dataset.totalPages || '1';
           }
+          if (window.removeDuplicateJobs) window.removeDuplicateJobs();
+          if (window.reinitLoadMore) window.reinitLoadMore();
           setFiltersFromUrl();
           renderActiveFilters();
           updateTopSalarySliderVisibility();
-          window.scrollTo(0, 0);
+          if (savedY !== null && savedPage !== null) {
+            setTimeout(function () {
+              window.scrollTo(0, parseInt(savedY, 10));
+              sessionStorage.removeItem('scrollPos');
+              sessionStorage.removeItem('currentPage');
+            }, 100);
+          } else {
+            window.scrollTo(0, 0);
+          }
         })
         .catch(function () { window.location.reload(); });
     });

@@ -187,6 +187,11 @@ app.get("/", async (req, res) => {
     const pageNum = Number(page);
     const isAppendRequest = append === "1";
 
+    if (isAppendRequest) {
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+      res.set("Pragma", "no-cache");
+    }
+
     const filterParamKeys = [
       "category",
       "company",
@@ -287,7 +292,7 @@ app.get("/", async (req, res) => {
     const [{ total }] = await countQuery;
     const totalPages = Math.ceil(total / Number(limit));
 
-    const jobs = await query
+    let jobs = await query
       .orderByRaw(
         `
         CASE job_premium_status
@@ -299,8 +304,18 @@ app.get("/", async (req, res) => {
       `,
       )
       .orderBy("created_at", "desc")
+      .orderBy("id", "desc")
       .limit(fetchLimit)
       .offset(offset);
+
+    // Deduplicate: same job name + company = keep first (by our sort order)
+    const seenKey = new Set();
+    jobs = jobs.filter((j) => {
+      const key = String(j.jobName || '').trim() + '|' + String(j.companyName || '').trim();
+      if (seenKey.has(key)) return false;
+      seenKey.add(key);
+      return true;
+    });
 
     const baseUrl = "https://samushao.ge";
     const canonical = baseUrl + (pageNum === 1 ? "/" : "/?page=" + pageNum);
