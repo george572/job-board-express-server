@@ -155,12 +155,13 @@
         if (dur < 1) return;
         sent = true;
         var payload = JSON.stringify({ job_id: parseInt(jobId,10), duration_seconds: dur });
-        var blob = new Blob([payload], { type: 'application/json' });
-        if (navigator.sendBeacon) {
-          navigator.sendBeacon('/api/visitors/record-duration', blob);
-        } else {
-          fetch('/api/visitors/record-duration', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(function(){});
-        }
+        fetch('/api/visitors/record-duration', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+          keepalive: true,
+          credentials: 'include'
+        }).catch(function(){});
       }
       window.addEventListener('pagehide', sendDuration);
       window.addEventListener('beforeunload', sendDuration);
