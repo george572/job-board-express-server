@@ -67,6 +67,7 @@ app.use(
       "http://localhost:4001",
       "https://samushao.ge",
       "https://samushao-admin.web.app",
+      "http://localhost:3000/"
     ],
     credentials: true,
   }),
