@@ -426,6 +426,10 @@ app.get("/vakansia/:slug", async (req, res) => {
       return res.status(404).render("404", { message: "Job not found" });
     }
 
+    await db("jobs")
+      .where({ id: jobId })
+      .increment("view_count", 1);
+
     // Generate correct slug and redirect if URL doesn't match
     const correctSlug = slugify(job.jobName) + "-" + job.id;
     if (slug !== correctSlug) {
@@ -468,26 +472,6 @@ app.get("/vakansia/:slug", async (req, res) => {
     });
   } catch (err) {
     res.status(500).send(err.message);
-  }
-});
-
-// Record a view for a job (every visit counts, including repeat visits)
-app.post("/api/job/:id/view", async (req, res) => {
-  try {
-    const jobId = parseInt(req.params.id, 10);
-    if (!jobId || isNaN(jobId)) {
-      return res.status(400).json({ error: "Invalid job id" });
-    }
-    const updated = await db("jobs")
-      .where({ id: jobId, job_status: "approved" })
-      .increment("view_count", 1);
-    if (updated === 0) {
-      return res.status(404).json({ error: "Job not found" });
-    }
-    res.status(204).send();
-  } catch (err) {
-    console.error("job view error:", err);
-    res.status(500).json({ error: "Failed to record view" });
   }
 });
 

@@ -143,9 +143,6 @@
 </head>
 
 <body data-user-uid="<%= user && user.uid ? user.uid : '' %>">
-  <script>
-    (function(){fetch('/api/job/<%= job.id %>/view',{method:'POST',credentials:'same-origin'}).catch(function(){});})();
-  </script>
   <%- include('partials/header') %>
 
   <main class="pb-52 lg:pb-12">
