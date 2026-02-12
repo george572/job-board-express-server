@@ -434,8 +434,21 @@ app.get("/vakansia/:slug", async (req, res) => {
       .increment("view_count", 1);
 
     if (req.visitorId) {
+      const cat = job.category_id
+        ? await db("categories").where("id", job.category_id).select("name").first()
+        : null;
       db("visitor_job_clicks")
-        .insert({ visitor_id: req.visitorId, job_id: jobId })
+        .insert({
+          visitor_id: req.visitorId,
+          job_id: jobId,
+          job_salary: job.jobSalary || null,
+          job_title: job.jobName || null,
+          category_id: job.category_id || null,
+          job_category_name: (cat && cat.name) || null,
+          job_city: job.job_city || null,
+          job_experience: job.job_experience || null,
+          job_type: job.job_type || null,
+        })
         .then(() => {})
         .catch((err) => console.error("visitor_job_clicks error:", err));
     }
