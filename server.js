@@ -626,8 +626,18 @@ app.get("/api/visitors", async (req, res) => {
 
     const [visitors, countRes] = await Promise.all([
       db("visitors")
-        .select("*")
-        .orderBy("last_seen", "desc")
+        .select(
+          "visitors.*",
+          db.raw(
+            "(SELECT COUNT(*)::int FROM visitor_job_clicks WHERE visitor_id = visitors.id) as job_clicks_count"
+          ),
+          db.raw(
+            "(SELECT COUNT(*)::int FROM job_applications WHERE visitor_id = visitors.id) as cv_count"
+          )
+        )
+        .orderByRaw("(CASE WHEN visitors.visit_count > 2 THEN 1 ELSE 0 END) DESC")
+        .orderByRaw("job_clicks_count DESC")
+        .orderByRaw("cv_count DESC")
         .limit(limit)
         .offset(offset),
       db("visitors").count("* as total"),
@@ -661,15 +671,20 @@ app.get("/api/visitors", async (req, res) => {
       applicationsByVisitor[a.visitor_id].push(a);
     });
 
-    const result = visitors.map((v) => ({
-      ...v,
-      is_registered: !!v.user_id,
-      job_clicks: (clicksByVisitor[v.id] || []).map((c) => ({
-        ...c,
-        time_spent_seconds: c.time_spent_seconds ?? null,
-      })),
-      cv_submissions: applicationsByVisitor[v.id] || [],
-    }));
+    const result = visitors.map((v) => {
+      const { job_clicks_count, cv_count, ...rest } = v;
+      return {
+        ...rest,
+        is_registered: !!v.user_id,
+        job_clicks_count: Number(job_clicks_count) || 0,
+        cv_count: Number(cv_count) || 0,
+        job_clicks: (clicksByVisitor[v.id] || []).map((c) => ({
+          ...c,
+          time_spent_seconds: c.time_spent_seconds ?? null,
+        })),
+        cv_submissions: applicationsByVisitor[v.id] || [],
+      };
+    });
 
     res.json({
       visitors: result,
