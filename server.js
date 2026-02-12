@@ -55,7 +55,7 @@ app.use((req, res, next) => {
 });
 
 const { visitorMiddleware } = require("./middleware/visitor");
-app.use(visitorMiddleware(db));
+app.use(visitorMiddleware(db, extractIdFromSlug));
 
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
