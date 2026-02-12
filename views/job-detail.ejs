@@ -142,7 +142,31 @@
 
 </head>
 
-<body data-user-uid="<%= user && user.uid ? user.uid : '' %>">
+<body data-user-uid="<%= user && user.uid ? user.uid : '' %>" data-job-id="<%= job.id %>">
+  <script>
+    (function(){
+      var jobId = document.body.getAttribute('data-job-id');
+      if (!jobId) return;
+      var start = Date.now();
+      var sent = false;
+      function sendDuration() {
+        if (sent) return;
+        var dur = Math.round((Date.now() - start) / 1000);
+        if (dur < 1) return;
+        sent = true;
+        var payload = JSON.stringify({ job_id: parseInt(jobId,10), duration_seconds: dur });
+        var blob = new Blob([payload], { type: 'application/json' });
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon('/api/visitors/record-duration', blob);
+        } else {
+          fetch('/api/visitors/record-duration', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(function(){});
+        }
+      }
+      window.addEventListener('pagehide', sendDuration);
+      window.addEventListener('beforeunload', sendDuration);
+      document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'hidden') sendDuration(); });
+    })();
+  </script>
   <%- include('partials/header') %>
 
   <main class="pb-52 lg:pb-12">

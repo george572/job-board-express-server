@@ -597,6 +597,27 @@ const sendCvRouter = require("./routes/sendCv");
 app.use("/send-cv", sendCvRouter);
 
 // Visitors API
+app.post("/api/visitors/record-duration", async (req, res) => {
+  try {
+    if (!req.visitorId) return res.status(400).json({ error: "No visitor" });
+    const jobId = parseInt(req.body?.job_id, 10);
+    const seconds = Math.max(0, parseInt(req.body?.duration_seconds, 10));
+    if (!jobId || isNaN(jobId)) return res.status(400).json({ error: "Invalid job_id" });
+    const subq = db("visitor_job_clicks")
+      .select("id")
+      .where({ visitor_id: req.visitorId, job_id: jobId })
+      .orderBy("clicked_at", "desc")
+      .limit(1);
+    await db("visitor_job_clicks")
+      .whereIn("id", subq)
+      .update({ time_spent_seconds: isNaN(seconds) ? null : seconds });
+    res.status(204).send();
+  } catch (err) {
+    console.error("visitors/record-duration error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get("/api/visitors", async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -643,7 +664,10 @@ app.get("/api/visitors", async (req, res) => {
     const result = visitors.map((v) => ({
       ...v,
       is_registered: !!v.user_id,
-      job_clicks: clicksByVisitor[v.id] || [],
+      job_clicks: (clicksByVisitor[v.id] || []).map((c) => ({
+        ...c,
+        time_spent_seconds: c.time_spent_seconds ?? null,
+      })),
       cv_submissions: applicationsByVisitor[v.id] || [],
     }));
 
