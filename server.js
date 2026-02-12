@@ -595,6 +595,70 @@ app.use("/upload-logo", companyLogosRouter);
 const sendCvRouter = require("./routes/sendCv");
 app.use("/send-cv", sendCvRouter);
 
+// Visitors API
+app.get("/api/visitors", async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const offset = (page - 1) * limit;
+
+    const [visitors, countRes] = await Promise.all([
+      db("visitors")
+        .select("*")
+        .orderBy("last_seen", "desc")
+        .limit(limit)
+        .offset(offset),
+      db("visitors").count("* as total"),
+    ]);
+    const total = Number((countRes[0] && countRes[0].total) || 0);
+
+    const visitorIds = visitors.map((v) => v.id);
+    const [clicks, applications] = await Promise.all([
+      visitorIds.length
+        ? db("visitor_job_clicks")
+            .whereIn("visitor_id", visitorIds)
+            .select("*")
+            .orderBy("clicked_at", "desc")
+        : [],
+      visitorIds.length
+        ? db("job_applications")
+            .whereIn("visitor_id", visitorIds)
+            .whereNotNull("visitor_id")
+            .select("*")
+        : [],
+    ]);
+
+    const clicksByVisitor = {};
+    clicks.forEach((c) => {
+      if (!clicksByVisitor[c.visitor_id]) clicksByVisitor[c.visitor_id] = [];
+      clicksByVisitor[c.visitor_id].push(c);
+    });
+    const applicationsByVisitor = {};
+    applications.forEach((a) => {
+      if (!applicationsByVisitor[a.visitor_id]) applicationsByVisitor[a.visitor_id] = [];
+      applicationsByVisitor[a.visitor_id].push(a);
+    });
+
+    const result = visitors.map((v) => ({
+      ...v,
+      is_registered: !!v.user_id,
+      job_clicks: clicksByVisitor[v.id] || [],
+      cv_submissions: applicationsByVisitor[v.id] || [],
+    }));
+
+    res.json({
+      visitors: result,
+      total: Number(total),
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    console.error("api/visitors error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.use("/uploads", express.static("uploads"));
 
 // Catch-all 404 (must be after all routes)

@@ -33,22 +33,24 @@ function visitorMiddleware(db) {
           const lastSeen = visitor.last_seen ? new Date(visitor.last_seen) : null;
           const isNewVisit =
             !lastSeen || now - lastSeen > NEW_VISIT_THRESHOLD_MS;
-          await db("visitors")
-            .where("id", visitor.id)
-            .update({
-              last_seen: now,
-              visit_count: isNewVisit
-                ? (visitor.visit_count || 1) + 1
-                : visitor.visit_count || 1,
-              ...(req.session?.user?.uid &&
-                !visitor.user_id && { user_id: req.session.user.uid }),
-            });
-          const [updated] = await db("visitors")
-            .where("id", visitor.id)
-            .select("*");
+          const newVisitCount = isNewVisit
+            ? (visitor.visit_count || 1) + 1
+            : visitor.visit_count || 1;
+          const userUpdate =
+            req.session?.user?.uid && !visitor.user_id
+              ? { user_id: req.session.user.uid }
+              : {};
+          await db("visitors").where("id", visitor.id).update({
+            last_seen: now,
+            visit_count: newVisitCount,
+            ...userUpdate,
+          });
           req.visitorId = visitor.id;
-          req.visitor = Object.assign({}, updated || visitor, {
-            isRegisteredUser: !!(updated || visitor).user_id,
+          req.visitor = Object.assign({}, visitor, {
+            last_seen: now,
+            visit_count: newVisitCount,
+            user_id: userUpdate.user_id || visitor.user_id,
+            isRegisteredUser: !!(userUpdate.user_id || visitor.user_id),
           });
           return next();
         }
