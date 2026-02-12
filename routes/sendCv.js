@@ -8,7 +8,9 @@ const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
 const router = express.Router();
-const db = knex(require("../knexfile").development);
+const knexConfig = require("../knexfile");
+const env = process.env.NODE_ENV || "development";
+const db = knex(knexConfig[env]);
 router.use(cors());
 
 const MAIL_USER = "info@samushao.ge";
@@ -90,8 +92,10 @@ router.post("/", (req, res) => {
           }
 
           // Record that this user applied to this job (so we can disable "Send CV" on job page)
+          const insertPayload = { user_id: user_id, job_id: job.id };
+          if (req.visitorId) insertPayload.visitor_id = req.visitorId;
           db("job_applications")
-            .insert({ user_id: user_id, job_id: job.id })
+            .insert(insertPayload)
             .then(() =>
               resolve({
                 message: "CV sent successfully to company email",

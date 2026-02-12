@@ -54,6 +54,9 @@ app.use((req, res, next) => {
   next();
 });
 
+const { visitorMiddleware } = require("./middleware/visitor");
+app.use(visitorMiddleware(db));
+
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 
@@ -429,6 +432,13 @@ app.get("/vakansia/:slug", async (req, res) => {
     await db("jobs")
       .where({ id: jobId })
       .increment("view_count", 1);
+
+    if (req.visitorId) {
+      db("visitor_job_clicks")
+        .insert({ visitor_id: req.visitorId, job_id: jobId })
+        .then(() => {})
+        .catch((err) => console.error("visitor_job_clicks error:", err));
+    }
 
     // Generate correct slug and redirect if URL doesn't match
     const correctSlug = slugify(job.jobName) + "-" + job.id;
