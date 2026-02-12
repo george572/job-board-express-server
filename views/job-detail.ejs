@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ka">
-
+<% const mainJob = { id: job.id, category_id: job.category_id, jobName: job.jobName, jobSalary: job.jobSalary, companyName: job.companyName, job_city: job.job_city, jobDescription: job.jobDescription, job_description: job.job_description }; %>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -374,7 +374,7 @@
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       const descEl = document.getElementById('jobDescription');
-      const raw = <%- JSON.stringify(job.jobDescription || '') %>;
+      const raw = <%- JSON.stringify(mainJob.jobDescription || mainJob.job_description || '') %>;
 
       const isHtml = function(str) {
         if (!str) return false;
@@ -444,7 +444,7 @@
                   title: this.getAttribute('data-job-title'),
                   company: this.getAttribute('data-job-company'),
                   location: this.getAttribute('data-job-location'),
-                  referrer_job_id: '<%= job.id %>'
+                  referrer_job_id: document.body.getAttribute('data-job-id')
                 });
               }
             } catch (e) {}
@@ -473,13 +473,14 @@
     const uploadProgressPercent = document.getElementById('uploadProgressPercent');
     const uploadProgressBar = document.getElementById('uploadProgressBar');
 
-    const jobId = <%- JSON.stringify(job.id) %>;
-    const jobCategoryId = <%- JSON.stringify(job.category_id || null) %>;
+    // Use data-job-id from body as single source of truth - avoid EJS include overwriting job (relatedJobs loop sets job to last related job)
+    const jobId = parseInt(document.body.getAttribute('data-job-id') || '0', 10);
+    const jobCategoryId = <%- JSON.stringify(mainJob.category_id || null) %>;
     const jobCategory = categoryNames[String(jobCategoryId)] || jobCategoryId;
-    const jobTitle = <%- JSON.stringify(job.jobName || '') %>;
-    const jobSalaryRange = <%- JSON.stringify(job.jobSalary || '') %>;
-    const jobCompany = <%- JSON.stringify(job.companyName || '') %>;
-    const jobLocation = <%- JSON.stringify(job.job_city || '') %>;
+    const jobTitle = <%- JSON.stringify(mainJob.jobName || '') %>;
+    const jobSalaryRange = <%- JSON.stringify(mainJob.jobSalary || '') %>;
+    const jobCompany = <%- JSON.stringify(mainJob.companyName || '') %>;
+    const jobLocation = <%- JSON.stringify(mainJob.job_city || '') %>;
     const userUid = <%- user ? JSON.stringify(user.uid) : 'null' %>;
 
     // State: does user already have a CV saved, and are we using it instead of uploading a new one?
