@@ -44,30 +44,67 @@
   <!-- Top salary jobs (scrollable, hidden when any filter is active) -->
   <% if (topSalaryJobs && topSalaryJobs.length > 0) { %>
   <section id="top-salary-slider-section" class="w-full mx-auto px-4 mt-6 mb-4" style="<%= filtersActive ? 'display:none' : '' %>">
-    <div class="flex items-center justify-between mb-4 gap-3">
-      <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1">
-        ყველაზე მაღალანაზღაურებადი ვაკანსიები
-      </h2>
-      <div class="flex items-center gap-2 flex-shrink-0">
-        <button type="button" class="top-salary-prev w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Prev">←</button>
-        <button type="button" class="top-salary-next w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Next">→</button>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+      <div class="flex flex-col gap-1 flex-1">
+        <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515]">
+          ყველაზე მაღალანაზღაურებადი ვაკანსიები
+        </h2>
+        <% if (typeof topSalaryTotalCount !== 'undefined' && topSalaryTotalCount > 0) { %>
+        <a href="/kvelaze-magalanazgaurebadi-vakansiebi" class="text-sm text-[#315EFF] hover:underline hidden sm:inline-block">
+          ყველას ნახვა (<%= topSalaryTotalCount %>)
+        </a>
+        <% } %>
+      </div>
+      <div class="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0">
+        <% if (typeof topSalaryTotalCount !== 'undefined' && topSalaryTotalCount > 0) { %>
+        <a href="/kvelaze-magalanazgaurebadi-vakansiebi" class="text-sm text-[#315EFF] hover:underline sm:hidden">
+          ყველას ნახვა (<%= topSalaryTotalCount %>)
+        </a>
+        <% } %>
+        <div class="flex items-center gap-2">
+          <button type="button" class="top-salary-prev w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Prev">←</button>
+          <button type="button" class="top-salary-next w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Next">→</button>
+        </div>
       </div>
     </div>
     <div id="top-salary-scroll" class="top-salary-scroll flex w-full items-stretch gap-3 sm:gap-4 overflow-x-auto pb-4 pr-4 snap-x snap-mandatory" 
     style="scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;">
     <% topSalaryJobs.forEach(job => { %>
    <div class="top-salary-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col">
-     <%- include('partials/jobItemCompact.ejs', { job, slugify }) %>
+     <%- include('partials/jobItemCompact.ejs', { job, slugify, inSlider: true }) %>
    </div>
  <% }) %>
 </div>
   </section>
   <% } %>
 
+  <!-- Today's jobs (დღევანდელი ვაკანსიები) - hidden when any filter is active -->
+  <% if (todayJobs && todayJobs.length > 0 && !filtersActive) { %>
+  <section id="today-jobs-section" class="w-full mx-auto px-4 mt-6 mb-4">
+    <div class="flex items-center justify-between mb-4 gap-3">
+      <div class="flex flex-col gap-1 flex-1">
+        <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515]">
+          დღევანდელი ვაკანსიები
+        </h2>
+        <% if (typeof todayJobsCount !== 'undefined' && todayJobsCount > 0) { %>
+        <a href="/dgevandeli-vakansiebi" class="text-sm text-[#315EFF] hover:underline">
+          ყველას ნახვა (<%= todayJobsCount %>)
+        </a>
+        <% } %>
+      </div>
+    </div>
+    <div class="w-full mx-auto flex flex-col gap-0">
+      <% todayJobs.slice(0, 10).forEach(job => { %>
+      <%- include('partials/jobItem.ejs', { job, slugify }) %>
+      <% }) %>
+    </div>
+  </section>
+  <% } %>
+
   <!-- Jobs area (replaced without reload when filters change) -->
   <div id="jobs-area" data-current-page="<%= currentPage || 1 %>" data-total-pages="<%= totalPages || 1 %>">
   <h1 id="all-vacancies-heading" class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1 pb-4 w-full mx-auto px-4" style="<%= filtersActive ? 'display:none' : '' %>">
-    ყველა ვაკანსია
+    <%= typeof pageType === 'string' && pageType === 'top-salary' ? 'ყველაზე მაღალანაზღაურებადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'today' ? 'დღევანდელი ვაკანსიები' : 'ყველა ვაკანსია') %>
   </h1>
   <div class="w-full relative mx-auto px-4" id="jobs-container">
     <% if (jobs && jobs.length > 0) { %>
@@ -88,9 +125,11 @@
 
 
   <% if (totalPages > 1) { %>
+  <% const _paginationBase = (typeof paginationBase !== 'undefined' && paginationBase) ? paginationBase : '/'; %>
+  <% const _pageUrl = _paginationBase + '?page='; %>
   <nav class="pagination pagination-small w-full flex justify-center items-center gap-2 py-4" style="display:none">
     <% if (currentPage > 1) { %>
-    <a href="/?page=<%= currentPage - 1 %>" class="p-2 bg-primary text-white rounded-xl">← წინა</a>
+    <a href="<%= _pageUrl %><%= currentPage - 1 %>" class="p-2 bg-primary text-white rounded-xl">← წინა</a>
     <% } %>
 
     <% 
@@ -99,21 +138,21 @@
     let endPage = Math.min(totalPages, currentPage + 2);
     
     if (startPage > 1) { %>
-    <a href="/?page=1" class="p-2 bg-primary text-white rounded-xl min-w-[30px] text-center">1</a>
+    <a href="<%= _pageUrl %>1" class="p-2 bg-primary text-white rounded-xl min-w-[30px] text-center">1</a>
     <% if (startPage > 2) { %><span>...</span><% } %>
     <% }
     
     for (let i = startPage; i <= endPage; i++) { %>
-    <a href="/?page=<%= i %>" class="<%= i === currentPage ? 'active' : '' %> p-2 bg-primary text-white rounded-xl min-w-[30px] text-center"><%= i %></a>
+    <a href="<%= _pageUrl %><%= i %>" class="<%= i === currentPage ? 'active' : '' %> p-2 bg-primary text-white rounded-xl min-w-[30px] text-center"><%= i %></a>
     <% }
     
     if (endPage < totalPages) { 
       if (endPage < totalPages - 1) { %><span>...</span><% } %>
-    <a href="/?page=<%= totalPages %>" class="p-2 bg-primary text-white rounded-xl min-w-[30px] text-center"><%= totalPages %></a>
+    <a href="<%= _pageUrl %><%= totalPages %>" class="p-2 bg-primary text-white rounded-xl min-w-[30px] text-center"><%= totalPages %></a>
     <% } %>
 
     <% if (currentPage < totalPages) { %>
-    <a href="/?page=<%= currentPage + 1 %>" class="p-2 bg-primary text-white rounded-xl">შემდეგი →</a>
+    <a href="<%= _pageUrl %><%= currentPage + 1 %>" class="p-2 bg-primary text-white rounded-xl">შემდეგი →</a>
     <% } %>
   </nav>
   <% } %>
@@ -188,7 +227,8 @@
       const params = new URLSearchParams(window.location.search);
       params.set('page', currentPage + 1);
       params.set('append', '1');
-      const url = '/?' + params.toString();
+      const base = (window.location.pathname || '/').replace(/\/$/, '') || '/';
+      const url = base + (params.toString() ? '?' + params.toString() : '?append=1');
 
       fetch(url, { cache: 'no-store' })
         .then(function (res) { return res.text(); })
@@ -262,7 +302,8 @@
       var params = new URLSearchParams(window.location.search);
       params.set('page', String(targetPage));
       params.delete('append');
-      var url = '/?' + params.toString();
+      var base = (window.location.pathname || '/').replace(/\/$/, '') || '/';
+      var url = base + (params.toString() ? '?' + params.toString() : '');
       return fetch(url, { cache: 'no-store' })
         .then(function (res) { return res.text(); })
         .then(function (html) {

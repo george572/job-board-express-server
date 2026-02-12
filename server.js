@@ -129,6 +129,18 @@ app.get("/sitemap.xml", async (req, res) => {
         changefreq: "monthly",
         priority: "0.5",
       },
+      {
+        loc: SITE_BASE_URL + "/kvelaze-magalanazgaurebadi-vakansiebi",
+        lastmod: toDate(new Date()),
+        changefreq: "daily",
+        priority: "0.9",
+      },
+      {
+        loc: SITE_BASE_URL + "/dgevandeli-vakansiebi",
+        lastmod: toDate(new Date()),
+        changefreq: "daily",
+        priority: "0.9",
+      },
       ...jobs.map((job) => ({
         loc: `${SITE_BASE_URL}/vakansia/${slugify(job.jobName)}-${job.id}`,
         lastmod: toDate(job.updated_at || job.created_at),
@@ -221,6 +233,9 @@ app.get("/", async (req, res) => {
 
     // Top salary jobs slider – skip when any filters are active
     let topSalaryJobs = [];
+    let topSalaryTotalCount = 0;
+    let todayJobs = [];
+    let todayJobsCount = 0;
     if (!filtersActive) {
       topSalaryJobs = await db("jobs")
         .select("*")
@@ -228,12 +243,35 @@ app.get("/", async (req, res) => {
         .whereNotNull("jobSalary_min")
         .orderBy("jobSalary_min", "desc")
         .limit(20);
+      topSalaryTotalCount = topSalaryJobs.length;
+
+      // Today's jobs (დღევანდელი ვაკანსიები)
+      todayJobs = await db("jobs")
+        .select("*")
+        .where("job_status", "approved")
+        .whereRaw("created_at::date = CURRENT_DATE")
+        .orderByRaw(
+          `CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END`
+        )
+        .orderBy("created_at", "desc")
+        .orderBy("id", "desc");
+      const seenToday = new Set();
+      todayJobs = todayJobs.filter((j) => {
+        const key = String(j.jobName || "").trim() + "|" + String(j.companyName || "").trim();
+        if (seenToday.has(key)) return false;
+        seenToday.add(key);
+        return true;
+      });
+      todayJobsCount = todayJobs.length;
     }
 
     let query = db("jobs").select("*").where("job_status", "approved");
     let countQuery = db("jobs")
       .count("* as total")
-      .where("job_status", "approved"); // ADD THIS
+      .where("job_status", "approved");
+    // Exclude today's jobs from main listing (ყველა ვაკანსია)
+    query.whereRaw("created_at::date < CURRENT_DATE");
+    countQuery.whereRaw("created_at::date < CURRENT_DATE");
 
     // Apply same filters to both queries
     if (company) {
@@ -326,11 +364,15 @@ app.get("/", async (req, res) => {
     res.render("index", {
       jobs,
       topSalaryJobs,
+      topSalaryTotalCount,
+      todayJobs,
+      todayJobsCount,
       currentPage: pageNum,
       totalPages,
       totalJobs: total,
       filters: req.query,
       filtersActive,
+      paginationBase: "/",
       slugify,
       seo: {
         title: "ვაკანსიები | Samushao.ge",
@@ -342,6 +384,104 @@ app.get("/", async (req, res) => {
       },
     });
   } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+// Highest paid jobs page – shows only top 20 (same as slider)
+app.get("/kvelaze-magalanazgaurebadi-vakansiebi", async (req, res) => {
+  try {
+    const topLimit = 20;
+
+    let jobs = await db("jobs")
+      .select("*")
+      .where("job_status", "approved")
+      .whereNotNull("jobSalary_min")
+      .orderBy("jobSalary_min", "desc")
+      .limit(topLimit);
+
+    // Deduplicate: same job name + company = keep first
+    const seenKey = new Set();
+    jobs = jobs.filter((j) => {
+      const key = String(j.jobName || "").trim() + "|" + String(j.companyName || "").trim();
+      if (seenKey.has(key)) return false;
+      seenKey.add(key);
+      return true;
+    });
+
+    res.render("index", {
+      jobs,
+      topSalaryJobs: [],
+      topSalaryTotalCount: jobs.length,
+      todayJobs: [],
+      todayJobsCount: 0,
+      currentPage: 1,
+      totalPages: 1,
+      totalJobs: jobs.length,
+      filters: {},
+      filtersActive: false,
+      pageType: "top-salary",
+      paginationBase: "/kvelaze-magalanazgaurebadi-vakansiebi",
+      slugify,
+      seo: {
+        title: "ყველაზე მაღალანაზღაურებადი ვაკანსიები | Samushao.ge",
+        description:
+          "ყველაზე მაღალანაზღაურებადი ვაკანსიები",
+        canonical: "https://samushao.ge/kvelaze-magalanazgaurebadi-vakansiebi",
+        ogImage:
+          "https://res.cloudinary.com/dd7gz0aqv/image/upload/v1743605652/export_l1wpwr.png",
+      },
+    });
+  } catch (err) {
+    console.error("kvelaze-magalanazgaurebadi-vakansiebi error:", err);
+    res.status(500).send(err.message);
+  }
+});
+
+// Today's jobs page (დღევანდელი ვაკანსიები)
+app.get("/dgevandeli-vakansiebi", async (req, res) => {
+  try {
+    let jobs = await db("jobs")
+      .select("*")
+      .where("job_status", "approved")
+      .whereRaw("created_at::date = CURRENT_DATE")
+      .orderByRaw(
+        `CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END`
+      )
+      .orderBy("created_at", "desc")
+      .orderBy("id", "desc");
+
+    const seenKey = new Set();
+    jobs = jobs.filter((j) => {
+      const key = String(j.jobName || "").trim() + "|" + String(j.companyName || "").trim();
+      if (seenKey.has(key)) return false;
+      seenKey.add(key);
+      return true;
+    });
+
+    res.render("index", {
+      jobs,
+      topSalaryJobs: [],
+      topSalaryTotalCount: 0,
+      todayJobs: [],
+      todayJobsCount: 0,
+      currentPage: 1,
+      totalPages: 1,
+      totalJobs: jobs.length,
+      filters: {},
+      filtersActive: false,
+      pageType: "today",
+      paginationBase: "/dgevandeli-vakansiebi",
+      slugify,
+      seo: {
+        title: "დღევანდელი ვაკანსიები | Samushao.ge",
+        description:
+          "დღევანდელი ვაკანსიები. იპოვე სამუშაო და გაგზავნე CV.",
+        canonical: "https://samushao.ge/dgevandeli-vakansiebi",
+      },
+    });
+  } catch (err) {
+    console.error("dgevandeli-vakansiebi error:", err);
     res.status(500).send(err.message);
   }
 });

@@ -13,7 +13,7 @@
     <header class="w-full md:w-1/3 text-sm flex justify-between">
       <div class="flex gap-2 items-center">
         <% if (job.company_logo) { %>
-        <div class="w-[50px] h-[50px] rounded-lg overflow-hidden">
+        <div class="min-w-[44px] max-w-[44px] h-[44px] rounded-lg overflow-hidden">
           <img src="<%= job.company_logo %>" alt="<%= job.companyName %> — ლოგო" referrerpolicy="no-referrer" class="w-full h-full object-contain" />
         </div>
         <% } %>
@@ -21,7 +21,7 @@
         <div class="flex flex-col gap-1">
           <h3 class="text-[14px] text-[#3F3F3F] font-[300]"><%= job.companyName %></h3>
           <h2 class="font-kolkha">
-            <span class="font-[400] text-[16px] text-[#151515]">
+            <span class="font-[400] text-[15px] lg:text-[16px] text-[#151515]">
               <%= job.jobName %>
             </span>
           </h2>
@@ -30,7 +30,7 @@
     </header>
 
     <section class="w-full md:w-1/3 flex justify-center items-center gap-2 md:gap-0">
-      <div class="flex gap-4 sm:gap-8 items-center">
+      <div class="flex gap-1 sm:gap-8 items-center">
         <div class="flex flex-col">
           <span class="font-[mrgvlovani] text-[12px]">ანაზღაურება</span>
           <span class="flex gap-1 items-center text-[12px] font-[500] text-[#151515] mt-1 flex-nowrap text-nowrap">
