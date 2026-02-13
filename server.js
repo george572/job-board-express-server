@@ -269,9 +269,11 @@ app.get("/", async (req, res) => {
     let countQuery = db("jobs")
       .count("* as total")
       .where("job_status", "approved");
-    // Exclude today's jobs from main listing (ყველა ვაკანსია)
-    query.whereRaw("created_at::date < CURRENT_DATE");
-    countQuery.whereRaw("created_at::date < CURRENT_DATE");
+    // Exclude today's jobs from main listing (ყველა ვაკანსია) – unless filters/search active (today section is hidden)
+    if (!filtersActive) {
+      query.whereRaw("created_at::date < CURRENT_DATE");
+      countQuery.whereRaw("created_at::date < CURRENT_DATE");
+    }
 
     // Apply same filters to both queries
     if (company) {
