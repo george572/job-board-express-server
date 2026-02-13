@@ -575,9 +575,15 @@ app.get("/vakansia/:slug", async (req, res) => {
     res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
     res.set("Pragma", "no-cache");
 
-    await db("jobs")
-      .where("id", jobId)
-      .increment("view_count", 1);
+    // Use raw SQL for reliable increment (avoids Knex .increment() quirks)
+    try {
+      await db.raw(
+        "UPDATE jobs SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?",
+        [jobId]
+      );
+    } catch (incErr) {
+      console.error("view_count increment error:", incErr);
+    }
 
     if (req.visitorId) {
       const cat = job.category_id
