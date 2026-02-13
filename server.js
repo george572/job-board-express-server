@@ -556,9 +556,10 @@ app.get("/my-applications", async (req, res) => {
 app.get("/vakansia/:slug", async (req, res) => {
   try {
     const slug = req.params.slug;
-    const jobId = extractIdFromSlug(slug);
+    const jobIdRaw = extractIdFromSlug(slug);
+    const jobId = jobIdRaw ? parseInt(jobIdRaw, 10) : null;
 
-    if (!jobId) {
+    if (!jobId || isNaN(jobId)) {
       return res.status(404).render("404", { message: "Job not found" });
     }
 
@@ -570,8 +571,12 @@ app.get("/vakansia/:slug", async (req, res) => {
       return res.status(404).render("404", { message: "Job not found" });
     }
 
+    // Prevent caching so every view hits the server and gets counted
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    res.set("Pragma", "no-cache");
+
     await db("jobs")
-      .where({ id: jobId })
+      .where("id", jobId)
       .increment("view_count", 1);
 
     if (req.visitorId) {
