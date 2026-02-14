@@ -183,7 +183,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-router.post("/", upload.single("company_logo"), (req, res) => {
+router.post("/", upload.single("company_logo"), async (req, res) => {
   const {
     companyName,
     jobName,
@@ -213,10 +213,27 @@ router.post("/", upload.single("company_logo"), (req, res) => {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
+  const jName = String(jobName || "").trim();
+  const cName = String(companyName || "").trim();
+
+  const existing = await db("jobs")
+    .where("job_status", "approved")
+    .where("jobName", jName)
+    .where("companyName", cName)
+    .first();
+
+  if (existing) {
+    return res.status(409).json({
+      error: "Duplicate job",
+      message: "A job with this title and company already exists",
+      existingId: existing.id,
+    });
+  }
+
   db("jobs")
     .insert({
-      companyName,
-      jobName,
+      companyName: cName,
+      jobName: jName,
       jobSalary,
       jobDescription,
       jobIsUrgent,
@@ -249,6 +266,7 @@ router.post("/bulk", async (req, res) => {
 
   const validJobs = [];
   const failedJobs = [];
+  const seenInBatch = new Set();
 
   jobsToInsert.forEach((job, index) => {
     // Define your "Deal Breakers" here
@@ -259,9 +277,19 @@ router.post("/bulk", async (req, res) => {
       job.category_id;
 
     if (hasRequiredFields) {
+      const jName = String(job.jobName || "").trim();
+      const cName = String(job.companyName || "").trim();
+      const key = jName + "|" + cName;
+
+      if (seenInBatch.has(key)) {
+        failedJobs.push({ index, jobName: jName, error: "Duplicate within batch" });
+        return;
+      }
+      seenInBatch.add(key);
+
       validJobs.push({
-        companyName: job.companyName,
-        jobName: job.jobName,
+        companyName: cName,
+        jobName: jName,
         jobSalary: job.jobSalary,
         jobDescription: job.jobDescription,
         jobIsUrgent: job.jobIsUrgent || false,
@@ -302,7 +330,29 @@ router.post("/bulk", async (req, res) => {
   }
 
   try {
-    const ids = await db("jobs").insert(validJobs).returning("id");
+    const existingRows = await db("jobs")
+      .select("jobName", "companyName")
+      .where("job_status", "approved");
+    const existingSet = new Set(
+      existingRows.map((r) => String(r.jobName || "").trim() + "|" + String(r.companyName || "").trim())
+    );
+
+    const toInsert = validJobs.filter((j) => !existingSet.has(j.jobName + "|" + j.companyName));
+    const skippedAsDuplicates = validJobs.length - toInsert.length;
+
+    if (skippedAsDuplicates > 0) {
+      console.warn(`[!] Skipped ${skippedAsDuplicates} jobs – duplicate of existing approved job`);
+    }
+
+    if (toInsert.length === 0) {
+      return res.status(400).json({
+        error: "All jobs are duplicates of existing approved jobs",
+        failedCount: failedJobs.length,
+        skippedCount: skippedAsDuplicates,
+      });
+    }
+
+    const ids = await db("jobs").insert(toInsert).returning("id");
     
     console.log(`✅ SUCCESS: Inserted ${ids.length} jobs.`);
     if (failedJobs.length > 0) {
@@ -313,7 +363,8 @@ router.post("/bulk", async (req, res) => {
       message: "Processing complete", 
       insertedCount: ids.length,
       failedCount: failedJobs.length,
-      failedJobs: failedJobs // Send this back so your Python script knows what to fix
+      skippedAsDuplicates,
+      failedJobs: failedJobs
     });
   } catch (err) {
     // This catches DB-level crashes (e.g. unique constraint violations)
