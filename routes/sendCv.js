@@ -26,107 +26,73 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   const { job_id, user_id } = req.body;
 
-  // Get job information using Knex
-  db("jobs")
-    .where("id", job_id)
-    .first()
-    .then((job) => {
-      if (!job) {
-        return res.status(404).json({ error: "Job not found" });
-      }
+  try {
+    const job = await db("jobs").where("id", job_id).first();
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
 
-      // Increment cvs_sent for the job
-      return db("jobs")
-        .where("id", job_id)
-        .increment("cvs_sent", 1)
-        .returning("*")
-        .then(() => job);
-    })
-    .then((job) => {
-      // Get resume information using Knex
-      return db("resumes")
-        .where("user_id", user_id)
-        .first()
-        .then((resume) => {
-          if (!resume) {
-            return res.status(404).json({ error: "Resume not found" });
-          }
-          return { job, resume };
-        });
-    })
-    .then(({ job, resume }) => {
-      // Get user information using Knex
-      return db("users")
-        .where("user_uid", user_id)
-        .first()
-        .then((user) => {
-          if (!user) {
-            return res.status(404).json({ error: "User not found" });
-          }
+    await db("jobs").where("id", job_id).increment("cvs_sent", 1);
 
-          if (!MAIL_PASS) {
-            return reject(new Error("MAIL_PSW is not set in .env"));
-          }
+    const resume = await db("resumes").where("user_id", user_id).first();
+    if (!resume) {
+      return res.status(404).json({ error: "Resume not found" });
+    }
 
-          // Send email (from must match auth user for Gmail)
-          const mailOptions = {
-            from: MAIL_USER,
-            to: job.company_email,
-            subject: `New Application for ${job.jobName}`,
-            html: `<p>ახალი CV გამოიგზავნა თქვენს ვაკანსიაზე: "${job.jobName}".</p>
-                   <p>CV-ის ბმული: ${resume.file_url}</p>
-                   <p>კანდიდატის სახელი: ${user.user_name}</p>
-                   <p>კანდიდატის ელ-ფოსტა: ${user.user_email}</p>`,
-          };
+    const user = await db("users").where("user_uid", user_id).first();
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
 
-      return new Promise((resolve, reject) => {
-        transporter.sendMail(mailOptions, (error, info) => {
-          if (error) {
-            console.error("Email sending error:", error);
-            return reject(
-              new Error("Failed to send email: " + error.message)
-            );
-          }
+    if (!MAIL_PASS) {
+      return res.status(500).json({ error: "Email service not configured" });
+    }
 
-          // Record that this user applied to this job (so we can disable "Send CV" on job page)
-          const insertPayload = { user_id: user_id, job_id: job.id };
-          if (req.visitorId) insertPayload.visitor_id = req.visitorId;
-          db("job_applications")
-            .insert(insertPayload)
-            .then(() =>
-              resolve({
-                message: "CV sent successfully to company email",
-                job,
-                resume,
-                user,
-              })
-            )
-            .catch((insertErr) => {
-              console.error("job_applications insert error:", insertErr);
-              // Still resolve success - email was sent
-              resolve({
-                message: "CV sent successfully to company email",
-                job,
-                resume,
-                user,
-              });
-            });
-        });
+    const mailOptions = {
+      from: MAIL_USER,
+      to: job.company_email,
+      subject: `New Application for ${job.jobName}`,
+      html: `<p>ახალი CV გამოიგზავნა თქვენს ვაკანსიაზე: "${job.jobName}".</p>
+             <p>CV-ის ბმული: ${resume.file_url}</p>
+             <p>კანდიდატის სახელი: ${user.user_name}</p>
+             <p>კანდიდატის ელ-ფოსტა: ${user.user_email}</p>`,
+    };
+
+    await new Promise((resolve, reject) => {
+      transporter.sendMail(mailOptions, (err) => {
+        if (err) {
+          console.error("Email sending error:", err);
+          reject(new Error("Failed to send email: " + err.message));
+        } else {
+          resolve();
+        }
       });
-        });
-    })
-    .then((result) => {
-      res.json(result);
-    })
-    .catch((err) => {
-      console.error("Database or email error:", err);
-      // Prefer the error message, but fall back to any `error` field or a generic message
-      const message = err?.message || err?.error || "An unexpected error occurred";
-      return res.status(500).json({ error: message });
     });
+
+    const insertPayload = { user_id, job_id: job.id };
+    if (req.visitorId) insertPayload.visitor_id = req.visitorId;
+    try {
+      await db("job_applications").insert(insertPayload);
+    } catch (insertErr) {
+      console.error("job_applications insert error:", insertErr);
+      // Email was sent; application record may already exist (duplicate)
+    }
+
+    return res.json({
+      message: "CV sent successfully to company email",
+      job,
+      resume,
+      user,
+    });
+  } catch (err) {
+    if (res.headersSent) return;
+    console.error("send-cv error:", err);
+    const message = err?.message || err?.error || "An unexpected error occurred";
+    return res.status(500).json({ error: message });
+  }
 });
 
 module.exports = router;
