@@ -24,8 +24,8 @@ const PROPOSITIONAL_MAIL_PASS = (process.env.PROPOSITIONAL_MAIL_PASS || "").trim
 const PROPOSITIONAL_HTML_TEMPLATE = (cvsSent) => `
 <p>სალამი!</p>
 <p>ბოდიში, ჩვენ დაუკითხავად (მაგრამ კეთილი განზრახვით) დავდეთ თქვენი ვაკანსია ჩვენს საიტზე (<a href="https://samushao.ge">samushao.ge</a>), იმედია არ გაგაბრაზეთ.</p>
-<p>საკმაოდ ბევრი ნახვა აქვს განცხადებას, იმის მიუხედავად რომ პრემიუმი არ არის და უკვე <strong>${cvsSent}</strong> რეზიუმე გამოიგზავნა.</p>
-<p>თუ თქვენც მოგწონთ ეს შედეგები და გინდათ თქვენი ვაკანსია დარჩეს საიტზე, ჩვენთან განცხადების დადება ფასიანია.</p>
+<p>იმის მიუხედავად რომ პრემიუმი არ არის, უკვე <strong>${cvsSent}</strong> რეზიუმე გამოიგზავნა მოკლე დროში.</p>
+<p>თუ მოგწონთ ეს შედეგი და გინდათ თქვენი ვაკანსია დარჩეს საიტზე, ჩვენთან განცხადების დადება ფასიანია.</p>
 `;
 
 const transporter = nodemailer.createTransport({
@@ -58,6 +58,10 @@ router.post("/", async (req, res) => {
     const job = await db("jobs").where("id", job_id).first();
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
+    }
+
+    if (job.expires_at && new Date(job.expires_at) <= new Date()) {
+      return res.status(410).json({ error: "This vacancy has expired and is no longer accepting applications" });
     }
 
     const cvsSentBefore = job.cvs_sent || 0;

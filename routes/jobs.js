@@ -27,7 +27,10 @@ router.get("/", async (req, res) => {
 
     const offset = (Number(page) - 1) * Number(limit);
 
-    let query = db("jobs").select("*").where("job_status", "approved");
+    let query = db("jobs")
+      .select("*")
+      .where("job_status", "approved")
+      .whereRaw("(expires_at IS NULL OR expires_at > NOW())");
 
     // Apply filters
     if (company) query.where("companyName", company);

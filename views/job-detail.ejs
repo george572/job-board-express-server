@@ -184,7 +184,12 @@
             </svg><span class="text-[14px]">ყველა ვაკანსია</span></a></div>
         <section class=" bg-white rounded-lg border border-[#EBEBEB] self-start w-full lg:min-w-[360px] p-4 lg:p-8 relative">
           <header>
-            <h1 class="mb-0 lg:mb-6"><span class="text-[16px] text-[#151515] font-bold"><%= 'ვაკანსია' + ' - ' + job.jobName %></span></h1>
+            <h1 class="mb-0 lg:mb-6 flex items-center gap-2 flex-wrap">
+            <span class="text-[16px] text-[#151515] font-bold"><%= 'ვაკანსია' + ' - ' + job.jobName %></span>
+            <% if (typeof isExpired !== 'undefined' && isExpired) { %>
+            <span class="text-[11px] px-2 py-0.5 rounded bg-gray-200 text-gray-600 font-[400]">არქივი</span>
+            <% } %>
+          </h1>
             <div class="flex lg:hidden gap-2 items-center">
               <% if (job.company_logo) { %>
               <div class="w-[50px] h-[50px] rounded-lg overflow-hidden">
@@ -237,6 +242,10 @@
           <div class="bg-gray-200 w-[296px] h-[52px] text-gray-600 rounded-lg my-8 mb-1 text-[16px] hidden lg:flex items-center justify-center mt-8 cursor-not-allowed">
             თქვენ უკვე გაგზავნეთ CV
           </div>
+          <% } else if (typeof isExpired !== 'undefined' && isExpired) { %>
+          <div class="bg-gray-200 w-[296px] h-[52px] text-gray-600 rounded-lg my-8 mb-1 text-[16px] hidden lg:flex items-center justify-center mt-8">
+            ვაკანსიის ვადა გაუვიდა
+          </div>
           <% } else { %>
           <button id="openDialogBtn" class="bg-[#315EFF] w-[296px] h-[52px] text-white rounded-lg my-8 mb-1 text-[16px] hidden lg:block mt-8 <% if (!user) { %>opacity-50 cursor-not-allowed<% } else { %>cursor-pointer<% } %>" <% if (!user) { %>disabled<% } %>> გააგზავნე რეზიუმე </button>
           <% } %>
@@ -285,6 +294,10 @@
       <% if (typeof userAlreadyApplied !== 'undefined' && userAlreadyApplied) { %>
       <div class="bg-gray-200 w-full min-h-[52px] text-gray-600 rounded-lg my-8 mt-0 mb-1 text-[16px] flex items-center justify-center cursor-not-allowed">
         თქვენ უკვე გაგზავნეთ CV
+      </div>
+      <% } else if (typeof isExpired !== 'undefined' && isExpired) { %>
+      <div class="bg-gray-200 w-full min-h-[52px] text-gray-600 rounded-lg my-8 mt-0 mb-1 text-[16px] flex items-center justify-center">
+        ვაკანსიის ვადა გაუვიდა
       </div>
       <% } else { %>
       <button id="openDialogBtn2" class="bg-[#315EFF] mt-2 w-full min-h-[52px] text-white rounded-lg my-8 mt-0 mb-1 text-[16px] <% if (!user) { %>opacity-50 cursor-not-allowed<% } else { %>cursor-pointer<% } %>" <% if (!user) { %>disabled<% } %>> გააგზავნე რეზიუმე </button>

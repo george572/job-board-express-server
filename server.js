@@ -102,6 +102,7 @@ app.get("/sitemap.xml", async (req, res) => {
     const jobs = await db("jobs")
       .select("id", "jobName", "updated_at", "created_at")
       .where("job_status", "approved")
+      .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
       .orderBy("id", "asc");
 
     const toDate = (d) => {
@@ -240,6 +241,7 @@ app.get("/", async (req, res) => {
       topSalaryJobs = await db("jobs")
         .select("*")
         .where("job_status", "approved")
+        .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
         .whereNotNull("jobSalary_min")
         .orderBy("jobSalary_min", "desc")
         .limit(20);
@@ -249,6 +251,7 @@ app.get("/", async (req, res) => {
       todayJobs = await db("jobs")
         .select("*")
         .where("job_status", "approved")
+        .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
         .whereRaw("created_at::date = CURRENT_DATE")
         .orderByRaw(
           `CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END`
@@ -265,10 +268,14 @@ app.get("/", async (req, res) => {
       todayJobsCount = todayJobs.length;
     }
 
-    let query = db("jobs").select("*").where("job_status", "approved");
+    let query = db("jobs")
+      .select("*")
+      .where("job_status", "approved")
+      .whereRaw("(expires_at IS NULL OR expires_at > NOW())");
     let countQuery = db("jobs")
       .count("* as total")
-      .where("job_status", "approved");
+      .where("job_status", "approved")
+      .whereRaw("(expires_at IS NULL OR expires_at > NOW())");
     // Exclude today's jobs from main listing (ყველა ვაკანსია) – unless filters/search active (today section is hidden)
     if (!filtersActive) {
       query.whereRaw("created_at::date < CURRENT_DATE");
@@ -398,6 +405,7 @@ app.get("/kvelaze-magalanazgaurebadi-vakansiebi", async (req, res) => {
     let jobs = await db("jobs")
       .select("*")
       .where("job_status", "approved")
+      .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
       .whereNotNull("jobSalary_min")
       .orderBy("jobSalary_min", "desc")
       .limit(topLimit);
@@ -446,6 +454,7 @@ app.get("/dgevandeli-vakansiebi", async (req, res) => {
     let jobs = await db("jobs")
       .select("*")
       .where("job_status", "approved")
+      .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
       .whereRaw("created_at::date = CURRENT_DATE")
       .orderByRaw(
         `CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END`
@@ -612,9 +621,12 @@ app.get("/vakansia/:slug", async (req, res) => {
 
     const relatedJobs = await db("jobs")
       .where("job_status", "approved")
+      .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
       .where("category_id", job.category_id)
       .whereNot("id", jobId)
       .limit(5);
+
+    const isExpired = job.expires_at && new Date(job.expires_at) <= new Date();
 
     // Has this user already sent CV to this job?
     let userAlreadyApplied = false;
@@ -636,6 +648,7 @@ app.get("/vakansia/:slug", async (req, res) => {
       relatedJobs,
       slugify,
       userAlreadyApplied,
+      isExpired,
       seo: {
         title: job.jobName + " | Samushao.ge",
         description: "vakansia - " + jobDescription,
