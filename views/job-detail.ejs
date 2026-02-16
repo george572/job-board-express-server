@@ -233,6 +233,7 @@
               <dd class="mt-1 font-[500]"><%= job.job_experience ? job.job_experience + ' წელი' : '-' %></dd>
             </dl>
           </section>
+          <% if (!job.isHelio) { %>
           <% if (!user) { %>
           <p class="mt-4 text-[12px] block text-center text-red-400 pb-1 mx-auto">
             რეზიუმეს გასაგზავნად გაიარეთ ავტორიზაცია
@@ -248,6 +249,7 @@
           </div>
           <% } else { %>
           <button id="openDialogBtn" class="bg-[#315EFF] w-[296px] h-[52px] text-white rounded-lg my-8 mb-1 text-[16px] hidden lg:block mt-8 <% if (!user) { %>opacity-50 cursor-not-allowed<% } else { %>cursor-pointer<% } %>" <% if (!user) { %>disabled<% } %>> გააგზავნე რეზიუმე </button>
+          <% } %>
           <% } %>
         </section>
       </nav>
@@ -284,8 +286,8 @@
     </section>
     <% } %>
 
+    <% if (!job.isHelio) { %>
     <footer class="fixed bg-white bottom-0 left-0 right-0 w-full px-2 pb-1 flex lg:hidden flex-col items-between justify-between border border-[#E5E5E5] z-40">
-
       <% if (!user) { %>
       <p class="mt-2 text-[12px] block text-center text-red-400 pb-1 mx-auto">
         რეზიუმეს გასაგზავნად გაიარეთ ავტორიზაცია
@@ -303,7 +305,9 @@
       <button id="openDialogBtn2" class="bg-[#315EFF] mt-2 w-full min-h-[52px] text-white rounded-lg my-8 mt-0 mb-1 text-[16px] <% if (!user) { %>opacity-50 cursor-not-allowed<% } else { %>cursor-pointer<% } %>" <% if (!user) { %>disabled<% } %>> გააგზავნე რეზიუმე </button>
       <% } %>
     </footer>
+    <% } %>
 
+    <% if (!job.isHelio) { %>
     <!-- Job upload dialog -->
     <dialog id="uploadDialog" class="slide-dialog">
       <!-- Custom backdrop for click-to-close -->
@@ -382,6 +386,7 @@
         </div>
       </div>
     </dialog>
+    <% } %>
   </main>
 
   <script>
@@ -466,6 +471,7 @@
       } catch (e) {}
     });
   </script>
+  <% if (!job.isHelio) { %>
   <script>
     const dialog = document.getElementById('uploadDialog');
     const openBtn = document.getElementById('openDialogBtn');
@@ -816,6 +822,7 @@
       xhr.send(formData);
     });
   </script>
+  <% } %>
 
   <!-- Related jobs scroll (prev/next buttons) -->
   <script>

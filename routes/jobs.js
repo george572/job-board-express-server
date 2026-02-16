@@ -1,15 +1,86 @@
 const cors = require("cors");
 const express = require("express");
 const knex = require("knex");
+const nodemailer = require("nodemailer");
+const path = require("path");
 const router = express.Router();
 router.use(cors()); // Ensure CORS is applied to this router
 const multer = require("multer");
-const path = require("path");
+
+require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+const { slugify } = require("../utils/slugify");
 
 // Use the same environment-based Knex config as the main app
 const knexConfig = require("../knexfile");
 const environment = process.env.NODE_ENV || "development";
 const db = knex(knexConfig[environment]);
+
+// Email for freshly uploaded jobs (to HR)
+const NEW_JOB_MAIL_USER = (process.env.PROPOSITIONAL_MAIL_USER || "").trim();
+const NEW_JOB_MAIL_PASS = (process.env.PROPOSITIONAL_MAIL_PASS || "").trim().replace(/\s/g, "");
+const SITE_BASE_URL = process.env.SITE_BASE_URL || "https://samushao.ge";
+const EMAIL_SIGNATURE = (process.env.EMAIL_SIGNATURE || "").trim();
+
+const newJobTransporter =
+  NEW_JOB_MAIL_USER && NEW_JOB_MAIL_PASS
+    ? nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false,
+        auth: { user: NEW_JOB_MAIL_USER, pass: NEW_JOB_MAIL_PASS },
+      })
+    : null;
+
+// Helper: extract numeric salary for comparison (e.g. "1500-2000" → 1500, "1200" → 1200)
+function parseSalaryNum(s) {
+  if (s == null || s === "") return null;
+  const m = String(s).match(/\d+/);
+  return m ? parseInt(m[0], 10) : null;
+}
+
+const NEW_JOB_HTML_TEMPLATE = (job) => {
+  const salaryNum = parseSalaryNum(job.jobSalary ?? job.jobSalary_min);
+  const salaryDisplay = job.jobSalary ? String(job.jobSalary).replace(/<[^>]*>/g, "") : "—";
+  const salaryParagraph =
+    salaryNum != null && salaryNum >= 1200
+      ? "ვინაიდან თქვენი კომპანია იხდის " + salaryDisplay + " ლარს, გამოხმაურება ისედაც იქნება, და ამიტომ გთავაზობთ სტანდარტული პაკეტით სარგებლობას."
+      : salaryNum != null && salaryNum < 1200
+        ? "ვინაიდან თქვენი კომპანია იხდის " + salaryDisplay + " ლარს, გთავაზობთ პრემიუმ/პრემიუმ+ პაკეტით სარგებლობას, ასე ბევრი ადამიანი ნახავს ვაკანსიას და მაღალი შანსია რომ მეტი რელევანტური რეზიუმეები გამოიგზავნება."
+        : "";
+
+  const lowSalaryBonus =
+    salaryNum != null && salaryNum < 1200
+      ? "<p>რადგან ჯერ არ ვიცნობთ ერთმანეთს, გვინდა ჩვენი პლატფორმა გაგაცნოთ, და გთავაზობთ პრემიუმ+ განცხადებას 100 ლარად 250 ლარის ნაცვლად.</p>"
+      : "";
+
+  return `
+<p>გამარჯობა!</p>
+<p>ინტერნეტში თქვენი ვაკანსია "${job.jobName}" ვიპოვეთ და ჩვენს საიტზე (<a href="https://samushao.ge">samushao.ge</a>) განვათავსეთ, ბოდიშს გიხდით თუ ეს არ უნდა გვექნა. თუ ცალსახად წინააღმდეგი ხართ, წავშლით.</p>
+<p>ხოლო თუ დაინტერესებული ხართ რომ ვაკანსია უფრო მეტმა ნახოს, გთავაზობთ ვითანამშრომლოთ.</p>
+<p>ფასების შესახებ ინფორმაცია:</p>
+<p>1. სტანდარტული განცხადება - 50 ლარი</p>
+<p>2. პრემიუმ განცხადება - 10 დღე მთავარ გვერდზე - 70 ლარი</p>
+<p>3. პრემიუმ+ განცხადება - ყველაზე მაღალი ხილვადობა, 30 დღე მთავარ გვერდზე + პრიორიტეტი "მსგავს ვაკანსიებში" - 250 ლარი</p>
+<p>სტატისტიკურად, ვაკანსიები სადაც ანაზღაურება 1200 ლარი ან მეტია და გამოცდილება 2 წელზე მეტი არ მოითხოვება, კარგ გამოხმაურებას იღებენ და ბევრი რეზიუმეც იგზავნება, ხოლო თუ ანაზღაურება 1200 ლარზე ნაკლებია, ბევრი განცხადება იგნორდება.</p>
+<p>${salaryParagraph}</p>
+<p>${lowSalaryBonus}</p>
+<p>თუ დაინტერესდებით, ვითანამშრომლოთ!</p>
+`;
+};
+
+async function sendNewJobEmail(job) {
+  if (!newJobTransporter || !job.company_email) return;
+  const jobLink = `${SITE_BASE_URL}/vakansia/${slugify(job.jobName)}-${job.id}`;
+  const mailOptions = {
+    from: NEW_JOB_MAIL_USER,
+    to: job.company_email.trim(),
+    subject: `თქვენი ვაკანსია "${job.jobName}" - Samushao.ge`,
+    html: NEW_JOB_HTML_TEMPLATE({ ...job, jobLink }),
+  };
+  newJobTransporter.sendMail(mailOptions, (err) => {
+    if (err) console.error("New job email error:", err);
+  });
+}
 
 router.get("/", async (req, res) => {
   try {
@@ -233,29 +304,41 @@ router.post("/", upload.single("company_logo"), async (req, res) => {
     });
   }
 
-  db("jobs")
-    .insert({
-      companyName: cName,
-      jobName: jName,
-      jobSalary,
-      jobDescription,
-      jobIsUrgent,
-      user_uid,
-      category_id,
-      company_email,
-      job_experience,
-      job_city,
-      job_address,
-      job_type,
-      job_premium_status,
-      isHelio,
-      job_status: "approved",
-    })
-    .returning("id")
-    .then((ids) => {
-      res.status(201).json({ message: "Job created", jobId: ids[0] });
-    })
-    .catch((err) => res.status(500).json({ error: err.message }));
+  try {
+    const [inserted] = await db("jobs")
+      .insert({
+        companyName: cName,
+        jobName: jName,
+        jobSalary,
+        jobDescription,
+        jobIsUrgent,
+        user_uid,
+        category_id,
+        company_email,
+        job_experience,
+        job_city,
+        job_address,
+        job_type,
+        job_premium_status,
+        isHelio,
+        job_status: "approved",
+      })
+      .returning("id");
+
+    if (inserted) {
+      sendNewJobEmail({
+        id: inserted.id,
+        jobName: jName,
+        companyName: cName,
+        company_email,
+        jobSalary,
+      });
+    }
+
+    res.status(201).json({ message: "Job created", jobId: inserted?.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // bulk upload many jobs
@@ -356,7 +439,12 @@ router.post("/bulk", async (req, res) => {
     }
 
     const ids = await db("jobs").insert(toInsert).returning("id");
-    
+
+    // Send new-job email to each HR (fire-and-forget)
+    for (let i = 0; i < ids.length; i++) {
+      sendNewJobEmail({ id: ids[i].id, ...toInsert[i] });
+    }
+
     console.log(`✅ SUCCESS: Inserted ${ids.length} jobs.`);
     if (failedJobs.length > 0) {
       console.warn(`[!] Note: ${failedJobs.length} jobs were skipped due to errors.`);
