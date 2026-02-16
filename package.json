@@ -15,6 +15,7 @@
     "dev": "concurrently \"npm:start:server\" \"npm:start:css\" \"npm:start:browser\"",
     "build:css": "npx tailwindcss -i ./public/css/input.css -o ./public/css/style.css",
     "clean-descriptions": "node scripts/clean-job-descriptions.js",
+    "send-propositional-emails": "node scripts/send-propositional-emails.js",
     "clean-descriptions:apply": "node scripts/clean-job-descriptions.js --apply"
   },
   "dependencies": {

@@ -1,0 +1,3 @@
+{
+  "ignorePaths": [".env", ".env.example"]
+}
