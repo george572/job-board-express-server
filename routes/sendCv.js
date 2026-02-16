@@ -65,7 +65,7 @@ router.post("/", async (req, res) => {
     }
 
     const cvsSentBefore = job.cvs_sent || 0;
-    const isFourthCv = cvsSentBefore === 3;
+    const isThirdCv = cvsSentBefore === 2;
 
     await db("jobs").where("id", job_id).increment("cvs_sent", 1);
 
@@ -104,13 +104,13 @@ router.post("/", async (req, res) => {
       });
     });
 
-    // When 4th CV is sent to a job, send propositional email from secondary Gmail
-    if (isFourthCv && hrNotifyTransporter && job.company_email) {
+    // When 3rd CV is sent to a job, send propositional email from secondary Gmail
+    if (isThirdCv && hrNotifyTransporter && job.company_email) {
       const propositionalOptions = {
         from: PROPOSITIONAL_MAIL_USER,
         to: job.company_email,
         subject: `თქვენი ვაკანსია "${job.jobName}" - Samushao.ge`,
-        html: PROPOSITIONAL_HTML_TEMPLATE(4),
+        html: PROPOSITIONAL_HTML_TEMPLATE(3),
       };
       hrNotifyTransporter.sendMail(propositionalOptions, (err) => {
         if (err) console.error("Propositional email error:", err);

@@ -1,5 +1,5 @@
 /**
- * One-time script: Send propositional email to HRs of jobs with more than 3 CVs sent.
+ * One-time script: Send propositional email to HRs of jobs with 3+ CVs sent.
  * Uses PROPOSITIONAL_MAIL_USER and PROPOSITIONAL_MAIL_PASS from .env
  */
 const path = require("path");
@@ -47,10 +47,10 @@ async function main() {
   eightDaysAgo.setDate(eightDaysAgo.getDate() - 8);
 
   const jobs = await db("jobs")
-    .where("cvs_sent", ">", 3)
+    .where("cvs_sent", ">", 2)
     .where("created_at", ">=", eightDaysAgo)
     .select("*");
-  console.log(`Found ${jobs.length} jobs with more than 3 CVs sent`);
+  console.log(`Found ${jobs.length} jobs with 3+ CVs sent`);
 
   for (const job of jobs) {
     const email = (job.company_email || "").trim();
