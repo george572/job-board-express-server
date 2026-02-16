@@ -49,6 +49,7 @@ async function main() {
   const jobs = await db("jobs")
     .where("cvs_sent", ">", 2)
     .where("created_at", ">=", eightDaysAgo)
+    .whereRaw("(dont_send_email IS NOT TRUE)")
     .select("*");
   console.log(`Found ${jobs.length} jobs with 3+ CVs sent`);
 

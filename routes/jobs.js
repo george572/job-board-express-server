@@ -69,7 +69,7 @@ const NEW_JOB_HTML_TEMPLATE = (job) => {
 };
 
 async function sendNewJobEmail(job) {
-  if (!newJobTransporter || !job.company_email) return;
+  if (!newJobTransporter || !job.company_email || job.dont_send_email) return;
   const jobLink = `${SITE_BASE_URL}/vakansia/${slugify(job.jobName)}-${job.id}`;
   const mailOptions = {
     from: NEW_JOB_MAIL_USER,
@@ -273,6 +273,8 @@ router.post("/", upload.single("company_logo"), async (req, res) => {
     job_type,
     job_premium_status,
     isHelio,
+    prioritize,
+    dont_send_email,
   } = req.body;
 
   if (
@@ -321,6 +323,8 @@ router.post("/", upload.single("company_logo"), async (req, res) => {
         job_type,
         job_premium_status,
         isHelio,
+        prioritize: prioritize === true || prioritize === "true",
+        dont_send_email: dont_send_email === true || dont_send_email === "true",
         job_status: "approved",
       })
       .returning("id");
@@ -332,6 +336,7 @@ router.post("/", upload.single("company_logo"), async (req, res) => {
         companyName: cName,
         company_email,
         jobSalary,
+        dont_send_email: dont_send_email === true || dont_send_email === "true",
       });
     }
 
@@ -389,6 +394,8 @@ router.post("/bulk", async (req, res) => {
         job_status: "approved",
         job_premium_status: 'regular',
         isHelio: job.isHelio || false,
+        prioritize: job.prioritize === true || job.prioritize === "true",
+        dont_send_email: job.dont_send_email === true || job.dont_send_email === "true",
         company_logo: job.company_logo || null
       });
     } else {
@@ -440,9 +447,11 @@ router.post("/bulk", async (req, res) => {
 
     const ids = await db("jobs").insert(toInsert).returning("id");
 
-    // Send new-job email to each HR (fire-and-forget)
+    // Send new-job email to each HR (fire-and-forget); skip if dont_send_email
     for (let i = 0; i < ids.length; i++) {
-      sendNewJobEmail({ id: ids[i].id, ...toInsert[i] });
+      if (!toInsert[i].dont_send_email) {
+        sendNewJobEmail({ id: ids[i].id, ...toInsert[i] });
+      }
     }
 
     console.log(`✅ SUCCESS: Inserted ${ids.length} jobs.`);

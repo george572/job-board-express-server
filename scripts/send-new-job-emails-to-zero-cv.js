@@ -73,6 +73,7 @@ async function main() {
     .where(function () {
       this.where("cvs_sent", 0).orWhereNull("cvs_sent");
     })
+    .whereRaw("(dont_send_email IS NOT TRUE)")
     .select("*")
     .orderBy("created_at", "desc");
 

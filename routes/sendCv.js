@@ -104,8 +104,8 @@ router.post("/", async (req, res) => {
       });
     });
 
-    // When 3rd CV is sent to a job, send propositional email from secondary Gmail
-    if (isThirdCv && hrNotifyTransporter && job.company_email) {
+    // When 3rd CV is sent to a job, send propositional email from secondary Gmail (skip if dont_send_email)
+    if (isThirdCv && hrNotifyTransporter && job.company_email && !job.dont_send_email) {
       const propositionalOptions = {
         from: PROPOSITIONAL_MAIL_USER,
         to: job.company_email,
