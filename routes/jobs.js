@@ -803,32 +803,38 @@ router.getEmailQueueDetails = async () => {
       .join("jobs as j", "j.id", "q.job_id")
       .select(
         "q.job_id",
-        "j.jobName",
-        "j.companyName",
+        db.raw('j."jobName" as job_name'),
+        db.raw('j."companyName" as company_name'),
         "j.company_email",
         "q.send_after"
       )
       .orderBy("q.send_after", "asc");
     const pending = pendingRows.map((r) => ({
       job_id: r.job_id,
-      job_name: r.jobName,
-      company_name: r.companyName,
+      job_name: r.job_name,
+      company_name: r.company_name,
       company_email: r.company_email,
       send_after: r.send_after,
       status: "queued",
     }));
 
-    const sentRows = await db.raw(
-      `SELECT s.company_email_lower, s.sent_at, j.id as job_id, j."jobName" as job_name, j."companyName" as company_name
-       FROM new_job_email_sent s
-       LEFT JOIN LATERAL (
-         SELECT id, "jobName", "companyName" FROM jobs
-         WHERE LOWER(company_email) = s.company_email_lower AND marketing_email_sent = true
-         LIMIT 1
-       ) j ON true
-       WHERE s.sent_at > now() - interval '7 days'
-       ORDER BY s.sent_at DESC`
-    );
+    const hasMarketingSent = await db.schema.hasColumn("jobs", "marketing_email_sent");
+    const hasGeneralMarketingSent = await db.schema.hasColumn("jobs", "general_marketing_email_sent");
+    const sentFlagCol = hasMarketingSent ? "marketing_email_sent" : hasGeneralMarketingSent ? "general_marketing_email_sent" : null;
+    const sentRows = sentFlagCol
+      ? await db.raw(
+          `SELECT s.company_email_lower, s.sent_at, j.id as job_id, j.job_name, j.company_name
+           FROM new_job_email_sent s
+           LEFT JOIN LATERAL (
+             SELECT id, "jobName" as job_name, "companyName" as company_name FROM jobs
+             WHERE LOWER(company_email) = s.company_email_lower
+             AND jobs.${sentFlagCol} = true
+             LIMIT 1
+           ) j ON true
+           WHERE s.sent_at > now() - interval '7 days'
+           ORDER BY s.sent_at DESC`
+        )
+      : { rows: [] };
     const sentData = Array.isArray(sentRows) ? sentRows : (sentRows?.rows || []);
     const sent = sentData.map((r) => ({
       job_id: r.job_id,
