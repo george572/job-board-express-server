@@ -352,7 +352,6 @@ router.post("/complain", async (req, res) => {
   }
 });
 
-// Start processor for scheduled marketing emails on module load
-startScheduledMarketingProcessor();
+// Third CV marketing now uses new_job_email_queue processor in routes/jobs.js
 
 module.exports = router;
