@@ -137,6 +137,12 @@ app.get("/sitemap.xml", async (req, res) => {
         priority: "0.9",
       },
       {
+        loc: SITE_BASE_URL + "/kvelaze-motkhovnadi-vakansiebi",
+        lastmod: toDate(new Date()),
+        changefreq: "daily",
+        priority: "0.9",
+      },
+      {
         loc: SITE_BASE_URL + "/dgevandeli-vakansiebi",
         lastmod: toDate(new Date()),
         changefreq: "daily",
@@ -235,6 +241,8 @@ app.get("/", async (req, res) => {
     // Top salary jobs slider – skip when any filters are active
     let topSalaryJobs = [];
     let topSalaryTotalCount = 0;
+    let topPopularJobs = [];
+    let topPopularTotalCount = 0;
     let todayJobs = [];
     let todayJobsCount = 0;
     if (!filtersActive) {
@@ -278,6 +286,44 @@ app.get("/", async (req, res) => {
         const restBySalary = topSalaryRaw.filter((j) => !usedIds.has(j.id));
         topSalaryJobs = [slot1, ...prioritizedFor23, ...restBySalary].filter(Boolean).slice(0, 20);
         topSalaryTotalCount = topSalaryJobs.length;
+
+      // Top popular (most viewed): slot 1 = most viewed non-prioritized; slots 2-3 = prioritized (regardless of views)
+        let topPopularRaw = await db("jobs")
+          .select("*")
+          .where("job_status", "approved")
+          .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
+          .orderByRaw("COALESCE(view_count, 0) DESC")
+          .limit(50);
+        const prioritizedForPopular = await db("jobs")
+          .select("*")
+          .where("job_status", "approved")
+          .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
+          .where("prioritize", true)
+          .orderByRaw("COALESCE(view_count, 0) DESC")
+          .limit(2);
+        const seenPop = new Set();
+        topPopularRaw = topPopularRaw.filter((j) => {
+          const key = String(j.jobName || "").trim() + "|" + String(j.companyName || "").trim();
+          if (seenPop.has(key)) return false;
+          seenPop.add(key);
+          return true;
+        });
+        const dedupePrioritizedPop = [];
+        const seenPPop = new Set();
+        for (const j of prioritizedForPopular) {
+          const key = String(j.jobName || "").trim() + "|" + String(j.companyName || "").trim();
+          if (!seenPPop.has(key)) {
+            seenPPop.add(key);
+            dedupePrioritizedPop.push(j);
+          }
+        }
+        const nonPrioritizedPop = topPopularRaw.filter((j) => !isPrioritized(j));
+        const slot1Pop = (nonPrioritizedPop[0] || topPopularRaw[0]);
+        const prioritizedFor23Pop = dedupePrioritizedPop.slice(0, 2);
+        const usedIdsPop = new Set([slot1Pop?.id, ...prioritizedFor23Pop.map((j) => j.id)].filter(Boolean));
+        const restByViews = topPopularRaw.filter((j) => !usedIdsPop.has(j.id));
+        topPopularJobs = [slot1Pop, ...prioritizedFor23Pop, ...restByViews].filter(Boolean).slice(0, 20);
+        topPopularTotalCount = topPopularJobs.length;
 
       // Today's jobs (დღევანდელი ვაკანსიები)
       todayJobs = await db("jobs")
@@ -408,6 +454,8 @@ app.get("/", async (req, res) => {
       jobs,
       topSalaryJobs,
       topSalaryTotalCount,
+      topPopularJobs,
+      topPopularTotalCount,
       todayJobs,
       todayJobsCount,
       currentPage: pageNum,
@@ -427,6 +475,77 @@ app.get("/", async (req, res) => {
       },
     });
   } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+// Most popular jobs page – 20 most viewed; prioritized in slots 2-3 (same structure as highest paid)
+app.get("/kvelaze-motkhovnadi-vakansiebi", async (req, res) => {
+  try {
+    const topLimit = 20;
+    const isPrioritized = (j) => j.prioritize === true || j.prioritize === 1 || j.prioritize === "true";
+    let jobsRaw = await db("jobs")
+      .select("*")
+      .where("job_status", "approved")
+      .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
+      .orderByRaw("COALESCE(view_count, 0) DESC")
+      .limit(50);
+    const prioritizedWithViews = await db("jobs")
+      .select("*")
+      .where("job_status", "approved")
+      .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
+      .where("prioritize", true)
+      .orderByRaw("COALESCE(view_count, 0) DESC")
+      .limit(2);
+    const seenKey = new Set();
+    jobsRaw = jobsRaw.filter((j) => {
+      const key = String(j.jobName || "").trim() + "|" + String(j.companyName || "").trim();
+      if (seenKey.has(key)) return false;
+      seenKey.add(key);
+      return true;
+    });
+    const dedupePrioritized = [];
+    const seenP = new Set();
+    for (const j of prioritizedWithViews) {
+      const key = String(j.jobName || "").trim() + "|" + String(j.companyName || "").trim();
+      if (!seenP.has(key)) {
+        seenP.add(key);
+        dedupePrioritized.push(j);
+      }
+    }
+    const nonPrioritized = jobsRaw.filter((j) => !isPrioritized(j));
+    const slot1 = (nonPrioritized[0] || jobsRaw[0]);
+    const prioritizedFor23 = dedupePrioritized.slice(0, 2);
+    const usedIds = new Set([slot1?.id, ...prioritizedFor23.map((j) => j.id)].filter(Boolean));
+    const restByViews = jobsRaw.filter((j) => !usedIds.has(j.id));
+    const jobs = [slot1, ...prioritizedFor23, ...restByViews].filter(Boolean).slice(0, topLimit);
+
+    res.render("index", {
+      jobs,
+      topSalaryJobs: [],
+      topSalaryTotalCount: 0,
+      topPopularJobs: [],
+      topPopularTotalCount: 0,
+      todayJobs: [],
+      todayJobsCount: 0,
+      currentPage: 1,
+      totalPages: 1,
+      totalJobs: jobs.length,
+      filters: {},
+      filtersActive: false,
+      pageType: "top-views",
+      paginationBase: "/kvelaze-motkhovnadi-vakansiebi",
+      slugify,
+      seo: {
+        title: "ყველაზე ნახვადი ვაკანსიები | Samushao.ge",
+        description: "ყველაზე ნახვადი ვაკანსიები",
+        canonical: "https://samushao.ge/kvelaze-motkhovnadi-vakansiebi",
+        ogImage:
+          "https://res.cloudinary.com/dd7gz0aqv/image/upload/v1743605652/export_l1wpwr.png",
+      },
+    });
+  } catch (err) {
+    console.error("kvelaze-motkhovnadi-vakansiebi error:", err);
     res.status(500).send(err.message);
   }
 });
@@ -480,6 +599,8 @@ app.get("/kvelaze-magalanazgaurebadi-vakansiebi", async (req, res) => {
       jobs,
       topSalaryJobs: [],
       topSalaryTotalCount: jobs.length,
+      topPopularJobs: [],
+      topPopularTotalCount: 0,
       todayJobs: [],
       todayJobsCount: 0,
       currentPage: 1,
@@ -532,6 +653,8 @@ app.get("/dgevandeli-vakansiebi", async (req, res) => {
       jobs,
       topSalaryJobs: [],
       topSalaryTotalCount: 0,
+      topPopularJobs: [],
+      topPopularTotalCount: 0,
       todayJobs: [],
       todayJobsCount: 0,
       currentPage: 1,

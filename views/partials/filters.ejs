@@ -152,9 +152,11 @@
     function updateTopSalarySliderVisibility() {
       var hide = hasActiveFilters();
       var slider = document.getElementById('top-salary-slider-section');
+      var topPopularSlider = document.getElementById('top-popular-slider-section');
       var todaySection = document.getElementById('today-jobs-section');
       var heading = document.getElementById('all-vacancies-heading');
       if (slider) slider.style.display = hide ? 'none' : '';
+      if (topPopularSlider) topPopularSlider.style.display = hide ? 'none' : '';
       if (todaySection) todaySection.style.display = hide ? 'none' : '';
       if (heading) heading.style.display = hide ? 'none' : '';
     }

@@ -78,6 +78,43 @@
   </section>
   <% } %>
 
+  <!-- Most popular jobs (ყველაზე ნახვადი ვაკანსიები) - hidden when any filter is active -->
+  <% if (topPopularJobs && topPopularJobs.length > 0) { %>
+  <section id="top-popular-slider-section" class="w-full mx-auto px-4 mt-6 mb-4" style="<%= filtersActive ? 'display:none' : '' %>">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+      <div class="flex flex-col gap-1 flex-1">
+        <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515]">
+          ყველაზე ნახვადი ვაკანსიები
+        </h2>
+        <% if (typeof topPopularTotalCount !== 'undefined' && topPopularTotalCount > 0) { %>
+        <a href="/kvelaze-motkhovnadi-vakansiebi" class="text-sm text-[#315EFF] hover:underline hidden sm:inline-block">
+          ყველას ნახვა (<%= topPopularTotalCount %>)
+        </a>
+        <% } %>
+      </div>
+      <div class="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0">
+        <% if (typeof topPopularTotalCount !== 'undefined' && topPopularTotalCount > 0) { %>
+        <a href="/kvelaze-motkhovnadi-vakansiebi" class="text-sm text-[#315EFF] hover:underline sm:hidden">
+          ყველას ნახვა (<%= topPopularTotalCount %>)
+        </a>
+        <% } %>
+        <div class="flex items-center gap-2">
+          <button type="button" class="top-popular-prev w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Prev">←</button>
+          <button type="button" class="top-popular-next w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Next">→</button>
+        </div>
+      </div>
+    </div>
+    <div id="top-popular-scroll" class="top-popular-scroll flex w-full items-stretch gap-3 sm:gap-4 overflow-x-auto pb-4 pr-4 snap-x snap-mandatory" 
+    style="scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;">
+    <% topPopularJobs.forEach(job => { %>
+   <div class="top-popular-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col">
+     <%- include('partials/jobItemCompact.ejs', { job, slugify, inSlider: true }) %>
+   </div>
+ <% }) %>
+</div>
+  </section>
+  <% } %>
+
   <!-- Today's jobs (დღევანდელი ვაკანსიები) - hidden when any filter is active -->
   <% if (todayJobs && todayJobs.length > 0 && !filtersActive) { %>
   <section id="today-jobs-section" class="w-full mx-auto px-4 mt-6 mb-4">
@@ -104,7 +141,7 @@
   <!-- Jobs area (replaced without reload when filters change) -->
   <div id="jobs-area" data-current-page="<%= currentPage || 1 %>" data-total-pages="<%= totalPages || 1 %>">
   <h1 id="all-vacancies-heading" class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1 pb-4 w-full mx-auto px-4" style="<%= filtersActive ? 'display:none' : '' %>">
-    <%= typeof pageType === 'string' && pageType === 'top-salary' ? 'ყველაზე მაღალანაზღაურებადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'today' ? 'დღევანდელი ვაკანსიები' : 'ყველა ვაკანსია') %>
+    <%= typeof pageType === 'string' && pageType === 'top-salary' ? 'ყველაზე მაღალანაზღაურებადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'top-views' ? 'ყველაზე ნახვადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'today' ? 'დღევანდელი ვაკანსიები' : 'ყველა ვაკანსია')) %>
   </h1>
   <div class="w-full relative mx-auto px-4" id="jobs-container">
     <% if (jobs && jobs.length > 0) { %>
@@ -390,6 +427,57 @@
       if (scrollEl && nextBtn) nextBtn.addEventListener('click', function () {
         scrollEl.scrollBy({ left: 320, behavior: 'smooth' });
       });
+
+      var popularScroll = document.getElementById('top-popular-scroll');
+      var popularPrev = document.querySelector('.top-popular-prev');
+      var popularNext = document.querySelector('.top-popular-next');
+      if (popularScroll && popularPrev) popularPrev.addEventListener('click', function () {
+        popularScroll.scrollBy({ left: -320, behavior: 'smooth' });
+      });
+      if (popularScroll && popularNext) popularNext.addEventListener('click', function () {
+        popularScroll.scrollBy({ left: 320, behavior: 'smooth' });
+      });
+
+      // Most popular: click tracking
+      const popularCards = document.querySelectorAll('.top-popular-card a[data-job-id]');
+      popularCards.forEach(function (card) {
+        card.addEventListener('click', function () {
+          try {
+            if (window.amplitude) {
+              const categoryId = this.getAttribute('data-job-category');
+              window.amplitude.track('Most Popular Job Clicked', {
+                job_id: this.getAttribute('data-job-id'),
+                job_category: categoryNames[categoryId] || categoryId,
+                job_title: this.getAttribute('data-job-title'),
+                salary_range: this.getAttribute('data-salary-range'),
+                title: this.getAttribute('data-job-title'),
+                company: this.getAttribute('data-job-company'),
+                location: this.getAttribute('data-job-location')
+              });
+            }
+          } catch (e) {}
+        });
+      });
+
+      // Most popular: swipe/scroll tracking
+      if (popularScroll) {
+        var lastPopularScrollLeft = popularScroll.scrollLeft;
+        var popularScrollTimeout;
+        popularScroll.addEventListener('scroll', function () {
+          clearTimeout(popularScrollTimeout);
+          popularScrollTimeout = setTimeout(function () {
+            var now = popularScroll.scrollLeft;
+            if (now !== lastPopularScrollLeft && window.amplitude) {
+              try {
+                window.amplitude.track('Most Popular Slider Swiped', {
+                  direction: now > lastPopularScrollLeft ? 'left' : 'right'
+                });
+              } catch (e) {}
+              lastPopularScrollLeft = now;
+            }
+          }, 150);
+        });
+      }
 
       const cards = document.querySelectorAll('.top-salary-card a[data-job-id]');
       cards.forEach(function (card) {
