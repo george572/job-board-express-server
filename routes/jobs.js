@@ -71,8 +71,11 @@ const newJobTransporter =
       })
     : null;
 
-// Cooldown between new-job emails (seconds) - avoids blasting; server-side, survives refresh
-const NEW_JOB_EMAIL_COOLDOWN_SEC = 120;
+// Bulk emails spread over 2–3 hours, random jitter between sends
+const BULK_SPREAD_MIN_MS = 2 * 60 * 60 * 1000;    // 2 hours total window
+const BULK_SPREAD_MAX_MS = 3 * 60 * 60 * 1000;    // 3 hours total window
+const MIN_DELAY_BETWEEN_SENDS_MS = 60 * 1000;     // at least 1 min between sends
+const MAX_DELAY_BETWEEN_SENDS_MS = 5 * 60 * 1000; // random 1–5 min before next check
 const SENT_JOB_KEY_TTL_MS = 24 * 60 * 60 * 1000; // 24h – skip requeue if we sent recently
 const EMAIL_QUEUE_FILE = path.join(__dirname, "..", ".new-job-email-queue.json");
 
@@ -140,7 +143,10 @@ function loadEmailQueue() {
       if (key != null) seenKeys.add(key);
       if (company) seenCompanies.add(company);
       return true;
-    });
+    }).map((j) => ({
+      ...j,
+      sendAfter: j.sendAfter != null ? j.sendAfter : Date.now(),
+    }));
     if (parsed.lastSentAt && typeof parsed.lastSentAt === "number") {
       newJobEmailLastSentAt = parsed.lastSentAt;
     }
@@ -198,20 +204,28 @@ function saveEmailQueue() {
 // Load persisted queue on startup
 loadEmailQueue();
 
+function randomBetween(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 async function processNewJobEmailQueue() {
   if (newJobEmailQueue.length === 0) {
     newJobEmailProcessorScheduled = false;
     return;
   }
   const now = Date.now();
-  const elapsed = (now - newJobEmailLastSentAt) / 1000;
-  if (newJobEmailLastSentAt > 0 && elapsed < NEW_JOB_EMAIL_COOLDOWN_SEC) {
-    const waitMs = (NEW_JOB_EMAIL_COOLDOWN_SEC - elapsed) * 1000;
+  newJobEmailQueue.sort((a, b) => (a.sendAfter || 0) - (b.sendAfter || 0));
+  const readyIdx = newJobEmailQueue.findIndex((j) => (j.sendAfter || 0) <= now);
+  if (readyIdx < 0) {
+    const waitMs = Math.max(
+      MIN_DELAY_BETWEEN_SENDS_MS,
+      (newJobEmailQueue[0].sendAfter || now) - now
+    );
     newJobEmailProcessorScheduled = true;
     setTimeout(processNewJobEmailQueue, waitMs);
     return;
   }
-  const job = newJobEmailQueue.shift();
+  const job = newJobEmailQueue.splice(readyIdx, 1)[0];
   const companyEmail = (job.company_email || "").trim().toLowerCase();
   if (companyEmail && sentCompanyEmails[companyEmail] && (Date.now() - sentCompanyEmails[companyEmail]) < SENT_JOB_KEY_TTL_MS) {
     saveEmailQueue();
@@ -249,12 +263,11 @@ async function processNewJobEmailQueue() {
       saveEmailQueue();
       console.log(`📧 Sent new-job email to ${job.company_email?.trim()} (job #${job.id}: ${job.jobName})`);
     }
-    try {
-      processNewJobEmailQueue();
-    } catch (e) {
-      console.error("Email queue processor error:", e);
-      newJobEmailProcessorScheduled = false;
-    }
+    newJobEmailLastSentAt = Date.now();
+    saveEmailQueue();
+    const nextDelay = randomBetween(MIN_DELAY_BETWEEN_SENDS_MS, MAX_DELAY_BETWEEN_SENDS_MS);
+    newJobEmailProcessorScheduled = true;
+    setTimeout(processNewJobEmailQueue, nextDelay);
   });
 }
 
@@ -295,7 +308,12 @@ const NEW_JOB_HTML_TEMPLATE = (job) => {
 `;
 };
 
-async function sendNewJobEmail(job) {
+/**
+ * Add job to queue with sendAfter time.
+ * @param {object} job
+ * @param {object} opts - { batchIndex, batchTotal } for bulk (spreads over 2-3h); omit for single job (sends soon)
+ */
+async function sendNewJobEmail(job, opts = {}) {
   if (!newJobTransporter || !job.company_email || job.dont_send_email) return;
   const companyEmail = (job.company_email || "").trim().toLowerCase();
   if (!companyEmail) return;
@@ -303,7 +321,19 @@ async function sendNewJobEmail(job) {
   if (key != null && newJobEmailQueue.some((j) => jobKey(j) === key)) return;
   if (companyEmail && newJobEmailQueue.some((j) => (j.company_email || "").trim().toLowerCase() === companyEmail)) return;
   if (await hasRecentlySentToCompany(companyEmail)) return;
-  newJobEmailQueue.push(job);
+
+  const now = Date.now();
+  let sendAfter;
+  if (opts.batchTotal != null && opts.batchTotal > 0 && opts.batchIndex != null) {
+    const totalWindow = randomBetween(BULK_SPREAD_MIN_MS, BULK_SPREAD_MAX_MS);
+    const slotSize = totalWindow / opts.batchTotal;
+    const base = opts.batchIndex * slotSize;
+    const jitter = (Math.random() - 0.5) * slotSize * 0.4;
+    sendAfter = now + Math.max(0, base + jitter);
+  } else {
+    sendAfter = now + randomBetween(60000, 300000);
+  }
+  newJobEmailQueue.push({ ...job, sendAfter });
   saveEmailQueue();
   if (!newJobEmailProcessorScheduled) {
     newJobEmailProcessorScheduled = true;
@@ -313,13 +343,14 @@ async function sendNewJobEmail(job) {
 
 /**
  * Send one email per company when multiple jobs are uploaded (bulk).
+ * Spreads all emails over 2-3 hours with random intervals.
  */
-async function sendNewJobEmailToCompany(jobs) {
+async function sendNewJobEmailToCompany(jobs, batchIndex, batchTotal) {
   if (!newJobTransporter || !Array.isArray(jobs) || jobs.length === 0) return;
   const first = jobs[0];
   const email = (first.company_email || "").trim();
   if (!email || first.dont_send_email) return;
-  await sendNewJobEmail(first);
+  await sendNewJobEmail(first, { batchIndex, batchTotal });
 }
 
 router.get("/", async (req, res) => {
@@ -711,8 +742,9 @@ router.post("/bulk", async (req, res) => {
       if (!byCompany.has(key)) byCompany.set(key, []);
       byCompany.get(key).push(j);
     }
-    for (const jobs of byCompany.values()) {
-      await sendNewJobEmailToCompany(jobs);
+    const companies = Array.from(byCompany.values());
+    for (let i = 0; i < companies.length; i++) {
+      await sendNewJobEmailToCompany(companies[i], i, companies.length);
     }
 
     console.log(`✅ SUCCESS: Inserted ${ids.length} jobs.`);
