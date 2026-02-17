@@ -9,7 +9,6 @@ require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
 const router = express.Router();
 const knexConfig = require("../knexfile");
-const { slugify } = require("../utils/slugify");
 const env = process.env.NODE_ENV || "development";
 const db = knex(knexConfig[env]);
 router.use(cors());
@@ -21,32 +20,13 @@ const MAIL_PASS = (process.env.MAIL_PSW || "").trim();
 const PROPOSITIONAL_MAIL_USER = (process.env.PROPOSITIONAL_MAIL_USER || "").trim();
 const PROPOSITIONAL_MAIL_PASS = (process.env.PROPOSITIONAL_MAIL_PASS || "").trim().replace(/\s/g, "");
 
-const APPLICANTS_MAIL_USER = (process.env.APPLICANTS_MAIL_USER || "").trim();
-const APPLICANTS_MAIL_PASS = (process.env.APPLICANTS_MAIL_PASS || "").trim().replace(/\s/g, "");
-const SITE_BASE_URL = process.env.SITE_BASE_URL || "https://samushao.ge";
-
-const applicantsTransporter =
-  APPLICANTS_MAIL_USER && APPLICANTS_MAIL_PASS
-    ? nodemailer.createTransport({
-        host: "smtp.gmail.com",
-        port: 587,
-        secure: false,
-        auth: { user: APPLICANTS_MAIL_USER, pass: APPLICANTS_MAIL_PASS },
-      })
-    : null;
-
-const APPLICANTS_HTML_TEMPLATE = (jobName, cvsSent, jobLink) => `
-<p>გამარჯობა!</p>
-<p>თქვენი ვაკანსია "<strong>${jobName}</strong>" უკვე <strong>${cvsSent}</strong> აპლიკანტს იღებს.</p>
-<p>ვნახოთ საიტზე: <a href="${jobLink}">${jobLink}</a></p>
-<p>— Samushao.ge</p>
-`;
-
 const PROPOSITIONAL_HTML_TEMPLATE = (cvsSent) => `
 <p>სალამი!</p>
 <p>ბოდიში, ჩვენ დაუკითხავად (მაგრამ კეთილი განზრახვით) დავდეთ თქვენი ვაკანსია ჩვენს საიტზე (<a href="https://samushao.ge">samushao.ge</a>), იმედია არ გაგაბრაზეთ.</p>
 <p>იმის მიუხედავად რომ პრემიუმი არ არის, უკვე <strong>${cvsSent}</strong> რეზიუმე გამოიგზავნა მოკლე დროში.</p>
-<p>თუ მოგწონთ ეს შედეგი და გინდათ თქვენი ვაკანსია დარჩეს საიტზე, ჩვენთან განცხადების დადება ფასიანია.</p>
+<p>ეს იმის დასტურია, რომ ჩვენი აუდიტორია თქვენი კომპანიით დაინტერესებულია. თუმცა, ამჟამად თქვენი განცხადება "სტანდარტულ" რეჟიმშია და რამდენიმე დღეში სხვა ვაკანსიების ქვეშ ჩაიკარგება.</p>
+<p>რომ არ დაკარგოთ ეს იმპულსი, გირჩევთ Premium სტატუსს (100 ლარი, 10 დღე მთავარ გვერდზე) ან პრემიუმ+ (250 ლარი, 30 დღე მთავარ გვერდზე), რათა დარჩენილი დროის განმავლობაში მთავარ გვერდზე იყოთ და კიდევ უფრო მეტი ხარისხიანი კანდიდატი მოიზიდოთ.</p>
+<p>გსურთ, რომ დაგეხმაროთ გააქტიურებაში?</p>
 `;
 
 const transporter = nodemailer.createTransport({
@@ -107,11 +87,11 @@ router.post("/", async (req, res) => {
     const mailOptions = {
       from: MAIL_USER,
       to: job.company_email,
-      subject: `New Application for ${job.jobName}`,
+      subject: `ახალი CV - "${job.jobName}"`,
       html: `<p>ახალი CV გამოიგზავნა თქვენს ვაკანსიაზე: "${job.jobName}".</p>
-             <p>CV-ის ბმული: ${resume.file_url}</p>
-             <p>კანდიდატის სახელი: ${user.user_name}</p>
-             <p>კანდიდატის ელ-ფოსტა: ${user.user_email}</p>`,
+<p>CV-ის ბმული: ${resume.file_url}</p>
+<p>კანდიდატის სახელი: ${user.user_name}</p>
+<p>კანდიდატის ელ-ფოსტა: ${user.user_email}</p>`,
     };
 
     await new Promise((resolve, reject) => {
@@ -125,28 +105,7 @@ router.post("/", async (req, res) => {
       });
     });
 
-    // Applicants notification: "Your job has X applicants" from giorgi@samushao.ge – ONLY on 3rd CV
-    const cvsSentNow = cvsSentBefore + 1;
-    const isThirdCvForApplicants = cvsSentNow === 3;
-    const alreadySentCvSubs = job.cv_submissions_email_sent === true || job.cv_submissions_email_sent === 1;
-    if (isThirdCvForApplicants && !alreadySentCvSubs && applicantsTransporter && job.company_email && !job.dont_send_email) {
-      const jobLink = `${SITE_BASE_URL}/vakansia/${slugify(job.jobName)}-${job.id}`;
-      const applicantsOptions = {
-        from: APPLICANTS_MAIL_USER,
-        to: (job.company_email || "").trim().split(/[,;]/)[0].trim(),
-        subject: `თქვენი ვაკანსია "${job.jobName}" - უკვე ${cvsSentNow} აპლიკანტი`,
-        html: APPLICANTS_HTML_TEMPLATE(job.jobName, cvsSentNow, jobLink),
-      };
-      applicantsTransporter.sendMail(applicantsOptions, async (err) => {
-        if (err) {
-          console.error("Applicants notification error:", err);
-        } else {
-          await db("jobs").where("id", job_id).update({ cv_submissions_email_sent: true });
-        }
-      });
-    }
-
-    // When 3rd CV is sent to a job, send propositional email from secondary Gmail (skip if dont_send_email)
+    // When 3rd CV is sent, send propositional email (PROPOSITIONAL_HTML_TEMPLATE)
     if (isThirdCv && hrNotifyTransporter && job.company_email && !job.dont_send_email) {
       const propositionalOptions = {
         from: PROPOSITIONAL_MAIL_USER,
