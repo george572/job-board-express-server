@@ -31,6 +31,40 @@ const newJobTransporter =
       })
     : null;
 
+// Cooldown between new-job emails (seconds) - avoids blasting; server-side, survives refresh
+const NEW_JOB_EMAIL_COOLDOWN_SEC = 120;
+const newJobEmailQueue = [];
+let newJobEmailLastSentAt = 0;
+let newJobEmailProcessorScheduled = false;
+
+function processNewJobEmailQueue() {
+  if (newJobEmailQueue.length === 0) {
+    newJobEmailProcessorScheduled = false;
+    return;
+  }
+  const now = Date.now();
+  const elapsed = (now - newJobEmailLastSentAt) / 1000;
+  if (newJobEmailLastSentAt > 0 && elapsed < NEW_JOB_EMAIL_COOLDOWN_SEC) {
+    const waitMs = (NEW_JOB_EMAIL_COOLDOWN_SEC - elapsed) * 1000;
+    newJobEmailProcessorScheduled = true;
+    setTimeout(processNewJobEmailQueue, waitMs);
+    return;
+  }
+  const job = newJobEmailQueue.shift();
+  newJobEmailLastSentAt = Date.now();
+  const jobLink = `${SITE_BASE_URL}/vakansia/${slugify(job.jobName)}-${job.id}`;
+  const mailOptions = {
+    from: NEW_JOB_MAIL_USER,
+    to: job.company_email.trim(),
+    subject: `თქვენი ვაკანსია "${job.jobName}" - Samushao.ge`,
+    html: NEW_JOB_HTML_TEMPLATE({ ...job, jobLink }),
+  };
+  newJobTransporter.sendMail(mailOptions, (err) => {
+    if (err) console.error("New job email error:", err);
+    processNewJobEmailQueue();
+  });
+}
+
 // Helper: extract numeric salary for comparison (e.g. "1500-2000" → 1500, "1200" → 1200)
 function parseSalaryNum(s) {
   if (s == null || s === "") return null;
@@ -68,18 +102,13 @@ const NEW_JOB_HTML_TEMPLATE = (job) => {
 `;
 };
 
-async function sendNewJobEmail(job) {
+function sendNewJobEmail(job) {
   if (!newJobTransporter || !job.company_email || job.dont_send_email) return;
-  const jobLink = `${SITE_BASE_URL}/vakansia/${slugify(job.jobName)}-${job.id}`;
-  const mailOptions = {
-    from: NEW_JOB_MAIL_USER,
-    to: job.company_email.trim(),
-    subject: `თქვენი ვაკანსია "${job.jobName}" - Samushao.ge`,
-    html: NEW_JOB_HTML_TEMPLATE({ ...job, jobLink }),
-  };
-  newJobTransporter.sendMail(mailOptions, (err) => {
-    if (err) console.error("New job email error:", err);
-  });
+  newJobEmailQueue.push(job);
+  if (!newJobEmailProcessorScheduled) {
+    newJobEmailProcessorScheduled = true;
+    processNewJobEmailQueue();
+  }
 }
 
 /**
