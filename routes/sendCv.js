@@ -4,6 +4,9 @@ const nodemailer = require("nodemailer");
 const cors = require("cors");
 const path = require("path");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { slugify } = require("../utils/slugify");
+
+const SITE_BASE_URL = process.env.SITE_BASE_URL || "https://samushao.ge";
 
 // Load .env from project root (reliable when app is started from any cwd)
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
@@ -241,6 +244,12 @@ router.post("/complain", async (req, res) => {
     if (!refusal) {
       return res.status(400).json({ error: "No refusal found for this user and job" });
     }
+    if (refusal.complaint_sent) {
+      return res.status(400).json({
+        error: "complaint_already_sent",
+        message: "თქვენ უკვე გაგზავნეთ სარჩევი",
+      });
+    }
 
     const job = await db("jobs").where("id", job_id).first();
     if (!job) {
@@ -254,6 +263,7 @@ router.post("/complain", async (req, res) => {
 
     const resume = await db("resumes").where("user_id", user_id).first();
     const cvLink = resume ? resume.file_url : "N/A";
+    const jobUrl = `${SITE_BASE_URL}/vakansia/${slugify(job.jobName || "")}-${job.id}`;
 
     if (!marketingTransporter) {
       return res.status(500).json({ error: "Email service for complaints is not configured" });
@@ -263,6 +273,7 @@ router.post("/complain", async (req, res) => {
 <p>მომხმარებელი აცხადებს, რომ Samushao.ge-ის AI შეფასება არასწორია და ის შესაფერისია ვაკანსიისთვის.</p>
 <p><strong>ვაკანსია:</strong> ${job.jobName || "N/A"} (ID: ${job.id})</p>
 <p><strong>კომპანია:</strong> ${job.companyName || "N/A"}</p>
+<p><strong>ვაკანსიის ბმული:</strong> <a href="${jobUrl}">${jobUrl}</a></p>
 <hr>
 <p><strong>მომხმარებლის სახელი:</strong> ${user.user_name || "N/A"}</p>
 <p><strong>User UID:</strong> ${user_id}</p>
@@ -288,6 +299,10 @@ router.post("/complain", async (req, res) => {
         }
       );
     });
+
+    await db("cv_refusals")
+      .where({ user_id, job_id })
+      .update({ complaint_sent: true });
 
     return res.json({ message: "Complaint sent successfully" });
   } catch (err) {

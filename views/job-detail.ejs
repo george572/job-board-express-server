@@ -248,9 +248,13 @@
             <p class="text-red-500 text-[16px] my-8 mt-8 text-center max-w-[296px]">
               თქვენ უკვე სცადეთ აქ გაგზავნა, მაგრამ ვაკანსიის მოთხოვნებს ვერ აკმაყოფილებთ
             </p>
+            <% if (!cvComplaintAlreadySent) { %>
             <button type="button" id="complainBtnDesktop" class="w-[296px] mt-2 text-[14px] text-[#315EFF] underline cursor-pointer hover:no-underline">
               თუ ფიქრობ ვცდებით - გაასაჩივრე
             </button>
+            <% } else { %>
+            <p class="text-[14px] text-gray-500 mt-2">საჩივარი უკვე გაგზავნილია</p>
+            <% } %>
           </div>
           <% } else if (typeof isExpired !== 'undefined' && isExpired) { %>
           <div class="bg-gray-200 w-[296px] h-[52px] text-gray-600 rounded-lg my-8 mb-1 text-[16px] hidden lg:flex items-center justify-center mt-8">
@@ -315,9 +319,13 @@
         <p class="text-red-500 text-[16px] my-8 mt-0 mb-1 flex items-center justify-center text-center px-2">
           თქვენ უკვე სცადეთ აქ გაგზავნა, მაგრამ ვაკანსიის მოთხოვნებს ვერ აკმაყოფილებთ
         </p>
+        <% if (!cvComplaintAlreadySent) { %>
         <button type="button" id="complainBtnMobile" class="w-full mt-2 text-[14px] text-[#315EFF] underline cursor-pointer hover:no-underline">
           თუ ფიქრობ ვცდებით - გაასაჩივრე
         </button>
+        <% } else { %>
+        <p class="text-[14px] text-gray-500 mt-2 text-center">საჩივარი უკვე გაგზავნილია</p>
+        <% } %>
       </div>
       <% } else if (typeof isExpired !== 'undefined' && isExpired) { %>
       <div class="bg-gray-200 w-full min-h-[52px] text-gray-600 rounded-lg my-8 mt-0 mb-1 text-[16px] flex items-center justify-center">
@@ -584,13 +592,23 @@
       })
         .then(function(r) { return r.json(); })
         .then(function(data) {
+          if (data.error === 'complaint_already_sent') {
+            btn.textContent = 'საჩივარი უკვე გაგზავნილია';
+            btn.disabled = true;
+            btn.classList.add('cursor-not-allowed', 'opacity-60');
+            btn.classList.remove('cursor-pointer');
+            return;
+          }
           if (data.error) throw new Error(data.error);
           btn.textContent = 'გაიგზავნა, გადავხედავთ და დაგიკავშირდებით';
+          btn.disabled = true;
+          btn.classList.add('cursor-not-allowed', 'opacity-60');
+          btn.classList.remove('cursor-pointer');
         })
         .catch(function(err) {
           btn.disabled = false;
           btn.textContent = originalText;
-          alert('სარჩევის გაგზავნა ვერ მოხერხდა: ' + (err.message || 'შეცდომა'));
+          alert('საჩივრის გაგზავნა ვერ მოხერხდა: ' + (err.message || 'შეცდომა'));
         });
     }
     [document.getElementById('complainBtnDesktop'), document.getElementById('complainBtnMobile'), document.getElementById('desktopComplainBtn'), document.getElementById('mobileComplainBtn')].forEach(function(btn) {
