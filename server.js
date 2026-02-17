@@ -416,13 +416,14 @@ app.get("/", async (req, res) => {
         "%" +
         searchQuery.trim().replace(/%/g, "\\%").replace(/_/g, "\\_") +
         "%";
-      const searchCondition = function () {
-        this.where("jobName", "ilike", term)
-          .orWhere("companyName", "ilike", term)
-          .orWhere("jobDescription", "ilike", term);
-      };
-      query.andWhere(searchCondition);
-      countQuery.andWhere(searchCondition);
+      query.andWhereRaw(
+        '("jobName" ilike ? OR "companyName" ilike ? OR COALESCE("jobDescription", \'\') ilike ?)',
+        [term, term, term]
+      );
+      countQuery.andWhereRaw(
+        '("jobName" ilike ? OR "companyName" ilike ? OR COALESCE("jobDescription", \'\') ilike ?)',
+        [term, term, term]
+      );
     }
 
     // Get total count
