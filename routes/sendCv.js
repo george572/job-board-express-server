@@ -16,9 +16,19 @@ router.use(cors());
 const MAIL_USER = "info@samushao.ge";
 const MAIL_PASS = (process.env.MAIL_PSW || "").trim();
 
-// Secondary Gmail for 4th CV propositional email - PROPOSITIONAL_MAIL_USER, PROPOSITIONAL_MAIL_PASS
-const PROPOSITIONAL_MAIL_USER = (process.env.PROPOSITIONAL_MAIL_USER || "").trim();
-const PROPOSITIONAL_MAIL_PASS = (process.env.PROPOSITIONAL_MAIL_PASS || "").trim().replace(/\s/g, "");
+// Marketing email on 3rd CV – from giorgi@samushao.ge
+const MARKETING_MAIL_USER = (process.env.APPLICANTS_MAIL_USER || process.env.MARKETING_MAIL_USER || "").trim();
+const MARKETING_MAIL_PASS = (process.env.APPLICANTS_MAIL_PASS || process.env.MARKETING_MAIL_PASS || "").trim().replace(/\s/g, "");
+
+const marketingTransporter =
+  MARKETING_MAIL_USER && MARKETING_MAIL_PASS
+    ? nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false,
+        auth: { user: MARKETING_MAIL_USER, pass: MARKETING_MAIL_PASS },
+      })
+    : null;
 
 const PROPOSITIONAL_HTML_TEMPLATE = (cvsSent) => `
 <p>სალამი!</p>
@@ -38,19 +48,6 @@ const transporter = nodemailer.createTransport({
     pass: MAIL_PASS,
   },
 });
-
-const hrNotifyTransporter =
-PROPOSITIONAL_MAIL_USER && PROPOSITIONAL_MAIL_PASS
-    ? nodemailer.createTransport({
-        host: "smtp.gmail.com",
-        port: 587,
-        secure: false,
-        auth: {
-          user: PROPOSITIONAL_MAIL_USER,
-          pass: PROPOSITIONAL_MAIL_PASS,
-        },
-      })
-    : null;
 
 router.post("/", async (req, res) => {
   const { job_id, user_id } = req.body;
@@ -105,17 +102,19 @@ router.post("/", async (req, res) => {
       });
     });
 
-    // When 3rd CV is sent, send propositional email (PROPOSITIONAL_HTML_TEMPLATE)
-    if (isThirdCv && hrNotifyTransporter && job.company_email && !job.dont_send_email) {
-      const propositionalOptions = {
-        from: PROPOSITIONAL_MAIL_USER,
-        to: job.company_email,
-        subject: `თქვენი ვაკანსია "${job.jobName}" - Samushao.ge`,
-        html: PROPOSITIONAL_HTML_TEMPLATE(3),
-      };
-      hrNotifyTransporter.sendMail(propositionalOptions, (err) => {
-        if (err) console.error("Propositional email error:", err);
-      });
+    // When 3rd CV is sent, send marketing email from giorgi@samushao.ge
+    if (isThirdCv && marketingTransporter && job.company_email && !job.dont_send_email) {
+      marketingTransporter.sendMail(
+        {
+          from: MARKETING_MAIL_USER,
+          to: job.company_email,
+          subject: `თქვენი ვაკანსია "${job.jobName}" - Samushao.ge`,
+          html: PROPOSITIONAL_HTML_TEMPLATE(3),
+        },
+        (err) => {
+          if (err) console.error("Marketing email error:", err);
+        }
+      );
     }
 
     const insertPayload = { user_id, job_id: job.id };
