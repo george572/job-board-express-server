@@ -22,6 +22,45 @@ const NEW_JOB_MAIL_PASS = (process.env.PROPOSITIONAL_MAIL_PASS || "").trim().rep
 const SITE_BASE_URL = process.env.SITE_BASE_URL || "https://samushao.ge";
 const EMAIL_SIGNATURE = (process.env.EMAIL_SIGNATURE || "").trim();
 
+let blacklistCache = { emails: new Set(), companyNames: new Set() };
+let blacklistLoaded = false;
+
+async function loadBlacklist() {
+  try {
+    const rows = await db("blacklisted_company_emails").select("email", "company_name");
+    const emails = new Set();
+    const companyNames = new Set();
+    rows.forEach((r) => {
+      const e = (r.email || "").trim().toLowerCase();
+      const c = (r.company_name || "").trim().toLowerCase();
+      if (e) emails.add(e);
+      if (c) companyNames.add(c);
+    });
+    blacklistCache = { emails, companyNames };
+    blacklistLoaded = true;
+    return blacklistCache;
+  } catch (e) {
+    if (e.code !== "42P01") console.error("loadBlacklist error:", e.message);
+    blacklistLoaded = true;
+    return blacklistCache;
+  }
+}
+
+async function isBlacklisted(jobOrEmail, companyName) {
+  const email = (typeof jobOrEmail === "string" ? jobOrEmail : jobOrEmail?.company_email || "").trim().toLowerCase();
+  const name = (companyName ?? (typeof jobOrEmail === "object" ? jobOrEmail?.companyName : ""))?.trim().toLowerCase() || "";
+  if (!email && !name) return false;
+  if (!blacklistLoaded) await loadBlacklist();
+  if (email && blacklistCache.emails.has(email)) return true;
+  if (name && blacklistCache.companyNames.has(name)) return true;
+  return false;
+}
+
+async function refreshBlacklistCache() {
+  blacklistLoaded = false;
+  return loadBlacklist();
+}
+
 const newJobTransporter =
   NEW_JOB_MAIL_USER && NEW_JOB_MAIL_PASS
     ? nodemailer.createTransport({
@@ -34,20 +73,92 @@ const newJobTransporter =
 
 // Cooldown between new-job emails (seconds) - avoids blasting; server-side, survives refresh
 const NEW_JOB_EMAIL_COOLDOWN_SEC = 120;
+const SENT_JOB_KEY_TTL_MS = 24 * 60 * 60 * 1000; // 24h – skip requeue if we sent recently
 const EMAIL_QUEUE_FILE = path.join(__dirname, "..", ".new-job-email-queue.json");
 
 let newJobEmailQueue = [];
 let newJobEmailLastSentAt = 0;
 let newJobEmailProcessorScheduled = false;
+let sentJobKeys = {}; // { "jobName|companyName": timestamp }
+let sentCompanyEmails = {}; // { "email@company.com": timestamp } – max 1 email per company per 24h
+
+function jobKey(job) {
+  const n = String(job.jobName || "").trim();
+  const c = String(job.companyName || "").trim();
+  return (n && c) ? n + "|" + c : null;
+}
+
+async function hasRecentlySentToCompany(companyEmail) {
+  if (!companyEmail) return false;
+  try {
+    const row = await db("new_job_email_sent")
+      .where("company_email_lower", companyEmail)
+      .whereRaw("sent_at > now() - interval '24 hours'")
+      .first();
+    return !!row;
+  } catch (e) {
+    console.error("hasRecentlySentToCompany error:", e.message);
+    return false;
+  }
+}
+
+async function claimAndSendToCompany(companyEmail) {
+  if (!companyEmail) return false;
+  try {
+    const result = await db.raw(
+      `INSERT INTO new_job_email_sent (company_email_lower, sent_at)
+       VALUES (?, now())
+       ON CONFLICT (company_email_lower)
+       DO UPDATE SET sent_at = now()
+       WHERE new_job_email_sent.sent_at < now() - interval '24 hours'
+       RETURNING company_email_lower`,
+      [companyEmail]
+    );
+    return result.rows && result.rows.length > 0;
+  } catch (e) {
+    console.error("claimAndSendToCompany error:", e.message);
+    return false;
+  }
+}
 
 function loadEmailQueue() {
   try {
     const data = fs.readFileSync(EMAIL_QUEUE_FILE, "utf8");
     const parsed = JSON.parse(data);
-    newJobEmailQueue = Array.isArray(parsed.queue) ? parsed.queue : [];
+    let raw = Array.isArray(parsed.queue) ? parsed.queue : [];
+    const seenIds = new Set();
+    const seenKeys = new Set();
+    const seenCompanies = new Set();
+    newJobEmailQueue = raw.filter((j) => {
+      const id = j.id;
+      const key = jobKey(j);
+      const company = (j.company_email || "").trim().toLowerCase();
+      if (id != null && seenIds.has(id)) return false;
+      if (key != null && seenKeys.has(key)) return false;
+      if (company && seenCompanies.has(company)) return false;
+      if (id != null) seenIds.add(id);
+      if (key != null) seenKeys.add(key);
+      if (company) seenCompanies.add(company);
+      return true;
+    });
     if (parsed.lastSentAt && typeof parsed.lastSentAt === "number") {
       newJobEmailLastSentAt = parsed.lastSentAt;
     }
+    const rawSent = parsed.sentJobKeys || {};
+    const rawCompany = parsed.sentCompanyEmails || {};
+    const cutoff = Date.now() - SENT_JOB_KEY_TTL_MS;
+    sentJobKeys = {};
+    Object.keys(rawSent).forEach((k) => {
+      if (typeof rawSent[k] === "number" && rawSent[k] > cutoff) sentJobKeys[k] = rawSent[k];
+    });
+    sentCompanyEmails = {};
+    Object.keys(rawCompany).forEach((k) => {
+      if (typeof rawCompany[k] === "number" && rawCompany[k] > cutoff) sentCompanyEmails[k] = rawCompany[k];
+    });
+    newJobEmailQueue = newJobEmailQueue.filter((j) => {
+      const company = (j.company_email || "").trim().toLowerCase();
+      return !company || !sentCompanyEmails[company] || (Date.now() - sentCompanyEmails[company]) >= SENT_JOB_KEY_TTL_MS;
+    });
     if (newJobEmailQueue.length > 0) {
       newJobEmailProcessorScheduled = true;
       processNewJobEmailQueue();
@@ -59,11 +170,22 @@ function loadEmailQueue() {
 
 function saveEmailQueue() {
   try {
+    const cutoff = Date.now() - SENT_JOB_KEY_TTL_MS;
+    const prunedKeys = {};
+    Object.keys(sentJobKeys).forEach((k) => {
+      if (sentJobKeys[k] > cutoff) prunedKeys[k] = sentJobKeys[k];
+    });
+    const prunedCompany = {};
+    Object.keys(sentCompanyEmails).forEach((k) => {
+      if (sentCompanyEmails[k] > cutoff) prunedCompany[k] = sentCompanyEmails[k];
+    });
     fs.writeFileSync(
       EMAIL_QUEUE_FILE,
       JSON.stringify({
         queue: newJobEmailQueue,
         lastSentAt: newJobEmailLastSentAt,
+        sentJobKeys: prunedKeys,
+        sentCompanyEmails: prunedCompany,
         updatedAt: Date.now(),
       }),
       "utf8"
@@ -76,7 +198,7 @@ function saveEmailQueue() {
 // Load persisted queue on startup
 loadEmailQueue();
 
-function processNewJobEmailQueue() {
+async function processNewJobEmailQueue() {
   if (newJobEmailQueue.length === 0) {
     newJobEmailProcessorScheduled = false;
     return;
@@ -90,12 +212,30 @@ function processNewJobEmailQueue() {
     return;
   }
   const job = newJobEmailQueue.shift();
+  const companyEmail = (job.company_email || "").trim().toLowerCase();
+  if (companyEmail && sentCompanyEmails[companyEmail] && (Date.now() - sentCompanyEmails[companyEmail]) < SENT_JOB_KEY_TTL_MS) {
+    saveEmailQueue();
+    processNewJobEmailQueue();
+    return;
+  }
+  if (companyEmail && (await hasRecentlySentToCompany(companyEmail))) {
+    saveEmailQueue();
+    processNewJobEmailQueue();
+    return;
+  }
+  const claimed = companyEmail && (await claimAndSendToCompany(companyEmail));
+  if (companyEmail && !claimed) {
+    saveEmailQueue();
+    processNewJobEmailQueue();
+    return;
+  }
   newJobEmailLastSentAt = Date.now();
   saveEmailQueue();
   const jobLink = `${SITE_BASE_URL}/vakansia/${slugify(job.jobName)}-${job.id}`;
+  const toEmail = (job.company_email || "").trim().split(/[,;]/)[0].trim();
   const mailOptions = {
     from: NEW_JOB_MAIL_USER,
-    to: job.company_email.trim(),
+    to: toEmail || job.company_email.trim(),
     subject: `თქვენი ვაკანსია "${job.jobName}" - Samushao.ge`,
     html: NEW_JOB_HTML_TEMPLATE({ ...job, jobLink }),
   };
@@ -103,6 +243,10 @@ function processNewJobEmailQueue() {
     if (err) {
       console.error("New job email error:", err);
     } else {
+      const key = jobKey(job);
+      if (key) sentJobKeys[key] = Date.now();
+      if (companyEmail) sentCompanyEmails[companyEmail] = Date.now();
+      saveEmailQueue();
       console.log(`📧 Sent new-job email to ${job.company_email?.trim()} (job #${job.id}: ${job.jobName})`);
     }
     try {
@@ -151,8 +295,14 @@ const NEW_JOB_HTML_TEMPLATE = (job) => {
 `;
 };
 
-function sendNewJobEmail(job) {
+async function sendNewJobEmail(job) {
   if (!newJobTransporter || !job.company_email || job.dont_send_email) return;
+  const companyEmail = (job.company_email || "").trim().toLowerCase();
+  if (!companyEmail) return;
+  const key = jobKey(job);
+  if (key != null && newJobEmailQueue.some((j) => jobKey(j) === key)) return;
+  if (companyEmail && newJobEmailQueue.some((j) => (j.company_email || "").trim().toLowerCase() === companyEmail)) return;
+  if (await hasRecentlySentToCompany(companyEmail)) return;
   newJobEmailQueue.push(job);
   saveEmailQueue();
   if (!newJobEmailProcessorScheduled) {
@@ -163,14 +313,13 @@ function sendNewJobEmail(job) {
 
 /**
  * Send one email per company when multiple jobs are uploaded (bulk).
- * Uses the first job's details for the email content.
  */
-function sendNewJobEmailToCompany(jobs) {
+async function sendNewJobEmailToCompany(jobs) {
   if (!newJobTransporter || !Array.isArray(jobs) || jobs.length === 0) return;
   const first = jobs[0];
   const email = (first.company_email || "").trim();
   if (!email || first.dont_send_email) return;
-  sendNewJobEmail(first);
+  await sendNewJobEmail(first);
 }
 
 router.get("/", async (req, res) => {
@@ -383,6 +532,13 @@ router.post("/", upload.single("company_logo"), async (req, res) => {
   const jName = String(jobName || "").trim();
   const cName = String(companyName || "").trim();
 
+  if (await isBlacklisted(company_email, cName)) {
+    return res.status(403).json({
+      error: "Blacklisted company",
+      message: "This company cannot upload vacancies",
+    });
+  }
+
   const existing = await db("jobs")
     .where("job_status", "approved")
     .where("jobName", jName)
@@ -421,7 +577,7 @@ router.post("/", upload.single("company_logo"), async (req, res) => {
       .returning("id");
 
     if (inserted) {
-      sendNewJobEmail({
+      await sendNewJobEmail({
         id: inserted.id,
         jobName: jName,
         companyName: cName,
@@ -433,6 +589,12 @@ router.post("/", upload.single("company_logo"), async (req, res) => {
 
     res.status(201).json({ message: "Job created", jobId: inserted?.id });
   } catch (err) {
+    if (err.code === "23505") {
+      return res.status(409).json({
+        error: "Duplicate job",
+        message: "A job with this title and company already exists",
+      });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -450,12 +612,12 @@ router.post("/bulk", async (req, res) => {
   const failedJobs = [];
   const seenInBatch = new Set();
 
-  jobsToInsert.forEach((job, index) => {
-    // Define your "Deal Breakers" here
-    const hasRequiredFields = 
-      job.companyName && 
-      job.jobName && 
-      job.user_uid && 
+  for (let index = 0; index < jobsToInsert.length; index++) {
+    const job = jobsToInsert[index];
+    const hasRequiredFields =
+      job.companyName &&
+      job.jobName &&
+      job.user_uid &&
       job.category_id;
 
     if (hasRequiredFields) {
@@ -465,7 +627,11 @@ router.post("/bulk", async (req, res) => {
 
       if (seenInBatch.has(key)) {
         failedJobs.push({ index, jobName: jName, error: "Duplicate within batch" });
-        return;
+        continue;
+      }
+      if (await isBlacklisted(job.company_email, job.companyName)) {
+        failedJobs.push({ index, jobName: jName, error: "Blacklisted company" });
+        continue;
       }
       seenInBatch.add(key);
 
@@ -490,20 +656,18 @@ router.post("/bulk", async (req, res) => {
         company_logo: job.company_logo || null
       });
     } else {
-      // THE "FUCKING CONSOLE LOG" YOU REQUESTED
       console.error(`⚠️ JOB FAILED VALIDATION (Index: ${index}):`, {
         jobName: job.jobName || "UNKNOWN",
         company: job.companyName || "UNKNOWN",
         reason: "Missing required fields (companyName, jobName, user_uid, or category_id)"
       });
-      
-      failedJobs.push({ 
-        index, 
-        jobName: job.jobName || "Unknown", 
-        error: "Missing required fields" 
+      failedJobs.push({
+        index,
+        jobName: job.jobName || "Unknown",
+        error: "Missing required fields"
       });
     }
-  });
+  }
 
   // If everything failed validation, stop here
   if (validJobs.length === 0) {
@@ -539,7 +703,7 @@ router.post("/bulk", async (req, res) => {
     const ids = await db("jobs").insert(toInsert).returning("id");
 
     // Send one email per company (group by company_email to avoid duplicates when company uploads multiple jobs)
-    const jobsWithIds = toInsert.map((j, i) => ({ ...j, id: ids[i].id }))
+    const jobsWithIds = toInsert.map((j, i) => ({ ...j, id: ids[i]?.id ?? ids[i] }))
       .filter((j) => !j.dont_send_email && (j.company_email || "").trim());
     const byCompany = new Map();
     for (const j of jobsWithIds) {
@@ -548,7 +712,7 @@ router.post("/bulk", async (req, res) => {
       byCompany.get(key).push(j);
     }
     for (const jobs of byCompany.values()) {
-      sendNewJobEmailToCompany(jobs);
+      await sendNewJobEmailToCompany(jobs);
     }
 
     console.log(`✅ SUCCESS: Inserted ${ids.length} jobs.`);
@@ -617,6 +781,52 @@ router.kickEmailQueue = () => {
   processNewJobEmailQueue();
 };
 
+// Blacklisted company emails (DB)
+router.get("/blacklist", async (req, res) => {
+  try {
+    const rows = await db("blacklisted_company_emails")
+      .select("id", "email", "company_name", "created_at", "note")
+      .orderBy("email");
+    res.json(rows);
+  } catch (e) {
+    if (e.code === "42P01") return res.json([]);
+    console.error("blacklist GET error:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post("/blacklist", async (req, res) => {
+  try {
+    const body = req.body?.email ? req.body : { email: req.body };
+    const email = (body.email || "").trim().toLowerCase();
+    const company_name = (body.company_name || "").trim() || null;
+    if (!email) return res.status(400).json({ error: "email required" });
+    const [row] = await db("blacklisted_company_emails")
+      .insert({ email, company_name, note: body.note || null })
+      .returning("*");
+    await refreshBlacklistCache();
+    res.status(201).json(row);
+  } catch (e) {
+    if (e.code === "23505") return res.status(409).json({ error: "Email already blacklisted" });
+    console.error("blacklist POST error:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.delete("/blacklist/:email", async (req, res) => {
+  try {
+    const email = decodeURIComponent(req.params.email || "").trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: "email required" });
+    const count = await db("blacklisted_company_emails").where("email", email).del();
+    if (count === 0) return res.status(404).json({ error: "Not found" });
+    await refreshBlacklistCache();
+    res.json({ deleted: true });
+  } catch (e) {
+    console.error("blacklist DELETE error:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.requeueJobsByIds = async (jobIds) => {
   if (!Array.isArray(jobIds) || jobIds.length === 0) return { added: 0 };
   const ids = jobIds.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
@@ -626,7 +836,7 @@ router.requeueJobsByIds = async (jobIds) => {
     .whereIn("id", ids)
     .where("job_status", "approved");
   for (const j of jobs) {
-    sendNewJobEmail({
+    await sendNewJobEmail({
       ...j,
       dont_send_email: j.dont_send_email === true || j.dont_send_email === 1,
     });

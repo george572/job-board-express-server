@@ -50,6 +50,14 @@
       <option value="full-time">სრული განაკვეთი</option>
       <option value="part-time">ნახევარი განაკვეთი</option>
     </select>
+    <!-- city -->
+    <select id="cityFilter" name="job_city" class="text-xs p-2 bg-white border-slate-200 h-[35px] border rounded-lg cursor-pointer w-[49%] lg:w-[172px]">
+      <option value="">ქალაქი</option>
+      <option value="თბილისი">თბილისი</option>
+      <option value="ქუთაისი">ქუთაისი</option>
+      <option value="ბათუმი">ბათუმი</option>
+      <option value="ზუგდიდი">ზუგდიდი</option>
+    </select>
   </div>
   <div class="w-full relative max-w-full lg:max-w-[200px] flex items-center">
     <input id="searchInput" placeholder="ძებნა" type="text" class="border-slate-200 bg-white w-full h-[35px] outline-none rounded-lg max-w-full lg:max-w-[200px] border p-3 font-[300] pr-10" autocomplete="off">
@@ -108,6 +116,13 @@
       'part-time': 'ნახევარი განაკვეთი'
     };
 
+    const cityNames = {
+      'თბილისი': 'თბილისი',
+      'ქუთაისი': 'ქუთაისი',
+      'ბათუმი': 'ბათუმი',
+      'ზუგდიდი': 'ზუგდიდი'
+    };
+
     const salaryNames = {
       '1000': '1000 GEL +',
       '2000': '2000 GEL +',
@@ -121,6 +136,7 @@
     const salaryFilter = document.getElementById('salaryFilter');
     const experienceFilter = document.getElementById('experienceFilter');
     const jobTypeFilter = document.getElementById('jobTypeFilter');
+    const cityFilter = document.getElementById('cityFilter');
     const searchInput = document.getElementById('searchInput');
     const searchSubmitBtn = document.getElementById('searchSubmitBtn');
     const activeFiltersContainer = document.getElementById('activeFiltersContainer');
@@ -135,6 +151,7 @@
       if (params.min_salary && params.min_salary.length > 0) qs.set('min_salary', params.min_salary[0]);
       if (params.job_experience && params.job_experience.length > 0) params.job_experience.forEach(e => qs.append('job_experience', e));
       if (params.job_type && params.job_type.length > 0) params.job_type.forEach(t => qs.append('job_type', t));
+      if (params.job_city && params.job_city.length > 0) params.job_city.forEach(c => qs.append('job_city', c));
       if (params.q && params.q.trim()) qs.set('q', params.q.trim());
       fetch('/api/filter-counts?' + qs.toString())
         .then(function (res) { return res.json(); })
@@ -171,6 +188,14 @@
               opt.text = val ? (jobTypeNames[val] || val) + (typ[val] !== undefined ? ' (' + typ[val] + ')' : '') : 'განაკვეთი';
             }
           }
+          var cityData = data.job_city || {};
+          if (cityFilter) {
+            for (var i = 0; i < cityFilter.options.length; i++) {
+              var opt = cityFilter.options[i];
+              var val = opt.value;
+              opt.text = val ? (cityNames[val] || val) + (cityData[val] !== undefined ? ' (' + cityData[val] + ')' : '') : 'ქალაქი';
+            }
+          }
         })
         .catch(function () {});
     }
@@ -183,6 +208,7 @@
         min_salary: params.get('min_salary') ? [params.get('min_salary')] : [],
         job_experience: params.getAll('job_experience'),
         job_type: params.getAll('job_type'),
+        job_city: params.getAll('job_city'),
         q: params.get('q') || ''
       };
     }
@@ -194,6 +220,7 @@
         (p.min_salary && p.min_salary.length > 0) ||
         (p.job_experience && p.job_experience.length > 0) ||
         (p.job_type && p.job_type.length > 0) ||
+        (p.job_city && p.job_city.length > 0) ||
         (p.q && typeof p.q === 'string' && p.q.trim() !== '');
     }
 
@@ -230,6 +257,9 @@
       }
       if (filters.job_type && filters.job_type.length > 0) {
         filters.job_type.forEach(type => params.append('job_type', type));
+      }
+      if (filters.job_city && filters.job_city.length > 0) {
+        filters.job_city.forEach(city => params.append('job_city', city));
       }
       if (filters.q && filters.q.trim()) {
         params.set('q', filters.q.trim());
@@ -276,6 +306,7 @@
       if (type === 'min_salary') return salaryNames[value] || value + ' GEL +';
       if (type === 'job_experience') return experienceNames[value] || value;
       if (type === 'job_type') return jobTypeNames[value] || value;
+      if (type === 'job_city') return cityNames[value] || value;
       if (type === 'q') return 'ძებნა: ' + value;
       return value;
     }
@@ -316,6 +347,14 @@
         hasFilters = true;
         const type = params.job_type[0];
         const tag = createFilterTag('job_type', type, getFilterDisplayName('job_type', type));
+        activeFiltersList.appendChild(tag);
+      }
+
+      // City filter
+      if (params.job_city && params.job_city.length > 0) {
+        hasFilters = true;
+        const city = params.job_city[0];
+        const tag = createFilterTag('job_city', city, getFilterDisplayName('job_city', city));
         activeFiltersList.appendChild(tag);
       }
 
@@ -369,6 +408,9 @@
       } else if (type === 'job_type') {
         params.job_type = [];
         jobTypeFilter.value = '';
+      } else if (type === 'job_city') {
+        params.job_city = [];
+        cityFilter.value = '';
       } else if (type === 'q') {
         params.q = '';
         if (searchInput) searchInput.value = '';
@@ -383,8 +425,9 @@
       salaryFilter.value = '';
       experienceFilter.value = '';
       jobTypeFilter.value = '';
+      if (cityFilter) cityFilter.value = '';
       if (searchInput) searchInput.value = '';
-      updateUrl({ category: [], min_salary: [], job_experience: [], job_type: [], q: '' });
+      updateUrl({ category: [], min_salary: [], job_experience: [], job_type: [], job_city: [], q: '' });
     }
 
     // Set filter dropdowns from URL params
@@ -409,6 +452,11 @@
       // Set job type (take first if multiple)
       if (params.job_type && params.job_type.length > 0) {
         jobTypeFilter.value = params.job_type[0];
+      }
+
+      // Set city (take first if multiple)
+      if (cityFilter && params.job_city && params.job_city.length > 0) {
+        cityFilter.value = params.job_city[0];
       }
 
       // Set search
@@ -441,6 +489,14 @@
       params.job_type = this.value ? [this.value] : [];
       updateUrl(params);
     });
+
+    if (cityFilter) {
+      cityFilter.addEventListener('change', function() {
+        const params = getUrlParams();
+        params.job_city = this.value ? [this.value] : [];
+        updateUrl(params);
+      });
+    }
 
     // Search: apply on Enter or click search icon
     function applySearch() {

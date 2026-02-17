@@ -197,6 +197,7 @@ app.get("/", async (req, res) => {
       company,
       job_experience,
       job_type,
+      job_city,
       page = 1,
       limit: limitParam = 10,
       hasSalary,
@@ -220,6 +221,7 @@ app.get("/", async (req, res) => {
       "company",
       "job_experience",
       "job_type",
+      "job_city",
       "hasSalary",
       "job_premium_status",
       "min_salary",
@@ -390,6 +392,11 @@ app.get("/", async (req, res) => {
       const types = Array.isArray(job_type) ? job_type : [job_type];
       query.whereIn("job_type", types);
       countQuery.whereIn("job_type", types);
+    }
+    if (job_city) {
+      const cities = Array.isArray(job_city) ? job_city : [job_city];
+      query.whereIn("job_city", cities);
+      countQuery.whereIn("job_city", cities);
     }
     if (hasSalary === "true") {
       query.whereNotNull("jobSalary");
@@ -859,12 +866,13 @@ cloudinary.config({
 // Filter counts (contextual: when category=2 active, other counts reflect jobs in that category)
 app.get("/api/filter-counts", async (req, res) => {
   try {
-    const { category, min_salary, job_experience, job_type, q } = req.query;
+    const { category, min_salary, job_experience, job_type, job_city, q } = req.query;
     const hasAnyFilter =
       (category && category.length > 0) ||
       (min_salary && min_salary.length > 0) ||
       (job_experience && job_experience.length > 0) ||
       (job_type && job_type.length > 0) ||
+      (job_city && job_city.length > 0) ||
       (q && typeof q === "string" && q.trim() !== "");
 
     const filterSearchTerm = (q && typeof q === "string" ? q.trim() : "") || "";
@@ -895,6 +903,10 @@ app.get("/api/filter-counts", async (req, res) => {
         const types = Array.isArray(job_type) ? job_type : [job_type];
         query.whereIn("job_type", types);
       }
+      if (exclude !== "job_city" && job_city) {
+        const cities = Array.isArray(job_city) ? job_city : [job_city];
+        query.whereIn("job_city", cities);
+      }
       if (exclude !== "q" && filterSearchTerm) {
         const term =
           "%" + filterSearchTerm.replace(/%/g, "\\%").replace(/_/g, "\\_") + "%";
@@ -907,7 +919,7 @@ app.get("/api/filter-counts", async (req, res) => {
       return query;
     };
 
-    const [categoryRows, salary1000, salary2000, salary3000, salary4000, salary5000, salary6000, expRows, typeRows] =
+    const [categoryRows, salary1000, salary2000, salary3000, salary4000, salary5000, salary6000, expRows, typeRows, cityRows] =
       await Promise.all([
         applyOtherFilters(baseQuery().clone(), "category")
           .select("category_id")
@@ -939,6 +951,11 @@ app.get("/api/filter-counts", async (req, res) => {
           .select("job_type")
           .count("* as c")
           .groupBy("job_type"),
+        applyOtherFilters(baseQuery().clone(), "job_city")
+          .whereIn("job_city", ["თბილისი", "ქუთაისი", "ბათუმი", "ზუგდიდი"])
+          .select("job_city")
+          .count("* as c")
+          .groupBy("job_city"),
       ]);
 
     const categoryCounts = {};
@@ -965,11 +982,17 @@ app.get("/api/filter-counts", async (req, res) => {
       if (r.job_type) jobTypeCounts[String(r.job_type)] = parseInt(r.c, 10) || 0;
     });
 
+    const cityCounts = {};
+    (cityRows || []).forEach((r) => {
+      if (r.job_city) cityCounts[String(r.job_city)] = parseInt(r.c, 10) || 0;
+    });
+
     res.json({
       category: categoryCounts,
       min_salary: salaryCounts,
       job_experience: experienceCounts,
       job_type: jobTypeCounts,
+      job_city: cityCounts,
     });
   } catch (err) {
     console.error("filter-counts error:", err);
