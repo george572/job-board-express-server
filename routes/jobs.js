@@ -397,33 +397,60 @@ router.get("/adm", async (req, res) => {
       .select("*")
       .orderBy("created_at", "desc");
     const jobIds = rows.map((r) => r.id);
-    const [succeededByJob, failedByJob] =
-      jobIds.length === 0
-        ? [[], []]
-        : await Promise.all([
-            db("job_applications")
-              .select("job_id")
-              .count("id as n")
-              .whereIn("job_id", jobIds)
-              .groupBy("job_id"),
-            db("cv_refusals")
-              .select("job_id")
-              .count("id as n")
-              .whereIn("job_id", jobIds)
-              .groupBy("job_id"),
-          ]);
+    if (jobIds.length === 0) {
+      return res.json({ data: rows.map((j) => ({ ...j, cv_stats: { tried: 0, succeeded: 0, failed: 0 }, cv_accepted: [], cv_refused: [] })) });
+    }
+    const [succeededByJob, failedByJob, acceptedRows, refusedRows] = await Promise.all([
+      db("job_applications")
+        .select("job_id")
+        .count("id as n")
+        .whereIn("job_id", jobIds)
+        .groupBy("job_id"),
+      db("cv_refusals")
+        .select("job_id")
+        .count("id as n")
+        .whereIn("job_id", jobIds)
+        .groupBy("job_id"),
+      db("job_applications as ja")
+        .join("users as u", "u.user_uid", "ja.user_id")
+        .whereIn("ja.job_id", jobIds)
+        .select("ja.job_id", "ja.user_id", "ja.created_at", "u.user_name", "u.user_email"),
+      db("cv_refusals as cr")
+        .join("users as u", "u.user_uid", "cr.user_id")
+        .whereIn("cr.job_id", jobIds)
+        .select("cr.job_id", "cr.user_id", "cr.created_at", "cr.complaint_sent", "u.user_name", "u.user_email"),
+    ]);
     const succeededMap = new Map(succeededByJob.map((r) => [r.job_id, parseInt(r.n || 0, 10)]));
     const failedMap = new Map(failedByJob.map((r) => [r.job_id, parseInt(r.n || 0, 10)]));
+    const acceptedByJob = new Map();
+    for (const r of acceptedRows) {
+      if (!acceptedByJob.has(r.job_id)) acceptedByJob.set(r.job_id, []);
+      acceptedByJob.get(r.job_id).push({
+        user_id: r.user_id,
+        user_name: r.user_name || "N/A",
+        user_email: r.user_email || "N/A",
+        created_at: r.created_at,
+      });
+    }
+    const refusedByJob = new Map();
+    for (const r of refusedRows) {
+      if (!refusedByJob.has(r.job_id)) refusedByJob.set(r.job_id, []);
+      refusedByJob.get(r.job_id).push({
+        user_id: r.user_id,
+        user_name: r.user_name || "N/A",
+        user_email: r.user_email || "N/A",
+        created_at: r.created_at,
+        complaint_sent: !!r.complaint_sent,
+      });
+    }
     const data = rows.map((job) => {
       const succeeded = succeededMap.get(job.id) || 0;
       const failed = failedMap.get(job.id) || 0;
       return {
         ...job,
-        cv_stats: {
-          tried: succeeded + failed,
-          succeeded,
-          failed,
-        },
+        cv_stats: { tried: succeeded + failed, succeeded, failed },
+        cv_accepted: acceptedByJob.get(job.id) || [],
+        cv_refused: refusedByJob.get(job.id) || [],
       };
     });
     res.json({ data });
@@ -520,7 +547,7 @@ router.get("/:id/cv-stats", async (req, res) => {
   }
 });
 
-// get a specific job by ID (includes cv_stats: tried, succeeded, failed)
+// get a specific job by ID (includes cv_stats, cv_accepted, cv_refused)
 router.get("/:id", async (req, res) => {
   try {
     const jobId = parseInt(req.params.id, 10);
@@ -531,22 +558,91 @@ router.get("/:id", async (req, res) => {
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
-    const [succeeded, failed] = await Promise.all([
-      db("job_applications").where("job_id", jobId).count("id as n").first(),
-      db("cv_refusals").where("job_id", jobId).count("id as n").first(),
+    const [acceptedRows, refusedRows] = await Promise.all([
+      db("job_applications as ja")
+        .join("users as u", "u.user_uid", "ja.user_id")
+        .where("ja.job_id", jobId)
+        .select("ja.user_id", "ja.created_at", "u.user_name", "u.user_email")
+        .orderBy("ja.created_at", "desc"),
+      db("cv_refusals as cr")
+        .join("users as u", "u.user_uid", "cr.user_id")
+        .where("cr.job_id", jobId)
+        .select("cr.user_id", "cr.created_at", "cr.complaint_sent", "u.user_name", "u.user_email")
+        .orderBy("cr.created_at", "desc"),
     ]);
-    const succeededCount = parseInt(succeeded?.n || 0, 10);
-    const failedCount = parseInt(failed?.n || 0, 10);
+    const cv_accepted = acceptedRows.map((r) => ({
+      user_id: r.user_id,
+      user_name: r.user_name || "N/A",
+      user_email: r.user_email || "N/A",
+      created_at: r.created_at,
+    }));
+    const cv_refused = refusedRows.map((r) => ({
+      user_id: r.user_id,
+      user_name: r.user_name || "N/A",
+      user_email: r.user_email || "N/A",
+      created_at: r.created_at,
+      complaint_sent: !!r.complaint_sent,
+    }));
     res.json({
       ...job,
       cv_stats: {
-        tried: succeededCount + failedCount,
-        succeeded: succeededCount,
-        failed: failedCount,
+        tried: cv_accepted.length + cv_refused.length,
+        succeeded: cv_accepted.length,
+        failed: cv_refused.length,
       },
+      cv_accepted,
+      cv_refused,
     });
   } catch (err) {
     console.error("jobs get :id error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Remove a user from job applications (admin)
+router.delete("/:id/applications/:userId", async (req, res) => {
+  try {
+    const jobId = parseInt(req.params.id, 10);
+    const userId = req.params.userId;
+    if (isNaN(jobId) || !userId) {
+      return res.status(400).json({ error: "Invalid job ID or user ID" });
+    }
+    const job = await db("jobs").where("id", jobId).first();
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    const deleted = await db("job_applications")
+      .where({ job_id: jobId, user_id: userId })
+      .del();
+    if (deleted > 0) {
+      const cvsSent = Math.max(0, (job.cvs_sent || 0) - 1);
+      await db("jobs").where("id", jobId).update({ cvs_sent: cvsSent });
+    }
+    res.json({ removed: deleted > 0, message: deleted > 0 ? "Application removed" : "Application not found" });
+  } catch (err) {
+    console.error("jobs remove application error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Remove a user from cv_refusals (admin) - allows them to try again
+router.delete("/:id/refusals/:userId", async (req, res) => {
+  try {
+    const jobId = parseInt(req.params.id, 10);
+    const userId = req.params.userId;
+    if (isNaN(jobId) || !userId) {
+      return res.status(400).json({ error: "Invalid job ID or user ID" });
+    }
+    const job = await db("jobs").where("id", jobId).first();
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    const deleted = await db("cv_refusals")
+      .where({ job_id: jobId, user_id: userId })
+      .del();
+    res.json({ removed: deleted > 0, message: deleted > 0 ? "Refusal removed - user can try again" : "Refusal not found" });
+  } catch (err) {
+    console.error("jobs remove refusal error:", err);
     res.status(500).json({ error: err.message });
   }
 });
