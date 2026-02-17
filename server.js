@@ -1037,9 +1037,8 @@ app.post("/api/auth/google", async (req, res) => {
       name: userInfo.name,
       picture: userInfo.picture,
       user_type: (() => {
-        const t = authData.user?.user_type ?? authData.user_type ?? null;
-        if (t === "pending" || t == null || t === "") return "pending";
-        return t;
+        const t = authData.user?.user_type ?? authData.user_type ?? "user";
+        return t === "pending" || t == null || t === "" ? "user" : t;
       })(),
     };
 
@@ -1059,13 +1058,6 @@ app.post("/logout", (req, res) => {
     res.redirect("/");
   });
 });
-// user type update (for welcome modal)
-app.post("/api/user/update-session-type", (req, res) => {
-  const { user_type } = req.body;
-  if (req.session.user) req.session.user.user_type = user_type;
-  res.json({ success: true });
-});
-
 // jobs router
 const jobsRouter = require("./routes/jobs");
 app.get("/jobs/email-queue-status", (req, res) => {

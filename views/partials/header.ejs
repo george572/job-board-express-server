@@ -72,33 +72,6 @@
         </form>
       </div>
     </div>
-    <!-- user type modal: shows when user_type is pending or null (for testing before prod removal) -->
-    <% if (user && (user.user_type === 'pending' || user.user_type == null || user.user_type === '')) { %>
-    <div class="user-type-modal-backdrop fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4" aria-modal="true" role="dialog">
-      <div class="user-type-modal flex flex-col max-w-[500px] w-full shadow-xl bg-white rounded-lg p-6 relative z-[101]">
-        <div class="text-center font-medium">მომხმარებლის ტიპი</div>
-        <div class="text-center text-sm my-2">რა ტიპის მომხმარებლის პროფილის შექმნა გსურთ?</div>
-        <div>
-          <div class="flex justify-center items-center my-4 flex-col gap-3">
-            <label for="userTypeUser" class="flex items-center gap-2 cursor-pointer">
-              <input type="radio" id="userTypeUser" name="userType" value="user">
-              მომხმარებელი
-            </label>
-            <label for="userTypeCompany" class="flex items-center gap-2 cursor-pointer">
-              <input type="radio" id="userTypeCompany" name="userType" value="company">
-              კომპანია
-            </label>
-          </div>
-        </div>
-        <div class="flex justify-center gap-2">
-          <button type="button" onclick="submitUserType()" class="border p-2 rounded-lg bg-green-600 text-white cursor-pointer font-[10px] block mt-4">
-            დადასტურება
-          </button>
-        </div>
-      </div>
-    </div>
-    <% } %>
-
   </header>
 </div>
 <style>
