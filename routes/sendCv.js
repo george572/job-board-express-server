@@ -160,6 +160,7 @@ router.post("/", async (req, res) => {
     const isFit = await assessCandidateFit(job, pdfBase64);
     if (!isFit) {
       await db("cv_refusals").insert({ user_id, job_id: job.id });
+      await db("users").where("user_uid", user_id).increment("failed_cvs", 1);
       return res.status(400).json({
         error: "you are not fit for this role",
         message: "სამწუხაროდ, თქვენი გამოცდილება/უნარები არ შეესაბამება ვაკანსიის მოთხოვნებს",
