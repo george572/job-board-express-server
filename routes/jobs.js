@@ -468,6 +468,36 @@ router.get("/searchterms", (req, res) => {
     .catch((err) => res.status(500).json({ error: err.message }));
 });
 
+// CV attempt stats for a job: how many tried, how many failed (Gemini NOT_FIT)
+router.get("/:id/cv-stats", async (req, res) => {
+  try {
+    const jobId = parseInt(req.params.id, 10);
+    if (isNaN(jobId)) {
+      return res.status(400).json({ error: "Invalid job ID" });
+    }
+    const job = await db("jobs").where("id", jobId).first();
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    const [succeeded, failed] = await Promise.all([
+      db("job_applications").where("job_id", jobId).count("id as n").first(),
+      db("cv_refusals").where("job_id", jobId).count("id as n").first(),
+    ]);
+    const succeededCount = parseInt(succeeded?.n || 0, 10);
+    const failedCount = parseInt(failed?.n || 0, 10);
+    res.json({
+      job_id: jobId,
+      tried: succeededCount + failedCount,
+      succeeded: succeededCount,
+      failed: failedCount,
+      cvs_sent: job.cvs_sent || 0,
+    });
+  } catch (err) {
+    console.error("jobs cv-stats error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // get a specific job by ID
 router.get("/:id", (req, res) => {
   db("jobs")
