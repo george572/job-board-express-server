@@ -80,16 +80,21 @@ async function assessCandidateFit(job, pdfBase64) {
     job.jobDescription || "",
   ].join("\n");
 
-  const prompt = `You are a recruiter. Assess if the candidate's CV (PDF attached) is a good fit for this job.
+  const prompt = `You are a recruiter assessing candidates for a job in Georgia. Read the candidate's CV (PDF attached) and the job details below.
 
 Job details:
 ${jobDetails}
 
-Read the CV/PDF and the job requirements above. Consider: skills, experience level, location preferences, and overall match.
+ASSESSMENT GUIDELINES:
+- Be inclusive: lean toward FIT when the candidate has RELEVANT or TRANSFERABLE experience (same industry, similar responsibilities, related technical skills, management experience).
+- Consider: engineering, technical work, project coordination, installation/maintenance, management, and similar roles as broadly relevant.
+- Only return NOT_FIT when there is a CLEAR, SIGNIFICANT mismatch (e.g. chef with no technical background applying for engineer role, or zero relevant experience).
+- If the candidate has years of experience in a related field, overlapping skills, or could reasonably do the job with minimal training → FIT.
+- Location and minor gaps are not automatic disqualifiers. Give benefit of the doubt when uncertain.
 
 Reply with ONLY one of these two words, nothing else:
-- FIT - if the candidate appears suitable for this role
-- NOT_FIT - if the candidate does not meet key requirements or is clearly unsuitable`;
+- FIT - if the candidate appears suitable, has relevant experience, or is a reasonable match
+- NOT_FIT - only if the candidate clearly lacks required background and would be unsuitable`;
 
   const result = await model.generateContent([
     { text: prompt },
