@@ -82,6 +82,18 @@ async function sendNewJobEmail(job) {
   });
 }
 
+/**
+ * Send one email per company when multiple jobs are uploaded (bulk).
+ * Uses the first job's details for the email content.
+ */
+function sendNewJobEmailToCompany(jobs) {
+  if (!newJobTransporter || !Array.isArray(jobs) || jobs.length === 0) return;
+  const first = jobs[0];
+  const email = (first.company_email || "").trim();
+  if (!email || first.dont_send_email) return;
+  sendNewJobEmail(first);
+}
+
 router.get("/", async (req, res) => {
   try {
     const {
@@ -447,11 +459,17 @@ router.post("/bulk", async (req, res) => {
 
     const ids = await db("jobs").insert(toInsert).returning("id");
 
-    // Send new-job email to each HR (fire-and-forget); skip if dont_send_email
-    for (let i = 0; i < ids.length; i++) {
-      if (!toInsert[i].dont_send_email) {
-        sendNewJobEmail({ id: ids[i].id, ...toInsert[i] });
-      }
+    // Send one email per company (group by company_email to avoid duplicates when company uploads multiple jobs)
+    const jobsWithIds = toInsert.map((j, i) => ({ ...j, id: ids[i].id }))
+      .filter((j) => !j.dont_send_email && (j.company_email || "").trim());
+    const byCompany = new Map();
+    for (const j of jobsWithIds) {
+      const key = (j.company_email || "").trim().toLowerCase();
+      if (!byCompany.has(key)) byCompany.set(key, []);
+      byCompany.get(key).push(j);
+    }
+    for (const jobs of byCompany.values()) {
+      sendNewJobEmailToCompany(jobs);
     }
 
     console.log(`✅ SUCCESS: Inserted ${ids.length} jobs.`);
