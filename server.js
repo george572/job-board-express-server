@@ -916,11 +916,10 @@ app.get("/api/filter-counts", async (req, res) => {
       if (exclude !== "q" && filterSearchTerm) {
         const term =
           "%" + filterSearchTerm.replace(/%/g, "\\%").replace(/_/g, "\\_") + "%";
-        query.andWhere(function () {
-          this.where("jobName", "ilike", term)
-            .orWhere("companyName", "ilike", term)
-            .orWhere("jobDescription", "ilike", term);
-        });
+        query.andWhereRaw(
+          '("jobName" ilike ? OR "companyName" ilike ? OR COALESCE("jobDescription", \'\') ilike ?)',
+          [term, term, term]
+        );
       }
       return query;
     };
