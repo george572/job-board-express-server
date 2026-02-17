@@ -80,21 +80,24 @@ async function assessCandidateFit(job, pdfBase64) {
     job.jobDescription || "",
   ].join("\n");
 
-  const prompt = `You are a recruiter assessing candidates for a job in Georgia. Read the candidate's CV (PDF attached) and the job details below.
+  const prompt = `You are an elite Technical Recruiter. Your task is to analyze a candidate's CV (PDF attached) against the Job Description below and provide a Fit Score.
 
 Job details:
 ${jobDetails}
 
-ASSESSMENT GUIDELINES:
-- Be inclusive: lean toward FIT when the candidate has RELEVANT or TRANSFERABLE experience (same industry, similar responsibilities, related technical skills, management experience).
-- Consider: engineering, technical work, project coordination, installation/maintenance, management, and similar roles as broadly relevant.
-- Only return NOT_FIT when there is a CLEAR, SIGNIFICANT mismatch (e.g. chef with no technical background applying for engineer role, or zero relevant experience).
-- If the candidate has years of experience in a related field, overlapping skills, or could reasonably do the job with minimal training → FIT.
-- Location and minor gaps are not automatic disqualifiers. Give benefit of the doubt when uncertain.
+SCORING LOGIC (Total 100%):
+1. Core Technical Skills (50%): Direct experience with the primary tools/languages requested in the JD.
+2. Years of Experience (25%): Does the candidate meet or exceed the seniority level?
+3. Industry Relevance (15%): Has the candidate worked in a similar sector?
+4. Education/Soft Skills (10%): Degree requirements and communication indicators.
 
-Reply with ONLY one of these two words, nothing else:
-- FIT - if the candidate appears suitable, has relevant experience, or is a reasonable match
-- NOT_FIT - only if the candidate clearly lacks required background and would be unsuitable`;
+CRITICAL RULE: If a "Mandatory" or "Hard Requirement" is missing (e.g. JD asks for Java and candidate has none), the fit_percentage cannot exceed 30%, regardless of other factors.
+
+FINAL DECISION:
+- If fit_percentage < 70% → reply NOT_FIT
+- If fit_percentage >= 70% → reply FIT
+
+First analyze the CV against the JD using the scoring logic above, then output your final decision. Reply with ONLY one of these two words at the end of your response: FIT or NOT_FIT`;
 
   const result = await model.generateContent([
     { text: prompt },

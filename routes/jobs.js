@@ -647,6 +647,24 @@ router.delete("/:id/refusals/:userId", async (req, res) => {
   }
 });
 
+// Reset complaint_sent for a refused user (admin) - allows them to send complaint again
+router.post("/:id/refusals/:userId/reset-complaint", async (req, res) => {
+  try {
+    const jobId = parseInt(req.params.id, 10);
+    const userId = req.params.userId;
+    if (isNaN(jobId) || !userId) {
+      return res.status(400).json({ error: "Invalid job ID or user ID" });
+    }
+    const updated = await db("cv_refusals")
+      .where({ job_id: jobId, user_id: userId })
+      .update({ complaint_sent: false });
+    res.json({ updated: updated > 0, message: updated > 0 ? "Complaint reset - user can complain again" : "Refusal not found" });
+  } catch (err) {
+    console.error("jobs reset complaint error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // create a new job
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
