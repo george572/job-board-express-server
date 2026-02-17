@@ -1,5 +1,6 @@
 const cors = require("cors");
 const express = require("express");
+const fs = require("fs");
 const knex = require("knex");
 const nodemailer = require("nodemailer");
 const path = require("path");
@@ -33,9 +34,47 @@ const newJobTransporter =
 
 // Cooldown between new-job emails (seconds) - avoids blasting; server-side, survives refresh
 const NEW_JOB_EMAIL_COOLDOWN_SEC = 120;
-const newJobEmailQueue = [];
+const EMAIL_QUEUE_FILE = path.join(__dirname, "..", ".new-job-email-queue.json");
+
+let newJobEmailQueue = [];
 let newJobEmailLastSentAt = 0;
 let newJobEmailProcessorScheduled = false;
+
+function loadEmailQueue() {
+  try {
+    const data = fs.readFileSync(EMAIL_QUEUE_FILE, "utf8");
+    const parsed = JSON.parse(data);
+    newJobEmailQueue = Array.isArray(parsed.queue) ? parsed.queue : [];
+    if (parsed.lastSentAt && typeof parsed.lastSentAt === "number") {
+      newJobEmailLastSentAt = parsed.lastSentAt;
+    }
+    if (newJobEmailQueue.length > 0) {
+      newJobEmailProcessorScheduled = true;
+      processNewJobEmailQueue();
+    }
+  } catch (e) {
+    if (e.code !== "ENOENT") console.error("Email queue load error:", e.message);
+  }
+}
+
+function saveEmailQueue() {
+  try {
+    fs.writeFileSync(
+      EMAIL_QUEUE_FILE,
+      JSON.stringify({
+        queue: newJobEmailQueue,
+        lastSentAt: newJobEmailLastSentAt,
+        updatedAt: Date.now(),
+      }),
+      "utf8"
+    );
+  } catch (e) {
+    console.error("Email queue save error:", e.message);
+  }
+}
+
+// Load persisted queue on startup
+loadEmailQueue();
 
 function processNewJobEmailQueue() {
   if (newJobEmailQueue.length === 0) {
@@ -52,6 +91,7 @@ function processNewJobEmailQueue() {
   }
   const job = newJobEmailQueue.shift();
   newJobEmailLastSentAt = Date.now();
+  saveEmailQueue();
   const jobLink = `${SITE_BASE_URL}/vakansia/${slugify(job.jobName)}-${job.id}`;
   const mailOptions = {
     from: NEW_JOB_MAIL_USER,
@@ -60,8 +100,17 @@ function processNewJobEmailQueue() {
     html: NEW_JOB_HTML_TEMPLATE({ ...job, jobLink }),
   };
   newJobTransporter.sendMail(mailOptions, (err) => {
-    if (err) console.error("New job email error:", err);
-    processNewJobEmailQueue();
+    if (err) {
+      console.error("New job email error:", err);
+    } else {
+      console.log(`📧 Sent new-job email to ${job.company_email?.trim()} (job #${job.id}: ${job.jobName})`);
+    }
+    try {
+      processNewJobEmailQueue();
+    } catch (e) {
+      console.error("Email queue processor error:", e);
+      newJobEmailProcessorScheduled = false;
+    }
   });
 }
 
@@ -105,6 +154,7 @@ const NEW_JOB_HTML_TEMPLATE = (job) => {
 function sendNewJobEmail(job) {
   if (!newJobTransporter || !job.company_email || job.dont_send_email) return;
   newJobEmailQueue.push(job);
+  saveEmailQueue();
   if (!newJobEmailProcessorScheduled) {
     newJobEmailProcessorScheduled = true;
     processNewJobEmailQueue();
@@ -556,5 +606,32 @@ router.delete("/:id", (req, res) => {
     })
     .catch((err) => res.status(500).json({ error: err.message }));
 });
+
+router.getEmailQueueStatus = () => ({
+  pending: newJobEmailQueue.length,
+  lastSentAt: newJobEmailLastSentAt || null,
+  processorScheduled: newJobEmailProcessorScheduled,
+});
+router.kickEmailQueue = () => {
+  newJobEmailProcessorScheduled = true;
+  processNewJobEmailQueue();
+};
+
+router.requeueJobsByIds = async (jobIds) => {
+  if (!Array.isArray(jobIds) || jobIds.length === 0) return { added: 0 };
+  const ids = jobIds.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
+  if (ids.length === 0) return { added: 0 };
+  const jobs = await db("jobs")
+    .select("id", "jobName", "companyName", "company_email", "jobSalary", "dont_send_email")
+    .whereIn("id", ids)
+    .where("job_status", "approved");
+  for (const j of jobs) {
+    sendNewJobEmail({
+      ...j,
+      dont_send_email: j.dont_send_email === true || j.dont_send_email === 1,
+    });
+  }
+  return { added: jobs.length, pending: newJobEmailQueue.length };
+};
 
 module.exports = router;

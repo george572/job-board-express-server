@@ -856,6 +856,127 @@ cloudinary.config({
 });
 
 // login router
+// Filter counts (contextual: when category=2 active, other counts reflect jobs in that category)
+app.get("/api/filter-counts", async (req, res) => {
+  try {
+    const { category, min_salary, job_experience, job_type, q } = req.query;
+    const hasAnyFilter =
+      (category && category.length > 0) ||
+      (min_salary && min_salary.length > 0) ||
+      (job_experience && job_experience.length > 0) ||
+      (job_type && job_type.length > 0) ||
+      (q && typeof q === "string" && q.trim() !== "");
+
+    const filterSearchTerm = (q && typeof q === "string" ? q.trim() : "") || "";
+    const baseQuery = () => {
+      let query = db("jobs")
+        .where("job_status", "approved")
+        .whereRaw("(expires_at IS NULL OR expires_at > NOW())");
+      if (!hasAnyFilter) {
+        query = query.whereRaw("created_at::date < CURRENT_DATE");
+      }
+      return query;
+    };
+
+    const applyOtherFilters = (query, exclude) => {
+      if (exclude !== "category" && category) {
+        const cats = Array.isArray(category) ? category : [category];
+        query.whereIn("category_id", cats);
+      }
+      if (exclude !== "min_salary" && min_salary) {
+        const min = parseInt(min_salary, 10);
+        if (!isNaN(min)) query.where("jobSalary_min", ">=", min);
+      }
+      if (exclude !== "job_experience" && job_experience) {
+        const exp = Array.isArray(job_experience) ? job_experience : [job_experience];
+        query.whereIn("job_experience", exp);
+      }
+      if (exclude !== "job_type" && job_type) {
+        const types = Array.isArray(job_type) ? job_type : [job_type];
+        query.whereIn("job_type", types);
+      }
+      if (exclude !== "q" && filterSearchTerm) {
+        const term =
+          "%" + filterSearchTerm.replace(/%/g, "\\%").replace(/_/g, "\\_") + "%";
+        query.andWhere(function () {
+          this.where("jobName", "ilike", term)
+            .orWhere("companyName", "ilike", term)
+            .orWhere("jobDescription", "ilike", term);
+        });
+      }
+      return query;
+    };
+
+    const [categoryRows, salary1000, salary2000, salary3000, salary4000, salary5000, salary6000, expRows, typeRows] =
+      await Promise.all([
+        applyOtherFilters(baseQuery().clone(), "category")
+          .select("category_id")
+          .count("* as c")
+          .groupBy("category_id"),
+        applyOtherFilters(baseQuery().clone().where("jobSalary_min", ">=", 1000), "min_salary")
+          .count("* as c")
+          .first(),
+        applyOtherFilters(baseQuery().clone().where("jobSalary_min", ">=", 2000), "min_salary")
+          .count("* as c")
+          .first(),
+        applyOtherFilters(baseQuery().clone().where("jobSalary_min", ">=", 3000), "min_salary")
+          .count("* as c")
+          .first(),
+        applyOtherFilters(baseQuery().clone().where("jobSalary_min", ">=", 4000), "min_salary")
+          .count("* as c")
+          .first(),
+        applyOtherFilters(baseQuery().clone().where("jobSalary_min", ">=", 5000), "min_salary")
+          .count("* as c")
+          .first(),
+        applyOtherFilters(baseQuery().clone().where("jobSalary_min", ">=", 6000), "min_salary")
+          .count("* as c")
+          .first(),
+        applyOtherFilters(baseQuery().clone(), "job_experience")
+          .select("job_experience")
+          .count("* as c")
+          .groupBy("job_experience"),
+        applyOtherFilters(baseQuery().clone(), "job_type")
+          .select("job_type")
+          .count("* as c")
+          .groupBy("job_type"),
+      ]);
+
+    const categoryCounts = {};
+    (categoryRows || []).forEach((r) => {
+      categoryCounts[String(r.category_id)] = parseInt(r.c, 10) || 0;
+    });
+
+    const salaryCounts = {
+      "1000": parseInt(salary1000?.c, 10) || 0,
+      "2000": parseInt(salary2000?.c, 10) || 0,
+      "3000": parseInt(salary3000?.c, 10) || 0,
+      "4000": parseInt(salary4000?.c, 10) || 0,
+      "5000": parseInt(salary5000?.c, 10) || 0,
+      "6000": parseInt(salary6000?.c, 10) || 0,
+    };
+
+    const experienceCounts = {};
+    (expRows || []).forEach((r) => {
+      if (r.job_experience) experienceCounts[String(r.job_experience)] = parseInt(r.c, 10) || 0;
+    });
+
+    const jobTypeCounts = {};
+    (typeRows || []).forEach((r) => {
+      if (r.job_type) jobTypeCounts[String(r.job_type)] = parseInt(r.c, 10) || 0;
+    });
+
+    res.json({
+      category: categoryCounts,
+      min_salary: salaryCounts,
+      job_experience: experienceCounts,
+      job_type: jobTypeCounts,
+    });
+  } catch (err) {
+    console.error("filter-counts error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/api/auth/google", async (req, res) => {
   const { access_token } = req.body;
 
@@ -924,6 +1045,23 @@ app.post("/api/user/update-session-type", (req, res) => {
 
 // jobs router
 const jobsRouter = require("./routes/jobs");
+app.get("/jobs/email-queue-status", (req, res) => {
+  res.json(jobsRouter.getEmailQueueStatus());
+});
+app.post("/jobs/email-queue-kick", (req, res) => {
+  jobsRouter.kickEmailQueue();
+  res.json({ ok: true, pending: jobsRouter.getEmailQueueStatus().pending });
+});
+app.post("/jobs/requeue-new-job-emails", async (req, res) => {
+  try {
+    const { jobIds } = req.body || {};
+    const result = await jobsRouter.requeueJobsByIds(jobIds);
+    res.json(result);
+  } catch (err) {
+    console.error("requeue-new-job-emails error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 app.use("/jobs", jobsRouter);
 
 // users router
