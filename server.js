@@ -19,6 +19,11 @@ const pgSession = require("connect-pg-simple")(session);
 // Base URL for SEO (sitemap, robots, canonicals)
 const SITE_BASE_URL = process.env.SITE_BASE_URL || "https://samushao.ge";
 
+// Georgia timezone for date comparisons – created_at is timestamptz
+const TZ_GEORGIA = "Asia/Tbilisi";
+const DATE_IN_GEORGIA = `(created_at AT TIME ZONE '${TZ_GEORGIA}')::date`;
+const TODAY_IN_GEORGIA = `(NOW() AT TIME ZONE '${TZ_GEORGIA}')::date`;
+
 // Behind Fly/Heroku we must trust the proxy so secure cookies work
 if (process.env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
@@ -332,7 +337,7 @@ app.get("/", async (req, res) => {
         .select("*")
         .where("job_status", "approved")
         .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
-        .whereRaw("created_at::date = CURRENT_DATE")
+        .whereRaw(`${DATE_IN_GEORGIA} = ${TODAY_IN_GEORGIA}`)
         .orderByRaw("(CASE WHEN prioritize THEN 1 ELSE 0 END) DESC")
         .orderByRaw(
           `CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END`
@@ -359,8 +364,8 @@ app.get("/", async (req, res) => {
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())");
     // Exclude today's jobs from main listing (ყველა ვაკანსია) – unless filters/search active (today section is hidden)
     if (!filtersActive) {
-      query.whereRaw("created_at::date < CURRENT_DATE");
-      countQuery.whereRaw("created_at::date < CURRENT_DATE");
+      query.whereRaw(`${DATE_IN_GEORGIA} < ${TODAY_IN_GEORGIA}`);
+      countQuery.whereRaw(`${DATE_IN_GEORGIA} < ${TODAY_IN_GEORGIA}`);
     }
 
     // Apply same filters to both queries
@@ -641,7 +646,7 @@ app.get("/dgevandeli-vakansiebi", async (req, res) => {
       .select("*")
       .where("job_status", "approved")
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
-      .whereRaw("created_at::date = CURRENT_DATE")
+      .whereRaw(`${DATE_IN_GEORGIA} = ${TODAY_IN_GEORGIA}`)
       .orderByRaw("(CASE WHEN prioritize THEN 1 ELSE 0 END) DESC")
       .orderByRaw(
         `CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END`
@@ -882,7 +887,7 @@ app.get("/api/filter-counts", async (req, res) => {
         .where("job_status", "approved")
         .whereRaw("(expires_at IS NULL OR expires_at > NOW())");
       if (!hasAnyFilter) {
-        query = query.whereRaw("created_at::date < CURRENT_DATE");
+        query = query.whereRaw(`${DATE_IN_GEORGIA} < ${TODAY_IN_GEORGIA}`);
       }
       return query;
     };

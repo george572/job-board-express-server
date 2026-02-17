@@ -83,16 +83,26 @@ const marketingTransporter =
       })
     : null;
 
-// Marketing email scheduling: if after 18:30 (server local), schedule for next day 10:00
+// Marketing email scheduling: if after 18:30 Georgia time, schedule for next day 10:20 Georgia
+const TZ_GEORGIA = "Asia/Tbilisi";
 function isAfter1830() {
-  const now = new Date();
-  return now.getHours() > 18 || (now.getHours() === 18 && now.getMinutes() >= 30);
+  const pts = new Intl.DateTimeFormat("en-US", { timeZone: TZ_GEORGIA, hour: "numeric", minute: "numeric", hour12: false }).formatToParts(new Date());
+  const hour = parseInt(pts.find((p) => p.type === "hour").value, 10);
+  const minute = parseInt(pts.find((p) => p.type === "minute").value, 10);
+  return hour > 18 || (hour === 18 && minute >= 30);
 }
-function getNextDay1000() {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  d.setHours(10, 0, 0, 0);
-  return d;
+function getNextDay1020Georgia() {
+  const now = new Date();
+  const opts = { timeZone: TZ_GEORGIA, year: "numeric", month: "2-digit", day: "2-digit" };
+  const parts = new Intl.DateTimeFormat("en-US", opts).formatToParts(now);
+  const y = parseInt(parts.find((p) => p.type === "year").value, 10);
+  const m = parseInt(parts.find((p) => p.type === "month").value, 10);
+  const d = parseInt(parts.find((p) => p.type === "day").value, 10);
+  const tomorrow = new Date(y, m - 1, d + 1);
+  const y2 = tomorrow.getFullYear();
+  const m2 = String(tomorrow.getMonth() + 1).padStart(2, "0");
+  const d2 = String(tomorrow.getDate()).padStart(2, "0");
+  return new Date(`${y2}-${m2}-${d2}T06:20:00.000Z`); // 10:20 Georgia = 06:20 UTC
 }
 
 // Bulk emails spread over 2 hours
@@ -312,9 +322,9 @@ const NEW_JOB_HTML_TEMPLATE = (job) => {
 
   return `
 <p>გამარჯობა!</p>
-<p>გაცნობებთ, რომ თქვენი ვაკანსია რომელიც საჯაროდ ხელმისაწვდომი იყო ინტერნეტში, გავაზიარეთ ჩვენს პლატფორმაზე ( samushao.ge ), თუ აღნიშული თქვენთვის მიუღებელია, გთხოვთ შეგვატყობინოთ და განცხადებას წავშლით.</p>
+<p>გაცნობებთ, რომ თქვენი ვაკანსია რომელიც საჯაროდ ხელმისაწვდომია ინტერნეტში, გავაზიარეთ ჩვენს პლატფორმაზე ( samushao.ge ), თუ აღნიშული თქვენთვის მიუღებელია, გთხოვთ შეგვატყობინოთ და განცხადებას წავშლით.</p>
 <p>თუ არ ხართ წინააღმდეგი, გთავაზობთ სრულიად უფასო 10 დღიან პრემიუმ სტატუსს თქვენი ვაკანსიისთვის, რადგან გამოსცადოთ ჩვენი პლატფორმა.</p>
-<p>რითიც გამოვირჩევით ის არის, რომ ხელოვნური ინტელექტი აანალიზებს კანდიდატების რეზიუმეებს, და თუ კანდიდატი თქვენს ვაკანსიას არ შეესაბამება, საიტიტ რეზიუმეს არ გამოაგზავნინებს, ანუ ნაკლებ არაკვალიფიციურ კანდიდატებს მიიღებთ.</p>
+<p>რითიც გამოვირჩევით ის არის, რომ ხელოვნური ინტელექტი აანალიზებს კანდიდატების რეზიუმეებს, და თუ კანდიდატი თქვენს ვაკანსიას არ შეესაბამება, საიტიტ რეზიუმეს არ გამოაგზავნინებს, ანუ მეტ კვალიფიციურ კანდიდატებს მიიღებთ.</p>
 <p>დამიდასტურეთ მეილის მიღება და თქვენს ვაკანსიას პრემიუმ სტატუსს მივანიჭებთ.</p>
 <p>პატივისცემით,</p>
 <p>გიორგი</p>
@@ -360,10 +370,10 @@ async function sendNewJobEmail(job, opts = {}) {
     const slotSize = totalWindow / opts.batchTotal;
     const base = opts.batchIndex * slotSize;
     const jitter = (Math.random() - 0.5) * slotSize * 0.4;
-    const baseTime = deferToNextDay ? getNextDay1000().getTime() : now;
+    const baseTime = deferToNextDay ? getNextDay1020Georgia().getTime() : now;
     sendAfterMs = baseTime + Math.max(0, base + jitter);
   } else {
-    sendAfterMs = deferToNextDay ? getNextDay1000().getTime() : now;
+    sendAfterMs = deferToNextDay ? getNextDay1020Georgia().getTime() : now;
   }
   const sendAfter = new Date(sendAfterMs);
   await db("new_job_email_queue").insert({

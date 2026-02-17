@@ -72,8 +72,8 @@
         const endDate = new Date(startDate);
         endDate.setMonth(endDate.getMonth() + 1); // add 1 month correctly
   
-        const startFormatted = startDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-        const endFormatted = endDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        const startFormatted = startDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'Asia/Tbilisi' });
+        const endFormatted = endDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'Asia/Tbilisi' });
       %>
         <%= startFormatted %> - <%= endFormatted %>
       </time>

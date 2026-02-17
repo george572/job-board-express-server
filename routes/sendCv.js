@@ -34,19 +34,26 @@ const marketingTransporter =
       })
     : null;
 
-// Marketing email scheduling: if after 18:30 (server local time), schedule for next day 10:00
+// Marketing email scheduling: if after 18:30 Georgia time, schedule for next day 10:20 Georgia
+const TZ_GEORGIA = "Asia/Tbilisi";
 function isAfter1830() {
-  const now = new Date();
-  const hour = now.getHours();
-  const min = now.getMinutes();
-  return hour > 18 || (hour === 18 && min >= 30);
+  const pts = new Intl.DateTimeFormat("en-US", { timeZone: TZ_GEORGIA, hour: "numeric", minute: "numeric", hour12: false }).formatToParts(new Date());
+  const hour = parseInt(pts.find((p) => p.type === "hour").value, 10);
+  const minute = parseInt(pts.find((p) => p.type === "minute").value, 10);
+  return hour > 18 || (hour === 18 && minute >= 30);
 }
-
-function getNextDay1000() {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  d.setHours(10, 0, 0, 0);
-  return d;
+function getNextDay1020Georgia() {
+  const now = new Date();
+  const opts = { timeZone: TZ_GEORGIA, year: "numeric", month: "2-digit", day: "2-digit" };
+  const parts = new Intl.DateTimeFormat("en-US", opts).formatToParts(now);
+  const y = parseInt(parts.find((p) => p.type === "year").value, 10);
+  const m = parseInt(parts.find((p) => p.type === "month").value, 10);
+  const d = parseInt(parts.find((p) => p.type === "day").value, 10);
+  const tomorrow = new Date(y, m - 1, d + 1);
+  const y2 = tomorrow.getFullYear();
+  const m2 = String(tomorrow.getMonth() + 1).padStart(2, "0");
+  const d2 = String(tomorrow.getDate()).padStart(2, "0");
+  return new Date(`${y2}-${m2}-${d2}T06:20:00.000Z`); // 10:20 Georgia = 06:20 UTC
 }
 
 const PROPOSITIONAL_HTML_TEMPLATE = (cvsSent) => `
@@ -213,35 +220,8 @@ router.post("/", async (req, res) => {
       });
     });
 
-    // Third CV marketing – disabled for now
-    // if (isThirdCv && marketingTransporter && job.company_email && !job.dont_send_email) {
-    //   const companyEmailLower = (job.company_email || "").trim().toLowerCase();
-    //   if (companyEmailLower) {
-    //     try {
-    //       const sendAfter = isAfter1830() ? getNextDay1000() : new Date();
-    //       const subject = `თქვენი ვაკანსია "${job.jobName}" - Samushao.ge`;
-    //       const html = PROPOSITIONAL_HTML_TEMPLATE(3);
-    //       await db("new_job_email_queue").insert({
-    //         job_id: job.id,
-    //         company_email_lower: companyEmailLower,
-    //         send_after: sendAfter,
-    //         email_type: "third_cv_marketing",
-    //         subject,
-    //         html,
-    //       });
-    //       const jobsRouter = require("./jobs");
-    //       if (typeof jobsRouter.triggerNewJobEmailQueue === "function") {
-    //         jobsRouter.triggerNewJobEmailQueue();
-    //       }
-    //     } catch (queueErr) {
-    //       if (queueErr.code === "23505") {
-    //         // unique violation – already queued for this job
-    //       } else {
-    //         console.error("Third CV marketing queue error:", queueErr.message);
-    //       }
-    //     }
-    //   }
-    // }
+    // Third CV marketing – disabled
+    // if (isThirdCv && marketingTransporter && job.company_email && !job.dont_send_email) { ... }
 
     const insertPayload = { user_id, job_id: job.id };
     if (req.visitorId) insertPayload.visitor_id = req.visitorId;
