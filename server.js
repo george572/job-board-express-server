@@ -823,22 +823,13 @@ app.get("/vakansia/:slug", async (req, res) => {
 
     const isExpired = job.expires_at && new Date(job.expires_at) <= new Date();
 
-    // Has this user already sent CV to this job?
+    // Has this user already sent CV to this job? (accepted only – refused users see success but aren't in job_applications)
     let userAlreadyApplied = false;
-    let cvRefusedByJob = false;
-    let cvComplaintAlreadySent = false;
     if (req.session?.user?.uid) {
       const application = await db("job_applications")
         .where({ user_id: req.session.user.uid, job_id: jobId })
         .first();
       userAlreadyApplied = !!application;
-      if (!userAlreadyApplied) {
-        const refusal = await db("cv_refusals")
-          .where({ user_id: req.session.user.uid, job_id: jobId })
-          .first();
-        cvRefusedByJob = !!refusal;
-        cvComplaintAlreadySent = !!(refusal && refusal.complaint_sent);
-      }
     }
 
     const jobDescription =
@@ -852,8 +843,6 @@ app.get("/vakansia/:slug", async (req, res) => {
       relatedJobs,
       slugify,
       userAlreadyApplied,
-      cvRefusedByJob,
-      cvComplaintAlreadySent,
       isExpired,
       seo: {
         title: job.jobName + " | Samushao.ge",

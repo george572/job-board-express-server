@@ -145,17 +145,6 @@ router.post("/", async (req, res) => {
       return res.status(410).json({ error: "This vacancy has expired and is no longer accepting applications" });
     }
 
-    // Already refused for this job? Don't let them retry.
-    const previouslyRefused = await db("cv_refusals")
-      .where({ user_id, job_id: job.id })
-      .first();
-    if (previouslyRefused) {
-      return res.status(400).json({
-        error: "cv_previously_refused",
-        message: "თქვენ უკვე სცადეთ აქ გაგზავნა, მაგრამ ვაკანსიის მოთხოვნებს ვერ აკმაყოფილებთ",
-      });
-    }
-
     const resume = await db("resumes").where("user_id", user_id).first();
     if (!resume) {
       return res.status(404).json({ error: "Resume not found" });
@@ -174,14 +163,23 @@ router.post("/", async (req, res) => {
     const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
     const pdfBase64 = pdfBuffer.toString("base64");
 
-    // Step B & C: Pass to Gemini and assess fit
+    // Step B & C: Pass to Gemini and assess fit (silent – user always sees success)
     const isFit = await assessCandidateFit(job, pdfBase64);
     if (!isFit) {
-      await db("cv_refusals").insert({ user_id, job_id: job.id });
-      await db("users").where("user_uid", user_id).increment("failed_cvs", 1);
-      return res.status(400).json({
-        error: "you are not fit for this role",
-        message: "სამწუხაროდ, თქვენი გამოცდილება/უნარები არ შეესაბამება ვაკანსიის მოთხოვნებს",
+      try {
+        await db("cv_refusals").insert({ user_id, job_id: job.id });
+        await db("users").where("user_uid", user_id).increment("failed_cvs", 1);
+      } catch (e) {
+        if (e.code === "23505") {
+          // Already in cv_refusals (user retried); keep record for admin
+        } else throw e;
+      }
+      // Discard: don't send email, don't add to job_applications; show success to user
+      return res.json({
+        message: "CV is sent successfully",
+        job,
+        resume,
+        user,
       });
     }
 
@@ -268,90 +266,6 @@ router.post("/", async (req, res) => {
   }
 });
 
-// Complaint: user disagrees with AI assessment, believes they are a good fit
-router.post("/complain", async (req, res) => {
-  const { job_id, user_id } = req.body;
-
-  try {
-    if (!job_id || !user_id) {
-      return res.status(400).json({ error: "job_id and user_id are required" });
-    }
-
-    const refusal = await db("cv_refusals")
-      .where({ user_id, job_id })
-      .first();
-    if (!refusal) {
-      return res.status(400).json({ error: "No refusal found for this user and job" });
-    }
-    if (refusal.complaint_sent) {
-      return res.status(400).json({
-        error: "complaint_already_sent",
-        message: "თქვენ უკვე გაგზავნეთ სარჩევი",
-      });
-    }
-
-    const job = await db("jobs").where("id", job_id).first();
-    if (!job) {
-      return res.status(404).json({ error: "Job not found" });
-    }
-
-    const user = await db("users").where("user_uid", user_id).first();
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const resume = await db("resumes").where("user_id", user_id).first();
-    const cvLink = resume ? resume.file_url : "N/A";
-    const jobUrl = `${SITE_BASE_URL}/vakansia/${slugify(job.jobName || "")}-${job.id}`;
-
-    if (!marketingTransporter) {
-      return res.status(500).json({ error: "Email service for complaints is not configured" });
-    }
-
-    const html = `
-<p>მომხმარებელი აცხადებს, რომ Samushao.ge-ის AI შეფასება არასწორია და ის შესაფერისია ვაკანსიისთვის.</p>
-<p><strong>ვაკანსია:</strong> ${job.jobName || "N/A"} (ID: ${job.id})</p>
-<p><strong>კომპანია:</strong> ${job.companyName || "N/A"}</p>
-<p><strong>ვაკანსიის ბმული:</strong> <a href="${jobUrl}">${jobUrl}</a></p>
-<hr>
-<p><strong>მომხმარებლის სახელი:</strong> ${user.user_name || "N/A"}</p>
-<p><strong>User UID:</strong> ${user_id}</p>
-<p><strong>ელ-ფოსტა:</strong> ${user.user_email || "N/A"}</p>
-<p><strong>CV ბმული:</strong> <a href="${cvLink}">${cvLink}</a></p>
-`;
-
-    await new Promise((resolve, reject) => {
-      marketingTransporter.sendMail(
-        {
-          from: MARKETING_MAIL_USER,
-          to: "info@samushao.ge",
-          subject: `[გასაჩივრება] მომხმარებელი ფიქრობს რომ შესაფერისია - ${job.jobName || "ვაკანსია"} (ID: ${job.id})`,
-          html,
-        },
-        (err) => {
-          if (err) {
-            console.error("Complaint email error:", err);
-            reject(new Error("Failed to send complaint: " + err.message));
-          } else {
-            resolve();
-          }
-        }
-      );
-    });
-
-    await db("cv_refusals")
-      .where({ user_id, job_id })
-      .update({ complaint_sent: true });
-
-    return res.json({ message: "Complaint sent successfully" });
-  } catch (err) {
-    if (res.headersSent) return;
-    console.error("send-cv complain error:", err);
-    const message = err?.message || err?.error || "An unexpected error occurred";
-    return res.status(500).json({ error: message });
-  }
-});
-
-// Third CV marketing now uses new_job_email_queue processor in routes/jobs.js
+// Complaint endpoint removed – users no longer see refusal, so no appeal UI
 
 module.exports = router;
