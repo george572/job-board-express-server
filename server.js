@@ -1025,7 +1025,7 @@ app.post("/api/auth/google", async (req, res) => {
         user_uid: userInfo.sub,
         user_name: userInfo.name,
         user_email: userInfo.email,
-        user_type: "pending",
+        user_type: "user",
       }),
     });
 
@@ -1036,7 +1036,11 @@ app.post("/api/auth/google", async (req, res) => {
       email: userInfo.email,
       name: userInfo.name,
       picture: userInfo.picture,
-      user_type: authData.user?.user_type || authData.user_type || "pending",
+      user_type: (() => {
+        const t = authData.user?.user_type ?? authData.user_type ?? null;
+        if (t === "pending" || t == null || t === "") return "pending";
+        return t;
+      })(),
     };
 
     res.json({ success: true });
@@ -1055,14 +1059,10 @@ app.post("/logout", (req, res) => {
     res.redirect("/");
   });
 });
-// user type update
+// user type update (for welcome modal)
 app.post("/api/user/update-session-type", (req, res) => {
   const { user_type } = req.body;
-
-  if (req.session.user) {
-    req.session.user.user_type = user_type;
-  }
-
+  if (req.session.user) req.session.user.user_type = user_type;
   res.json({ success: true });
 });
 

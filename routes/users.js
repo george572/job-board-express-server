@@ -44,10 +44,10 @@ router.get("/:id", (req, res) => {
 
 // Signup/login user
 router.post("/auth", (req, res) => {
-  const { user_uid, user_name, user_email, user_type } = req.body;
+  const { user_uid, user_name, user_email } = req.body;
 
   // Validate input
-  if (!user_uid || !user_name || !user_email || !user_type) {
+  if (!user_uid || !user_name || !user_email) {
     return res.status(400).json({ error: "All fields are required" });
   }
 
@@ -58,20 +58,20 @@ router.post("/auth", (req, res) => {
         return res.status(201).json({ exists: true, user: existingUser });
       }
 
-      // If user does not exist, add it to the database
+      // If user does not exist, add with user_type "user"
       db("users")
         .insert({
           user_uid,
           user_name,
           user_email,
-          user_type,
+          user_type: "user",
         })
         .then(() => {
           res.status(201).json({
             user_uid,
             user_name,
             user_email,
-            user_type,
+            user_type: "user",
           });
         })
         .catch((err) => res.status(500).json({ error: err.message }));

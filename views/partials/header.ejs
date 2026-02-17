@@ -72,8 +72,8 @@
         </form>
       </div>
     </div>
-    <!-- user type modal: fixed overlay so it always appears on top (above filters/nav) -->
-    <% if (user && user.user_type === 'pending') { %>
+    <!-- user type modal: shows when user_type is pending or null (for testing before prod removal) -->
+    <% if (user && (user.user_type === 'pending' || user.user_type == null || user.user_type === '')) { %>
     <div class="user-type-modal-backdrop fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4" aria-modal="true" role="dialog">
       <div class="user-type-modal flex flex-col max-w-[500px] w-full shadow-xl bg-white rounded-lg p-6 relative z-[101]">
         <div class="text-center font-medium">მომხმარებლის ტიპი</div>
@@ -198,40 +198,4 @@
     }
   });
 
-  function submitUserType() {
-    const selectedType = document.querySelector('input[name="userType"]:checked');
-
-    if (!selectedType) {
-      return;
-    }
-
-    const userUid = '<%= user?.uid %>';
-
-    fetch('/users/' + userUid, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          user_type: selectedType.value
-        })
-      })
-      .then(res => res.json())
-      .then(data => {
-        // Update session to reflect new user_type
-        return fetch('/api/user/update-session-type', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            user_type: selectedType.value
-          })
-        });
-      })
-      .then(() => {
-        window.location.reload();
-      })
-      .catch(err => console.error("Error:", err));
-  }
 </script>
