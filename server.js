@@ -888,24 +888,30 @@ app.get("/api/filter-counts", async (req, res) => {
 
     const applyOtherFilters = (query, exclude) => {
       if (exclude !== "category" && category) {
-        const cats = Array.isArray(category) ? category : [category];
-        query.whereIn("category_id", cats);
+        const raw = (Array.isArray(category) ? category : [category]).filter((c) => c != null && c !== "");
+        const cats = raw.flatMap((c) => String(c).split(",").map((s) => s.trim())).map((s) => parseInt(s, 10)).filter((n) => !isNaN(n));
+        if (cats.length === 1) {
+          query.where("category_id", cats[0]);
+        } else if (cats.length > 1) {
+          query.whereIn("category_id", cats);
+        }
       }
       if (exclude !== "min_salary" && min_salary) {
-        const min = parseInt(min_salary, 10);
+        const val = Array.isArray(min_salary) ? min_salary[0] : min_salary;
+        const min = parseInt(val, 10);
         if (!isNaN(min)) query.where("jobSalary_min", ">=", min);
       }
       if (exclude !== "job_experience" && job_experience) {
-        const exp = Array.isArray(job_experience) ? job_experience : [job_experience];
-        query.whereIn("job_experience", exp);
+        const exp = (Array.isArray(job_experience) ? job_experience : [job_experience]).filter((e) => e != null && e !== "");
+        if (exp.length > 0) query.whereIn("job_experience", exp);
       }
       if (exclude !== "job_type" && job_type) {
-        const types = Array.isArray(job_type) ? job_type : [job_type];
-        query.whereIn("job_type", types);
+        const types = (Array.isArray(job_type) ? job_type : [job_type]).filter((t) => t != null && t !== "");
+        if (types.length > 0) query.whereIn("job_type", types);
       }
       if (exclude !== "job_city" && job_city) {
-        const cities = Array.isArray(job_city) ? job_city : [job_city];
-        query.whereIn("job_city", cities);
+        const cities = (Array.isArray(job_city) ? job_city : [job_city]).filter((c) => c != null && c !== "");
+        if (cities.length > 0) query.whereIn("job_city", cities);
       }
       if (exclude !== "q" && filterSearchTerm) {
         const term =
@@ -995,7 +1001,7 @@ app.get("/api/filter-counts", async (req, res) => {
       job_city: cityCounts,
     });
   } catch (err) {
-    console.error("filter-counts error:", err);
+    console.error("filter-counts error:", err.message, "query params:", req.query);
     res.status(500).json({ error: err.message });
   }
 });
