@@ -128,7 +128,8 @@ router.post("/", async (req, res) => {
     // Applicants notification: "Your job has X applicants" from giorgi@samushao.ge – ONLY on 3rd CV
     const cvsSentNow = cvsSentBefore + 1;
     const isThirdCvForApplicants = cvsSentNow === 3;
-    if (isThirdCvForApplicants && applicantsTransporter && job.company_email && !job.dont_send_email) {
+    const alreadySentCvSubs = job.cv_submissions_email_sent === true || job.cv_submissions_email_sent === 1;
+    if (isThirdCvForApplicants && !alreadySentCvSubs && applicantsTransporter && job.company_email && !job.dont_send_email) {
       const jobLink = `${SITE_BASE_URL}/vakansia/${slugify(job.jobName)}-${job.id}`;
       const applicantsOptions = {
         from: APPLICANTS_MAIL_USER,
@@ -136,8 +137,12 @@ router.post("/", async (req, res) => {
         subject: `თქვენი ვაკანსია "${job.jobName}" - უკვე ${cvsSentNow} აპლიკანტი`,
         html: APPLICANTS_HTML_TEMPLATE(job.jobName, cvsSentNow, jobLink),
       };
-      applicantsTransporter.sendMail(applicantsOptions, (err) => {
-        if (err) console.error("Applicants notification error:", err);
+      applicantsTransporter.sendMail(applicantsOptions, async (err) => {
+        if (err) {
+          console.error("Applicants notification error:", err);
+        } else {
+          await db("jobs").where("id", job_id).update({ cv_submissions_email_sent: true });
+        }
       });
     }
 

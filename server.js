@@ -1060,12 +1060,18 @@ app.post("/logout", (req, res) => {
 });
 // jobs router
 const jobsRouter = require("./routes/jobs");
-app.get("/jobs/email-queue-status", (req, res) => {
-  res.json(jobsRouter.getEmailQueueStatus());
+app.get("/jobs/email-queue-status", async (req, res) => {
+  const status = await jobsRouter.getEmailQueueStatus();
+  res.json(status);
 });
-app.post("/jobs/email-queue-kick", (req, res) => {
+app.get("/jobs/email-queue-details", async (req, res) => {
+  const details = await jobsRouter.getEmailQueueDetails();
+  res.json(details);
+});
+app.post("/jobs/email-queue-kick", async (req, res) => {
   jobsRouter.kickEmailQueue();
-  res.json({ ok: true, pending: jobsRouter.getEmailQueueStatus().pending });
+  const status = await jobsRouter.getEmailQueueStatus();
+  res.json({ ok: true, pending: status.pending });
 });
 app.post("/jobs/requeue-new-job-emails", async (req, res) => {
   try {
