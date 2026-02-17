@@ -34,6 +34,21 @@ const marketingTransporter =
       })
     : null;
 
+// Marketing email scheduling: if after 18:30 (server local time), schedule for next day 10:00
+function isAfter1830() {
+  const now = new Date();
+  const hour = now.getHours();
+  const min = now.getMinutes();
+  return hour > 18 || (hour === 18 && min >= 30);
+}
+
+function getNextDay1000() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(10, 0, 0, 0);
+  return d;
+}
+
 const PROPOSITIONAL_HTML_TEMPLATE = (cvsSent) => `
 <p>სალამი!</p>
 <p>გაცნობებთ, რომ თქვენი ვაკანსია რომელიც საჯაროდ ხელმისაწვდომი იყო ინტერნეტში, განვათავსეთ ჩვენს პლატფორმაზე ( samushao.ge ), თუ აღნიშული თქვენთვის მიუღებელია, გთხოვთ შეგვატყობინოთ და განცხადებას წავშლით.</p>
@@ -200,20 +215,35 @@ router.post("/", async (req, res) => {
       });
     });
 
-    // When 3rd CV is sent, send marketing email from giorgi@samushao.ge
-    if (isThirdCv && marketingTransporter && job.company_email && !job.dont_send_email) {
-      marketingTransporter.sendMail(
-        {
-          from: MARKETING_MAIL_USER,
-          to: job.company_email,
-          subject: `თქვენი ვაკანსია "${job.jobName}" - Samushao.ge`,
-          html: PROPOSITIONAL_HTML_TEMPLATE(3),
-        },
-        (err) => {
-          if (err) console.error("Marketing email error:", err);
-        }
-      );
-    }
+    // Third CV marketing – disabled for now
+    // if (isThirdCv && marketingTransporter && job.company_email && !job.dont_send_email) {
+    //   const companyEmailLower = (job.company_email || "").trim().toLowerCase();
+    //   if (companyEmailLower) {
+    //     try {
+    //       const sendAfter = isAfter1830() ? getNextDay1000() : new Date();
+    //       const subject = `თქვენი ვაკანსია "${job.jobName}" - Samushao.ge`;
+    //       const html = PROPOSITIONAL_HTML_TEMPLATE(3);
+    //       await db("new_job_email_queue").insert({
+    //         job_id: job.id,
+    //         company_email_lower: companyEmailLower,
+    //         send_after: sendAfter,
+    //         email_type: "third_cv_marketing",
+    //         subject,
+    //         html,
+    //       });
+    //       const jobsRouter = require("./jobs");
+    //       if (typeof jobsRouter.triggerNewJobEmailQueue === "function") {
+    //         jobsRouter.triggerNewJobEmailQueue();
+    //       }
+    //     } catch (queueErr) {
+    //       if (queueErr.code === "23505") {
+    //         // unique violation – already queued for this job
+    //       } else {
+    //         console.error("Third CV marketing queue error:", queueErr.message);
+    //       }
+    //     }
+    //   }
+    // }
 
     const insertPayload = { user_id, job_id: job.id };
     if (req.visitorId) insertPayload.visitor_id = req.visitorId;
@@ -321,5 +351,8 @@ router.post("/complain", async (req, res) => {
     return res.status(500).json({ error: message });
   }
 });
+
+// Start processor for scheduled marketing emails on module load
+startScheduledMarketingProcessor();
 
 module.exports = router;

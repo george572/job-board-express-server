@@ -18,6 +18,9 @@ const db = knex(knexConfig[environment]);
 // Email for freshly uploaded jobs (to HR)
 const NEW_JOB_MAIL_USER = (process.env.PROPOSITIONAL_MAIL_USER || "").trim();
 const NEW_JOB_MAIL_PASS = (process.env.PROPOSITIONAL_MAIL_PASS || "").trim().replace(/\s/g, "");
+// Marketing email (3rd CV, from giorgi@samushao.ge)
+const MARKETING_MAIL_USER = (process.env.APPLICANTS_MAIL_USER || process.env.MARKETING_MAIL_USER || "").trim();
+const MARKETING_MAIL_PASS = (process.env.APPLICANTS_MAIL_PASS || process.env.MARKETING_MAIL_PASS || "").trim().replace(/\s/g, "");
 const SITE_BASE_URL = process.env.SITE_BASE_URL || "https://samushao.ge";
 const EMAIL_SIGNATURE = (process.env.EMAIL_SIGNATURE || "").trim();
 
@@ -69,6 +72,28 @@ const newJobTransporter =
         auth: { user: NEW_JOB_MAIL_USER, pass: NEW_JOB_MAIL_PASS },
       })
     : null;
+
+const marketingTransporter =
+  MARKETING_MAIL_USER && MARKETING_MAIL_PASS
+    ? nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false,
+        auth: { user: MARKETING_MAIL_USER, pass: MARKETING_MAIL_PASS },
+      })
+    : null;
+
+// Marketing email scheduling: if after 18:30 (server local), schedule for next day 10:00
+function isAfter1830() {
+  const now = new Date();
+  return now.getHours() > 18 || (now.getHours() === 18 && now.getMinutes() >= 30);
+}
+function getNextDay1000() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(10, 0, 0, 0);
+  return d;
+}
 
 // Bulk emails spread over 2 hours
 const BULK_SPREAD_MS = 2 * 60 * 60 * 1000;       // 2 hours total window
@@ -144,12 +169,15 @@ async function processNewJobEmailQueue() {
     }
     const now = new Date();
     const row = await db("new_job_email_queue as q")
-      .join("jobs as j", "j.id", "q.job_id")
+      .leftJoin("jobs as j", "j.id", "q.job_id")
       .select(
         "q.id as queue_id",
         "q.job_id",
         "q.company_email_lower",
         "q.send_after",
+        "q.email_type",
+        "q.subject",
+        "q.html",
         "j.jobName",
         "j.companyName",
         "j.company_email",
@@ -174,6 +202,40 @@ async function processNewJobEmailQueue() {
       return;
     }
     const companyEmail = (row.company_email_lower || "").trim().toLowerCase();
+    const isThirdCvMarketing = row.email_type === "third_cv_marketing";
+
+    if (isThirdCvMarketing) {
+      // Third CV marketing: use stored subject/html, marketing transporter
+      if (!marketingTransporter || !companyEmail || !row.subject || !row.html) {
+        await db("new_job_email_queue").where("id", row.queue_id).del();
+        processNewJobEmailQueue();
+        return;
+      }
+      const mailOptions = {
+        from: MARKETING_MAIL_USER,
+        to: companyEmail,
+        subject: row.subject,
+        html: row.html,
+      };
+      marketingTransporter.sendMail(mailOptions, async (err) => {
+        if (err) {
+          console.error("Third CV marketing email error:", err);
+        } else {
+          const hasCvSubmissions = await db.schema.hasColumn("jobs", "cv_submissions_email_sent");
+          if (hasCvSubmissions) {
+            await db("jobs").where("id", row.job_id).update({ cv_submissions_email_sent: true });
+          }
+          console.log(`📧 Sent third-CV marketing email to ${companyEmail} (job #${row.job_id})`);
+        }
+        await db("new_job_email_queue").where("id", row.queue_id).del();
+        newJobEmailLastSentAt = Date.now();
+        const nextDelay = randomBetween(MIN_DELAY_BETWEEN_SENDS_MS, MAX_DELAY_BETWEEN_SENDS_MS);
+        newJobEmailProcessorScheduled = true;
+        setTimeout(processNewJobEmailQueue, nextDelay);
+      });
+      return;
+    }
+
     if (companyEmail && (await hasRecentlySentToCompany(companyEmail))) {
       await db("new_job_email_queue").where("id", row.queue_id).del();
       processNewJobEmailQueue();
@@ -181,6 +243,11 @@ async function processNewJobEmailQueue() {
     }
     const claimed = companyEmail && (await claimAndSendToCompany(companyEmail));
     if (companyEmail && !claimed) {
+      await db("new_job_email_queue").where("id", row.queue_id).del();
+      processNewJobEmailQueue();
+      return;
+    }
+    if (!newJobTransporter) {
       await db("new_job_email_queue").where("id", row.queue_id).del();
       processNewJobEmailQueue();
       return;
@@ -266,9 +333,15 @@ async function sendNewJobEmail(job, opts = {}) {
   const companyEmail = (job.company_email || "").trim().toLowerCase();
   if (!companyEmail) return { queued: false, reason: "no_email" };
   try {
-    const existingJob = await db("new_job_email_queue").where("job_id", job.id).first();
+    const existingJob = await db("new_job_email_queue")
+      .where("job_id", job.id)
+      .where((qb) => qb.where("email_type", "new_job").orWhereNull("email_type"))
+      .first();
     if (existingJob) return { queued: false, reason: "duplicate_job_in_queue" };
-    const existingCompany = await db("new_job_email_queue").where("company_email_lower", companyEmail).first();
+    const existingCompany = await db("new_job_email_queue")
+      .where("company_email_lower", companyEmail)
+      .where((qb) => qb.where("email_type", "new_job").orWhereNull("email_type"))
+      .first();
     if (existingCompany) return { queued: false, reason: "company_already_in_queue" };
   } catch (e) {
     if (e.code === "42P01") { /* table doesn't exist yet */ }
@@ -280,14 +353,16 @@ async function sendNewJobEmail(job, opts = {}) {
 
   const now = Date.now();
   let sendAfterMs;
+  const deferToNextDay = isAfter1830();
   if (opts.batchTotal != null && opts.batchTotal > 0 && opts.batchIndex != null) {
     const totalWindow = BULK_SPREAD_MS;
     const slotSize = totalWindow / opts.batchTotal;
     const base = opts.batchIndex * slotSize;
     const jitter = (Math.random() - 0.5) * slotSize * 0.4;
-    sendAfterMs = now + Math.max(0, base + jitter);
+    const baseTime = deferToNextDay ? getNextDay1000().getTime() : now;
+    sendAfterMs = baseTime + Math.max(0, base + jitter);
   } else {
-    sendAfterMs = now; // single job: send immediately
+    sendAfterMs = deferToNextDay ? getNextDay1000().getTime() : now;
   }
   const sendAfter = new Date(sendAfterMs);
   await db("new_job_email_queue").insert({
@@ -1102,4 +1177,12 @@ router.requeueJobsByIds = async (jobIds) => {
   return { added: jobs.length, pending: await getQueueCount() };
 };
 
+function triggerNewJobEmailQueue() {
+  if (!newJobEmailProcessorScheduled) {
+    newJobEmailProcessorScheduled = true;
+    processNewJobEmailQueue();
+  }
+}
+
+router.triggerNewJobEmailQueue = triggerNewJobEmailQueue;
 module.exports = router;
