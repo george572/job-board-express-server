@@ -489,12 +489,22 @@ router.get("/adm", async (req, res) => {
         .groupBy("job_id"),
       db("job_applications as ja")
         .join("users as u", "u.user_uid", "ja.user_id")
+        .leftJoin(
+          db.raw('(SELECT DISTINCT ON (user_id) user_id, file_url FROM resumes ORDER BY user_id, updated_at DESC NULLS LAST) as r'),
+          "r.user_id",
+          "ja.user_id"
+        )
         .whereIn("ja.job_id", jobIds)
-        .select("ja.job_id", "ja.user_id", "ja.created_at", "u.user_name", "u.user_email"),
+        .select("ja.job_id", "ja.user_id", "ja.created_at", "u.user_name", "u.user_email", "r.file_url as cv_url"),
       db("cv_refusals as cr")
         .join("users as u", "u.user_uid", "cr.user_id")
+        .leftJoin(
+          db.raw('(SELECT DISTINCT ON (user_id) user_id, file_url FROM resumes ORDER BY user_id, updated_at DESC NULLS LAST) as r'),
+          "r.user_id",
+          "cr.user_id"
+        )
         .whereIn("cr.job_id", jobIds)
-        .select("cr.job_id", "cr.user_id", "cr.created_at", "cr.complaint_sent", "u.user_name", "u.user_email"),
+        .select("cr.job_id", "cr.user_id", "cr.created_at", "cr.complaint_sent", "u.user_name", "u.user_email", "r.file_url as cv_url"),
     ]);
     const succeededMap = new Map(succeededByJob.map((r) => [r.job_id, parseInt(r.n || 0, 10)]));
     const failedMap = new Map(failedByJob.map((r) => [r.job_id, parseInt(r.n || 0, 10)]));
@@ -506,6 +516,7 @@ router.get("/adm", async (req, res) => {
         user_name: r.user_name || "N/A",
         user_email: r.user_email || "N/A",
         created_at: r.created_at,
+        cv_url: r.cv_url || null,
       });
     }
     const refusedByJob = new Map();
@@ -517,6 +528,7 @@ router.get("/adm", async (req, res) => {
         user_email: r.user_email || "N/A",
         created_at: r.created_at,
         complaint_sent: !!r.complaint_sent,
+        cv_url: r.cv_url || null,
       });
     }
     const data = rows.map((job) => {
@@ -637,13 +649,23 @@ router.get("/:id", async (req, res) => {
     const [acceptedRows, refusedRows] = await Promise.all([
       db("job_applications as ja")
         .join("users as u", "u.user_uid", "ja.user_id")
+        .leftJoin(
+          db.raw('(SELECT DISTINCT ON (user_id) user_id, file_url FROM resumes ORDER BY user_id, updated_at DESC NULLS LAST) as r'),
+          "r.user_id",
+          "ja.user_id"
+        )
         .where("ja.job_id", jobId)
-        .select("ja.user_id", "ja.created_at", "u.user_name", "u.user_email")
+        .select("ja.user_id", "ja.created_at", "u.user_name", "u.user_email", "r.file_url as cv_url")
         .orderBy("ja.created_at", "desc"),
       db("cv_refusals as cr")
         .join("users as u", "u.user_uid", "cr.user_id")
+        .leftJoin(
+          db.raw('(SELECT DISTINCT ON (user_id) user_id, file_url FROM resumes ORDER BY user_id, updated_at DESC NULLS LAST) as r'),
+          "r.user_id",
+          "cr.user_id"
+        )
         .where("cr.job_id", jobId)
-        .select("cr.user_id", "cr.created_at", "cr.complaint_sent", "u.user_name", "u.user_email")
+        .select("cr.user_id", "cr.created_at", "cr.complaint_sent", "u.user_name", "u.user_email", "r.file_url as cv_url")
         .orderBy("cr.created_at", "desc"),
     ]);
     const cv_accepted = acceptedRows.map((r) => ({
@@ -651,6 +673,7 @@ router.get("/:id", async (req, res) => {
       user_name: r.user_name || "N/A",
       user_email: r.user_email || "N/A",
       created_at: r.created_at,
+      cv_url: r.cv_url || null,
     }));
     const cv_refused = refusedRows.map((r) => ({
       user_id: r.user_id,
@@ -658,6 +681,7 @@ router.get("/:id", async (req, res) => {
       user_email: r.user_email || "N/A",
       created_at: r.created_at,
       complaint_sent: !!r.complaint_sent,
+      cv_url: r.cv_url || null,
     }));
     res.json({
       ...job,
