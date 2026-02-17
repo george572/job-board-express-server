@@ -391,24 +391,46 @@ router.get("/", async (req, res) => {
 });
 
 // admin only
-router.get("/adm", (req, res) => {
-  let query = db("jobs").select("*");
-  let countQuery = db("jobs").count("id as totalItems");
-
-  query.orderBy("created_at", "desc");
-
-  query
-    .then((rows) => {
-      countQuery
-        .first()
-        .then((result) => {
-          res.json({
-            data: rows,
-          });
-        })
-        .catch((err) => res.status(500).json({ error: err.message }));
-    })
-    .catch((err) => res.status(500).json({ error: err.message }));
+router.get("/adm", async (req, res) => {
+  try {
+    const rows = await db("jobs")
+      .select("*")
+      .orderBy("created_at", "desc");
+    const jobIds = rows.map((r) => r.id);
+    const [succeededByJob, failedByJob] =
+      jobIds.length === 0
+        ? [[], []]
+        : await Promise.all([
+            db("job_applications")
+              .select("job_id")
+              .count("id as n")
+              .whereIn("job_id", jobIds)
+              .groupBy("job_id"),
+            db("cv_refusals")
+              .select("job_id")
+              .count("id as n")
+              .whereIn("job_id", jobIds)
+              .groupBy("job_id"),
+          ]);
+    const succeededMap = new Map(succeededByJob.map((r) => [r.job_id, parseInt(r.n || 0, 10)]));
+    const failedMap = new Map(failedByJob.map((r) => [r.job_id, parseInt(r.n || 0, 10)]));
+    const data = rows.map((job) => {
+      const succeeded = succeededMap.get(job.id) || 0;
+      const failed = failedMap.get(job.id) || 0;
+      return {
+        ...job,
+        cv_stats: {
+          tried: succeeded + failed,
+          succeeded,
+          failed,
+        },
+      };
+    });
+    res.json({ data });
+  } catch (err) {
+    console.error("jobs adm error:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // search jobs
