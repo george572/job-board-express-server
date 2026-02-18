@@ -83,7 +83,7 @@ const marketingTransporter =
       })
     : null;
 
-// Marketing email scheduling: if after 18:30 Georgia time, schedule for next day 10:20 Georgia
+// Marketing email scheduling: all times in Tbilisi (Asia/Tbilisi, UTC+4)
 const TZ_GEORGIA = "Asia/Tbilisi";
 function isAfter1830() {
   const pts = new Intl.DateTimeFormat("en-US", { timeZone: TZ_GEORGIA, hour: "numeric", minute: "numeric", hour12: false }).formatToParts(new Date());
@@ -91,6 +91,7 @@ function isAfter1830() {
   const minute = parseInt(pts.find((p) => p.type === "minute").value, 10);
   return hour > 18 || (hour === 18 && minute >= 30);
 }
+/** Returns Date for next calendar day 10:20 Tbilisi, stored as UTC (10:20 Tbilisi = 06:20 UTC) */
 function getNextDay1020Georgia() {
   const now = new Date();
   const opts = { timeZone: TZ_GEORGIA, year: "numeric", month: "2-digit", day: "2-digit" };
@@ -98,11 +99,8 @@ function getNextDay1020Georgia() {
   const y = parseInt(parts.find((p) => p.type === "year").value, 10);
   const m = parseInt(parts.find((p) => p.type === "month").value, 10);
   const d = parseInt(parts.find((p) => p.type === "day").value, 10);
-  const tomorrow = new Date(y, m - 1, d + 1);
-  const y2 = tomorrow.getFullYear();
-  const m2 = String(tomorrow.getMonth() + 1).padStart(2, "0");
-  const d2 = String(tomorrow.getDate()).padStart(2, "0");
-  return new Date(`${y2}-${m2}-${d2}T06:20:00.000Z`); // 10:20 Georgia = 06:20 UTC
+  // Tomorrow in Tbilisi: use Date.UTC to avoid server local timezone
+  return new Date(Date.UTC(y, m - 1, d + 1, 6, 20, 0)); // 06:20 UTC = 10:20 Tbilisi
 }
 
 // Bulk emails spread over 2 hours
@@ -182,7 +180,7 @@ async function processNewJobEmailQueue() {
       newJobEmailProcessorScheduled = false;
       return;
     }
-    const now = new Date();
+    // Compare in UTC – send_after is stored as UTC (06:20 UTC = 10:20 Tbilisi)
     const row = await db("new_job_email_queue as q")
       .leftJoin("jobs as j", "j.id", "q.job_id")
       .select(
@@ -199,7 +197,7 @@ async function processNewJobEmailQueue() {
         "j.jobSalary",
         "j.jobSalary_min"
       )
-      .where("q.send_after", "<=", now)
+      .whereRaw("q.send_after <= NOW()")
       .orderBy("q.send_after")
       .first();
     if (!row) {
