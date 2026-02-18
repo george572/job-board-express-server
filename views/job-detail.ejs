@@ -239,9 +239,9 @@
             რეზიუმეს გასაგზავნად გაიარეთ ავტორიზაცია
           </p>
           <% } %>
-          <% if (typeof userAlreadyApplied !== 'undefined' && userAlreadyApplied) { %>
+          <% if (typeof userAlreadyAppliedOrSubmitted !== 'undefined' && userAlreadyAppliedOrSubmitted) { %>
           <div class="bg-gray-200 w-[296px] h-[52px] text-gray-600 rounded-lg my-8 mb-1 text-[16px] hidden lg:flex items-center justify-center mt-8 cursor-not-allowed">
-            თქვენ უკვე გაგზავნეთ CV
+            <%= userAlreadyApplied ? 'თქვენ უკვე გაგზავნეთ CV' : 'თქვენ უკვე გააგზავნეთ განაცხადი' %>
           </div>
           <% } else if (typeof isExpired !== 'undefined' && isExpired) { %>
           <div class="bg-gray-200 w-[296px] h-[52px] text-gray-600 rounded-lg my-8 mb-1 text-[16px] hidden lg:flex items-center justify-center mt-8">
@@ -299,9 +299,9 @@
         რეზიუმეს გასაგზავნად გაიარეთ ავტორიზაცია
       </p>
       <% } %>
-      <% if (typeof userAlreadyApplied !== 'undefined' && userAlreadyApplied) { %>
+      <% if (typeof userAlreadyAppliedOrSubmitted !== 'undefined' && userAlreadyAppliedOrSubmitted) { %>
       <div class="bg-gray-200 w-full min-h-[52px] text-gray-600 rounded-lg my-8 mt-0 mb-1 text-[16px] flex items-center justify-center cursor-not-allowed">
-        თქვენ უკვე გაგზავნეთ CV
+        <%= userAlreadyApplied ? 'თქვენ უკვე გაგზავნეთ CV' : 'თქვენ უკვე გააგზავნეთ განაცხადი' %>
       </div>
       <% } else if (typeof isExpired !== 'undefined' && isExpired) { %>
       <div class="bg-gray-200 w-full min-h-[52px] text-gray-600 rounded-lg my-8 mt-0 mb-1 text-[16px] flex items-center justify-center">
@@ -861,6 +861,17 @@
     (function() {
       const jobId = parseInt(document.body.getAttribute('data-job-id') || '0', 10);
       var formDialog = document.getElementById('formDialog');
+      function setAppliedState() {
+        var msg = 'თქვენ უკვე გააგზავნეთ განაცხადი';
+        var openDialogBtn = document.getElementById('openDialogBtn');
+        var openDialogBtn2 = document.getElementById('openDialogBtn2');
+        var openFormBtn = document.getElementById('openFormBtn');
+        var openFormBtnDesktop = document.getElementById('openFormBtnDesktop');
+        if (openDialogBtn) { openDialogBtn.textContent = msg; openDialogBtn.disabled = true; openDialogBtn.classList.add('bg-gray-200','text-gray-600','cursor-not-allowed'); openDialogBtn.classList.remove('bg-[#315EFF]','cursor-pointer'); }
+        if (openDialogBtn2) { openDialogBtn2.textContent = msg; openDialogBtn2.disabled = true; openDialogBtn2.classList.add('bg-gray-200','text-gray-600','cursor-not-allowed'); openDialogBtn2.classList.remove('bg-[#315EFF]','cursor-pointer'); }
+        if (openFormBtn) { openFormBtn.disabled = true; openFormBtn.classList.add('bg-gray-200','text-gray-600','cursor-not-allowed'); openFormBtn.classList.remove('cursor-pointer'); }
+        if (openFormBtnDesktop) { openFormBtnDesktop.disabled = true; openFormBtnDesktop.classList.add('bg-gray-200','text-gray-600','cursor-not-allowed'); openFormBtnDesktop.classList.remove('cursor-pointer'); }
+      }
       function openFormDialog() {
         if (formDialog) {
           formDialog.showModal();
@@ -896,8 +907,18 @@
         })
         .then(function() {
           form.reset();
-          if (successEl) { successEl.classList.remove('hidden'); setTimeout(function() { successEl.classList.add('hidden'); }, 3000); }
-          closeFormDialog();
+          var formFields = form.querySelectorAll('input:not([type="hidden"]), textarea, button[type="submit"]');
+          formFields.forEach(function(el) { el.style.display = 'none'; });
+          if (successEl) {
+            successEl.classList.remove('hidden');
+            successEl.textContent = 'გამოგზავნილია! მადლობა.';
+          }
+          setTimeout(function() {
+            closeFormDialog();
+            formFields.forEach(function(el) { el.style.display = ''; });
+            if (successEl) successEl.classList.add('hidden');
+            setAppliedState();
+          }, 2500);
         })
         .catch(function(err) {
           alert(err.message || 'გაგზავნა ვერ მოხერხდა');

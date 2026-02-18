@@ -1145,6 +1145,15 @@ app.get("/vakansia/:slug", async (req, res) => {
       userAlreadyApplied = !!application;
     }
 
+    // Has this user/visitor already submitted the simple form?
+    let userAlreadySubmittedForm = false;
+    const formSubQ = db("job_form_submissions").where("job_id", jobId);
+    if (req.session?.user?.uid) {
+      userAlreadySubmittedForm = !!(await formSubQ.clone().where("user_id", req.session.user.uid).first());
+    } else if (req.visitorId) {
+      userAlreadySubmittedForm = !!(await formSubQ.clone().where("visitor_id", req.visitorId).first());
+    }
+
     const jobDescription =
       job.job_description && job.job_description.length > 0
         ? job.job_description.substring(0, 155)
@@ -1152,12 +1161,15 @@ app.get("/vakansia/:slug", async (req, res) => {
     const jobCanonical =
       "https://samushao.ge/vakansia/" + slugify(job.jobName) + "-" + job.id;
     const acceptFormSubmissions = job.accept_form_submissions === true || job.accept_form_submissions === 1;
+    const userAlreadyAppliedOrSubmitted = userAlreadyApplied || userAlreadySubmittedForm;
     res.render("job-detail", {
       job: { ...job, accept_form_submissions: acceptFormSubmissions },
       acceptFormSubmissions,
       relatedJobs,
       slugify,
       userAlreadyApplied,
+      userAlreadySubmittedForm,
+      userAlreadyAppliedOrSubmitted,
       isExpired,
       seo: {
         title: job.jobName + " | Samushao.ge",
