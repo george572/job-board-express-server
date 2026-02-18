@@ -887,7 +887,7 @@ app.get("/api/filter-counts", async (req, res) => {
         .where("job_status", "approved")
         .whereRaw("(expires_at IS NULL OR expires_at > NOW())");
       if (!hasAnyFilter) {
-        query = query.whereRaw(`${DATE_IN_GEORGIA} < ${TODAY_IN_GEORGIA}`);
+        query = query.whereRaw("(created_at AT TIME ZONE ?)::date < (NOW() AT TIME ZONE ?)::date", [TZ_GEORGIA, TZ_GEORGIA]);
       }
       return query;
     };
