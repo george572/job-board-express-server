@@ -261,6 +261,22 @@
     let isLoadingMore = false;
     let scrollHandler = null;
 
+    function trackPremiumPrioritizedClicks(link, section) {
+      try {
+        if (!window.amplitude) return;
+        var props = {
+          job_id: link.getAttribute('data-job-id'),
+          job_category: categoryNames[link.getAttribute('data-job-category')] || link.getAttribute('data-job-category'),
+          job_title: link.getAttribute('data-job-title'),
+          company: link.getAttribute('data-job-company'),
+          location: link.getAttribute('data-job-location'),
+          section: section
+        };
+        if (link.getAttribute('data-premium') === 'true') window.amplitude.track('Premium Job Clicked', props);
+        if (link.getAttribute('data-prioritize') === 'true') window.amplitude.track('Prioritized Job Clicked', props);
+      } catch (e) {}
+    }
+
     function bindNormalJobClicks(root) {
       try {
         if (!window.amplitude) return;
@@ -280,6 +296,7 @@
                 company: this.getAttribute('data-job-company'),
                 location: this.getAttribute('data-job-location')
               });
+              trackPremiumPrioritizedClicks(this, 'normal');
             } catch (e) {}
           });
         });
@@ -497,6 +514,7 @@
                 company: this.getAttribute('data-job-company'),
                 location: this.getAttribute('data-job-location')
               });
+              trackPremiumPrioritizedClicks(this, 'recommended');
             }
           } catch (e) {}
         });
@@ -550,6 +568,7 @@
                 company: this.getAttribute('data-job-company'),
                 location: this.getAttribute('data-job-location')
               });
+              trackPremiumPrioritizedClicks(this, 'most_popular');
             }
           } catch (e) {}
         });
@@ -590,6 +609,7 @@
                 company: this.getAttribute('data-job-company'),
                 location: this.getAttribute('data-job-location')
               });
+              trackPremiumPrioritizedClicks(this, 'highest_paid');
             }
           } catch (e) {}
         });

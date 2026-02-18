@@ -489,6 +489,23 @@
       '26': 'HR'
     };
 
+    function trackPremiumPrioritizedClicks(link, section) {
+      try {
+        if (!window.amplitude) return;
+        var catId = link.getAttribute('data-job-category');
+        var props = {
+          job_id: link.getAttribute('data-job-id'),
+          job_category: categoryNames[catId] || catId,
+          job_title: link.getAttribute('data-job-title'),
+          company: link.getAttribute('data-job-company'),
+          location: link.getAttribute('data-job-location'),
+          section: section
+        };
+        if (link.getAttribute('data-premium') === 'true') window.amplitude.track('Premium Job Clicked', props);
+        if (link.getAttribute('data-prioritize') === 'true') window.amplitude.track('Prioritized Job Clicked', props);
+      } catch (e) {}
+    }
+
     // Similar job clicks (inside job detail)
     document.addEventListener('DOMContentLoaded', function () {
       try {
@@ -510,6 +527,7 @@
                   location: this.getAttribute('data-job-location'),
                   referrer_job_id: document.body.getAttribute('data-job-id')
                 });
+                trackPremiumPrioritizedClicks(this, 'similar');
               }
             } catch (e) {}
           });
@@ -546,6 +564,8 @@
     const jobSalaryRange = <%- JSON.stringify(mainJob.jobSalary || '') %>;
     const jobCompany = <%- JSON.stringify(mainJob.companyName || '') %>;
     const jobLocation = <%- JSON.stringify(mainJob.job_city || '') %>;
+    const jobIsPremium = <%- JSON.stringify((typeof job !== 'undefined' && (job.job_premium_status === 'premium' || job.job_premium_status === 'premiumPlus')) ? 'premium' : 'standard') %>;
+    const jobIsPrioritized = <%- JSON.stringify(typeof job !== 'undefined' && (job.prioritize === true || job.prioritize === 1 || job.prioritize === 'true')) %>;
     const userUid = <%- user ? JSON.stringify(user.uid) : 'null' %>;
 
     // State: does user already have a CV saved, and are we using it instead of uploading a new one?
@@ -571,7 +591,9 @@
             salary_range: jobSalaryRange,
             company: jobCompany,
             location: jobLocation,
-            method: 'cv_dialog'
+            method: 'cv_dialog',
+            is_premium: jobIsPremium,
+            is_prioritized: jobIsPrioritized
           });
         }
       } catch (e) {}
@@ -731,7 +753,9 @@
                   company: jobCompany,
                   location: jobLocation,
                   success: true,
-                  method: 'existing_resume'
+                  method: 'existing_resume',
+                  is_premium: jobIsPremium,
+                  is_prioritized: jobIsPrioritized
                 });
               }
             } catch (e) {}
@@ -815,7 +839,9 @@
                     company: jobCompany,
                     location: jobLocation,
                     success: true,
-                    method: 'new_upload'
+                    method: 'new_upload',
+                    is_premium: jobIsPremium,
+                    is_prioritized: jobIsPrioritized
                   });
                 }
               } catch (e) {}
