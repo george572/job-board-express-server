@@ -266,17 +266,20 @@ async function getRecommendedJobs(db, visitorId, opts = {}) {
       if (hasKeywordSignal && s.keywordMatches === 0 && !isHighVisitCategory) return false;
       return true;
     });
+  // Sort: premium+prioritize > premium only > prioritize only > regular; within premium: premiumPlus > premium
+  const sortRank = (j) => {
+    const premium = ["premium", "premiumPlus"].includes(j.job_premium_status);
+    const prior = j.prioritize === true || j.prioritize === 1;
+    if (premium && prior) return j.job_premium_status === "premiumPlus" ? 0 : 1;
+    if (premium) return j.job_premium_status === "premiumPlus" ? 2 : 3;
+    if (prior) return 4;
+    return 5;
+  };
   scored.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
-    const aPremium = ["premium", "premiumPlus"].includes(a.job.job_premium_status);
-    const bPremium = ["premium", "premiumPlus"].includes(b.job.job_premium_status);
-    if (aPremium !== bPremium) return aPremium ? -1 : 1;
-    const aPrior = a.job.prioritize === true || a.job.prioritize === 1;
-    const bPrior = b.job.prioritize === true || b.job.prioritize === 1;
-    if (aPrior !== bPrior) return aPrior ? -1 : 1;
-    const aOrd = a.job.job_premium_status === "premiumPlus" ? 1 : a.job.job_premium_status === "premium" ? 2 : 3;
-    const bOrd = b.job.job_premium_status === "premiumPlus" ? 1 : b.job.job_premium_status === "premium" ? 2 : 3;
-    if (aOrd !== bOrd) return aOrd - bOrd;
+    const aR = sortRank(a.job);
+    const bR = sortRank(b.job);
+    if (aR !== bR) return aR - bR;
     return new Date(b.job.created_at) - new Date(a.job.created_at);
   });
 
@@ -566,7 +569,7 @@ app.get("/", async (req, res) => {
           .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
           .where((qb) => qb.where("prioritize", true).orWhereIn("job_premium_status", ["premium", "premiumPlus"]))
           .whereNotNull("jobSalary_min")
-          .orderByRaw(`CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 ELSE 3 END`)
+          .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 ELSE 5 END`)
           .orderBy("jobSalary_min", "desc")
           .limit(2);
         const topSeen = new Set();
@@ -618,7 +621,7 @@ app.get("/", async (req, res) => {
           .where("job_status", "approved")
           .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
           .where((qb) => qb.where("prioritize", true).orWhereIn("job_premium_status", ["premium", "premiumPlus"]))
-          .orderByRaw(`CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 ELSE 3 END`)
+          .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 ELSE 5 END`)
           .orderByRaw("COALESCE(view_count, 0) DESC")
           .limit(2);
         const seenPop = new Set();
@@ -651,8 +654,7 @@ app.get("/", async (req, res) => {
         .where("job_status", "approved")
         .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
         .whereRaw(`${DATE_IN_GEORGIA} = ${TODAY_IN_GEORGIA}`)
-        .orderByRaw(`CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END`)
-        .orderByRaw("(CASE WHEN prioritize THEN 1 ELSE 0 END) DESC")
+        .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 WHEN "job_premium_status" = 'regular' THEN 5 ELSE 6 END`)
         .orderBy("created_at", "desc")
         .orderBy("id", "desc");
       const seenToday = new Set();
@@ -746,11 +748,9 @@ app.get("/", async (req, res) => {
     const [{ total }] = await countQuery;
     const totalPages = Math.ceil(total / Number(limit));
 
+    const PREMIUM_PRIORITIZE_ORDER = `CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 WHEN "job_premium_status" = 'regular' THEN 5 ELSE 6 END`;
     let jobs = await query
-      .orderByRaw(
-        `CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END`
-      )
-      .orderByRaw("(CASE WHEN prioritize THEN 1 ELSE 0 END) DESC")
+      .orderByRaw(PREMIUM_PRIORITIZE_ORDER)
       .orderBy("created_at", "desc")
       .orderBy("id", "desc")
       .limit(fetchLimit)
@@ -813,7 +813,7 @@ app.get("/kvelaze-motkhovnadi-vakansiebi", async (req, res) => {
       .where("job_status", "approved")
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
       .where((qb) => qb.where("prioritize", true).orWhereIn("job_premium_status", ["premium", "premiumPlus"]))
-      .orderByRaw(`CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 ELSE 3 END`)
+      .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 ELSE 5 END`)
       .orderByRaw("COALESCE(view_count, 0) DESC")
       .limit(2);
     const seenKey = new Set();
@@ -890,7 +890,7 @@ app.get("/kvelaze-magalanazgaurebadi-vakansiebi", async (req, res) => {
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
       .where((qb) => qb.where("prioritize", true).orWhereIn("job_premium_status", ["premium", "premiumPlus"]))
       .whereNotNull("jobSalary_min")
-      .orderByRaw(`CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 ELSE 3 END`)
+      .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 ELSE 5 END`)
       .orderBy("jobSalary_min", "desc")
       .limit(2);
     const seenKey = new Set();
@@ -956,8 +956,7 @@ app.get("/dgevandeli-vakansiebi", async (req, res) => {
       .where("job_status", "approved")
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
       .whereRaw(`${DATE_IN_GEORGIA} = ${TODAY_IN_GEORGIA}`)
-      .orderByRaw(`CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END`)
-      .orderByRaw("(CASE WHEN prioritize THEN 1 ELSE 0 END) DESC")
+      .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 WHEN "job_premium_status" = 'regular' THEN 5 ELSE 6 END`)
       .orderBy("created_at", "desc")
       .orderBy("id", "desc");
 
@@ -1178,8 +1177,7 @@ app.get("/vakansia/:slug", async (req, res) => {
           .orWhereIn("job_premium_status", ["premium", "premiumPlus"]);
       })
       .whereNot("id", jobId)
-      .orderByRaw("CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 ELSE 3 END")
-      .orderByRaw("(CASE WHEN prioritize THEN 1 ELSE 0 END) DESC")
+      .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 ELSE 5 END`)
       .orderByRaw("(CASE WHEN category_id = ? THEN 1 ELSE 0 END) DESC", [job.category_id])
       .orderBy("created_at", "desc")
       .limit(10);

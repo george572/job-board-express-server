@@ -117,7 +117,7 @@ async function hasRecentlySentToCompany(companyEmail) {
   try {
     const row = await db("new_job_email_sent")
       .where("company_email_lower", companyEmail)
-      .whereRaw("sent_at > now() - interval '24 hours'")
+      .whereRaw("sent_at > now() - interval '7 days'")
       .first();
     return !!row;
   } catch (e) {
@@ -134,7 +134,7 @@ async function claimAndSendToCompany(companyEmail) {
        VALUES (?, now())
        ON CONFLICT (company_email_lower)
        DO UPDATE SET sent_at = now()
-       WHERE new_job_email_sent.sent_at < now() - interval '24 hours'
+       WHERE new_job_email_sent.sent_at < now() - interval '7 days'
        RETURNING company_email_lower`,
       [companyEmail]
     );
@@ -267,7 +267,7 @@ async function processNewJobEmailQueue() {
     }
 
     if (companyEmail && (await hasRecentlySentToCompany(companyEmail))) {
-      console.log(`[Email queue] Skip job #${row.job_id} → ${companyEmail}: already sent in last 24h`);
+      console.log(`[Email queue] Skip job #${row.job_id} → ${companyEmail}: already sent in last 7 days`);
       await db("new_job_email_queue").where("id", row.queue_id).del();
       processNewJobEmailQueue();
       return;
@@ -382,7 +382,7 @@ async function sendNewJobEmail(job, opts = {}) {
     else throw e;
   }
   if (await hasRecentlySentToCompany(companyEmail)) {
-    return { queued: false, reason: "already_sent_last_24h" };
+    return { queued: false, reason: "already_sent_last_7_days" };
   }
 
   const now = Date.now();
@@ -479,7 +479,7 @@ router.get("/", async (req, res) => {
       );
 
     const jobs = await query
-      .orderByRaw("CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END")
+      .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 WHEN "job_premium_status" = 'regular' THEN 5 ELSE 6 END`)
       .orderBy("created_at", "desc")
       .limit(Number(limit) + 1)
       .offset(offset);
