@@ -205,8 +205,8 @@ router.post("/", async (req, res) => {
     const mailOptions = {
       from: MAIL_USER,
       to: job.company_email,
-      subject: `ახალი CV - "${job.jobName}"`,
-      html: `<p>ახალი CV გამოიგზავნა თქვენს ვაკანსიაზე: "${job.jobName}".</p>
+      subject: `ახალი CV Samushao.ge-დან - "${job.jobName}"`,
+      html: `<p>Samushao.ge-დან ახალი CV გამოიგზავნა თქვენს ვაკანსიაზე: "${job.jobName}".</p>
 <p>CV-ის ბმული: ${resume.file_url}</p>
 <p>კანდიდატის სახელი: ${user.user_name}</p>
 <p>კანდიდატის ელ-ფოსტა: ${user.user_email}</p>`,

@@ -100,14 +100,24 @@ function getNextDay1020Georgia() {
   const y = parseInt(parts.find((p) => p.type === "year").value, 10);
   const m = parseInt(parts.find((p) => p.type === "month").value, 10);
   const d = parseInt(parts.find((p) => p.type === "day").value, 10);
-  // Tomorrow in Tbilisi: use Date.UTC to avoid server local timezone
   return new Date(Date.UTC(y, m - 1, d + 1, 6, 20, 0)); // 06:20 UTC = 10:20 Tbilisi
+}
+/** Returns Date for next calendar day 09:00 Tbilisi (05:00 UTC) */
+function getNextDay0900Georgia() {
+  const now = new Date();
+  const opts = { timeZone: TZ_GEORGIA, year: "numeric", month: "2-digit", day: "2-digit" };
+  const parts = new Intl.DateTimeFormat("en-US", opts).formatToParts(now);
+  const y = parseInt(parts.find((p) => p.type === "year").value, 10);
+  const m = parseInt(parts.find((p) => p.type === "month").value, 10);
+  const d = parseInt(parts.find((p) => p.type === "day").value, 10);
+  return new Date(Date.UTC(y, m - 1, d + 1, 5, 0, 0)); // 05:00 UTC = 09:00 Tbilisi
 }
 
 // Bulk emails spread over 2 hours
 const BULK_SPREAD_MS = 2 * 60 * 60 * 1000;       // 2 hours total window
 const MIN_DELAY_BETWEEN_SENDS_MS = 60 * 1000;     // at least 1 min between sends
 const MAX_DELAY_BETWEEN_SENDS_MS = 5 * 60 * 1000; // random 1–5 min before next check
+const RESCHEDULE_SLOT_MINUTES = 7;                 // 7 min between rescheduled emails (09:00, 09:07, 09:14…)
 
 let newJobEmailLastSentAt = 0;
 let newJobEmailProcessorScheduled = false;
@@ -229,6 +239,25 @@ async function processNewJobEmailQueue() {
       } else {
         newJobEmailProcessorScheduled = false;
       }
+      return;
+    }
+    // No sends after 18:30 Georgia: reschedule to next day 09:00, 09:07, 09:14… (spread)
+    if (isAfter1830()) {
+      const next0900 = getNextDay0900Georgia();
+      const windowEnd = new Date(next0900.getTime() + BULK_SPREAD_MS);
+      const existingCount = await db("new_job_email_queue")
+        .whereBetween("send_after", [next0900.toISOString(), windowEnd.toISOString()])
+        .count("id as n")
+        .first()
+        .then((r) => parseInt(r?.n || 0, 10));
+      const offsetMs = existingCount * RESCHEDULE_SLOT_MINUTES * 60 * 1000;
+      const newSendAfter = new Date(next0900.getTime() + offsetMs);
+      await db("new_job_email_queue").where("id", row.queue_id).update({
+        send_after: db.raw("?::timestamptz", [newSendAfter.toISOString()]),
+      });
+      console.log(`[Email queue] Rescheduled job #${row.job_id} to next day ${new Date(newSendAfter).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: TZ_GEORGIA })} (slot ${existingCount + 1}, was due after 18:30)`);
+      newJobEmailProcessorScheduled = true;
+      setTimeout(processNewJobEmailQueue, MIN_DELAY_BETWEEN_SENDS_MS);
       return;
     }
     const companyEmail = (row.company_email_lower || "").trim().toLowerCase();
