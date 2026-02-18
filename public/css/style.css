@@ -461,6 +461,9 @@
   .w-\[296px\] {
     width: 296px;
   }
+  .w-\[350px\] {
+    width: 350px;
+  }
   .w-full {
     width: 100%;
   }
@@ -514,6 +517,9 @@
   }
   .min-w-\[296px\] {
     min-width: 296px;
+  }
+  .min-w-\[350px\] {
+    min-width: 350px;
   }
   .flex-1 {
     flex: 1;
@@ -1285,6 +1291,11 @@
   .\[\&\>article\]\:flex {
     &>article {
       display: flex;
+    }
+  }
+  .\[\&\>article\]\:min-w-0 {
+    &>article {
+      min-width: calc(var(--spacing) * 0);
     }
   }
   .\[\&\>article\]\:flex-1 {

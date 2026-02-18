@@ -286,10 +286,10 @@
             <button type="button" class="related-jobs-next w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Next">→</button>
           </div>
         </div>
-        <div id="related-jobs-scroll" class="related-jobs-scroll flex w-full items-stretch gap-3 sm:gap-4 overflow-x-auto pb-4 pl-6 pr-4 snap-x snap-mandatory" style="scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;">
+        <div id="related-jobs-scroll" class="related-jobs-scroll flex w-full items-stretch gap-3 sm:gap-4 overflow-x-auto pb-4 pr-4 snap-x snap-mandatory" style="scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;">
           <% relatedJobs.forEach(function(relJob) { %>
-          <div class="related-jobs-card flex flex-shrink-0 min-w-[280px] w-max max-w-[450px] snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col">
-            <%- include('partials/jobItemCompact.ejs', { job: relJob, slugify }) %>
+          <div class="related-jobs-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col<%= (relJob.job_premium_status === 'premium' || relJob.job_premium_status === 'premiumPlus') ? ' premium-job-mobile-first' : '' %>"<%= (relJob.job_premium_status === 'premium' || relJob.job_premium_status === 'premiumPlus') ? ' data-premium="true"' : '' %>>
+            <%- include('partials/jobItemCompact.ejs', { job: relJob, slugify, inSlider: true }) %>
           </div>
           <% }); %>
         </div>
