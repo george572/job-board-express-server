@@ -137,7 +137,20 @@ async function getRecommendedJobs(db, visitorId, opts = {}) {
   }
 
   const appliedJobIdsToExclude = cvJobIds;
-  const allExclude = [...new Set([...clickedJobIdsToExclude, ...appliedJobIdsToExclude])];
+  // Always exclude applied jobs. For clicked jobs: don't exclude if premium/premiumPlus/prioritize (show in recommendations)
+  let allExclude = [...appliedJobIdsToExclude];
+  if (clickedJobIdsToExclude.length > 0) {
+    const premiumRows = await db("jobs")
+      .whereIn("id", clickedJobIdsToExclude)
+      .where((qb) =>
+        qb.whereIn("job_premium_status", ["premium", "premiumPlus"]).orWhere("prioritize", true).orWhere("prioritize", 1)
+      )
+      .select("id");
+    const premiumOrPrioritizedIds = (premiumRows || []).map((r) => r.id);
+    const premiumSet = new Set(premiumOrPrioritizedIds || []);
+    const clickedToExclude = clickedJobIdsToExclude.filter((id) => !premiumSet.has(id));
+    allExclude = [...new Set([...allExclude, ...clickedToExclude])];
+  }
   const allCategoryIds = [...new Set([...clickedCategoryIds, ...cvCategoryIds])];
   const kwWords = titleWords.slice(0, 8);
   const cvKwWords = cvTitleWords.slice(0, 8);
