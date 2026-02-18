@@ -251,10 +251,12 @@
           <% } else { %>
           <div class="hidden lg:flex flex-col items-start justify-center">
             <button id="openDialogBtn" class="bg-[#315EFF] w-[296px] h-[52px] text-white rounded-lg my-8 mb-1 text-[16px] mt-8 <% if (!user) { %>opacity-50 cursor-not-allowed<% } else { %>cursor-pointer<% } %>" <% if (!user) { %>disabled<% } %>> გააგზავნე რეზიუმე </button>
+            <% if (typeof acceptFormSubmissions !== 'undefined' && acceptFormSubmissions) { %>
             <p class="pl-4">ან შეავსე განაცხადის ფორმა</p>
             <button type="button" id="openFormBtnDesktop" class=" w-[296px] h-[52px] border bg-[#315EFF] text-white rounded-lg text-[14px] font-[300] mt-2">
               განაცხადის ფორმა
             </button>
+            <% } %>
           </div>
           <% } %>
           <% } %>
@@ -311,10 +313,12 @@
       <% } else { %>
       <div>
         <button id="openDialogBtn2" class="bg-[#315EFF] mt-2 w-full min-h-[52px] text-white rounded-lg my-8 mt-0 mb-1 text-[16px] <% if (!user) { %>opacity-50 cursor-not-allowed<% } else { %>cursor-pointer<% } %>" <% if (!user) { %>disabled<% } %>> გააგზავნე რეზიუმე </button>
+        <% if (typeof acceptFormSubmissions !== 'undefined' && acceptFormSubmissions) { %>
         <p class="text-center">ან შეავსე განაცხადის ფორმა</p>
         <button type="button" id="openFormBtn" class="cursor-pointer min-w-[296px] w-full h-[52px] border bg-[#315EFF] text-white rounded-lg text-[14px] font-[300] mt-2">
           განაცხადის ფორმა
         </button>
+        <% } %>
       </div>
       <% } %>
     </footer>
