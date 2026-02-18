@@ -9,6 +9,7 @@ const multer = require("multer");
 
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 const { slugify } = require("../utils/slugify");
+const { parsePremiumUntil } = require("../utils/parsePremiumUntil");
 
 // Use the same environment-based Knex config as the main app
 const knexConfig = require("../knexfile");
@@ -1074,7 +1075,7 @@ router.post("/bulk", async (req, res) => {
 const JOB_UPDATE_WHITELIST = [
   "companyName", "user_uid", "company_email", "jobName", "jobSalary", "jobDescription",
   "job_experience", "job_city", "job_address", "job_type", "jobIsUrgent", "category_id",
-  "job_premium_status", "isHelio", "job_status", "cvs_sent", "company_logo", "jobSalary_min",
+  "job_premium_status", "premium_until", "isHelio", "job_status", "cvs_sent", "company_logo", "jobSalary_min",
   "view_count", "expires_at", "prioritize", "dont_send_email", "marketing_email_sent",
   "cv_submissions_email_sent", "disable_cv_filter", "accept_form_submissions", "updated_at",
 ];
@@ -1082,6 +1083,7 @@ const JOB_UPDATE_WHITELIST = [
 const CAMEL_TO_SNAKE = {
   acceptFormSubmissions: "accept_form_submissions",
   disableCvFilter: "disable_cv_filter",
+  premiumUntil: "premium_until",
 };
 
 const patchOrPutJob = async (req, res) => {
@@ -1100,7 +1102,10 @@ const patchOrPutJob = async (req, res) => {
       const dbKey = CAMEL_TO_SNAKE[key] || key;
       if (JOB_UPDATE_WHITELIST.includes(dbKey) && body[key] !== undefined) {
         let val = body[key];
-        if (booleanFields.has(dbKey)) {
+        if (dbKey === "premium_until") {
+          val = parsePremiumUntil(val);
+          if (val === null && body[key] !== "" && body[key] !== undefined) continue; // invalid, skip
+        } else if (booleanFields.has(dbKey)) {
           val = val === true || val === 1 || val === "true" || val === "1" || val === "on";
         }
         updateData[dbKey] = val;

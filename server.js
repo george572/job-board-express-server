@@ -25,6 +25,26 @@ const TZ_GEORGIA = "Asia/Tbilisi";
 const DATE_IN_GEORGIA = `(created_at AT TIME ZONE '${TZ_GEORGIA}')::date`;
 const TODAY_IN_GEORGIA = `(NOW() AT TIME ZONE '${TZ_GEORGIA}')::date`;
 
+let lastPremiumExpiryCleanup = 0;
+const PREMIUM_EXPIRY_CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 min
+
+async function runPremiumExpiryCleanup() {
+  if (Date.now() - lastPremiumExpiryCleanup < PREMIUM_EXPIRY_CLEANUP_INTERVAL_MS) return;
+  lastPremiumExpiryCleanup = Date.now();
+  try {
+    const result = await db.raw(
+      `UPDATE jobs SET job_premium_status = 'regular'
+       WHERE job_premium_status IN ('premium','premiumPlus')
+       AND premium_until IS NOT NULL
+       AND premium_until < (NOW() AT TIME ZONE 'Asia/Tbilisi')::date`
+    );
+    const n = result?.rowCount ?? result?.[1] ?? 0;
+    if (n > 0) console.log("[premium expiry] Cleared", n, "expired premium job(s)");
+  } catch (e) {
+    console.error("premium expiry cleanup error:", e?.message);
+  }
+}
+
 // Sentinel category ID for personalized recommendations (no jobs have this category_id)
 const RECOMMENDED_CATEGORY_ID = 9999;
 
@@ -460,6 +480,8 @@ app.get("/sitemap.xml", async (req, res) => {
 // Home route
 app.get("/", async (req, res) => {
   try {
+    await runPremiumExpiryCleanup();
+
     const {
       category,
       company,
@@ -1088,6 +1110,8 @@ app.get("/my-applications", async (req, res) => {
 // get vacancy inner page
 app.get("/vakansia/:slug", async (req, res) => {
   try {
+    await runPremiumExpiryCleanup();
+
     const slug = req.params.slug;
     const jobIdRaw = extractIdFromSlug(slug);
     const jobId = jobIdRaw ? parseInt(jobIdRaw, 10) : null;
