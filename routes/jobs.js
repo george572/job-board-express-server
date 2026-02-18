@@ -1062,9 +1062,24 @@ router.post("/bulk", async (req, res) => {
 });
 
 // PATCH route to update a job
+const JOB_UPDATE_WHITELIST = [
+  "companyName", "user_uid", "company_email", "jobName", "jobSalary", "jobDescription",
+  "job_experience", "job_city", "job_address", "job_type", "jobIsUrgent", "category_id",
+  "job_premium_status", "isHelio", "job_status", "cvs_sent", "company_logo", "jobSalary_min",
+  "view_count", "expires_at", "prioritize", "dont_send_email", "marketing_email_sent",
+  "cv_submissions_email_sent", "updated_at",
+];
+
 router.patch("/:id", (req, res) => {
   const jobId = req.params.id;
-  const updateData = req.body;
+  const body = req.body;
+
+  const updateData = {};
+  for (const key of Object.keys(body)) {
+    if (JOB_UPDATE_WHITELIST.includes(key) && body[key] !== undefined) {
+      updateData[key] = body[key];
+    }
+  }
 
   if (Object.keys(updateData).length === 0) {
     return res.status(400).json({ error: "No fields provided to update" });
