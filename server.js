@@ -796,6 +796,7 @@ app.get("/kvelaze-motkhovnadi-vakansiebi", async (req, res) => {
 
     res.render("index", {
       jobs,
+      recommendedJobs: [],
       topSalaryJobs: [],
       topSalaryTotalCount: 0,
       topPopularJobs: [],
@@ -871,6 +872,7 @@ app.get("/kvelaze-magalanazgaurebadi-vakansiebi", async (req, res) => {
 
     res.render("index", {
       jobs,
+      recommendedJobs: [],
       topSalaryJobs: [],
       topSalaryTotalCount: jobs.length,
       topPopularJobs: [],
@@ -925,6 +927,7 @@ app.get("/dgevandeli-vakansiebi", async (req, res) => {
 
     res.render("index", {
       jobs,
+      recommendedJobs: [],
       topSalaryJobs: [],
       topSalaryTotalCount: 0,
       topPopularJobs: [],

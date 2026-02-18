@@ -42,7 +42,7 @@
   <%- include('partials/filters') %>
 
   <!-- Recommended jobs (personalized, at top – only when we have results) -->
-  <% if (recommendedJobs && recommendedJobs.length > 0) { %>
+  <% if (typeof recommendedJobs !== 'undefined' && recommendedJobs && recommendedJobs.length > 0) { %>
   <section id="recommended-jobs-section" class="w-full mx-auto px-4 mt-6 mb-4">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
       <div class="flex flex-col gap-1 flex-1">
