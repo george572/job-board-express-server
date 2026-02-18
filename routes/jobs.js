@@ -157,7 +157,8 @@ async function getQueueCount() {
 
 // Start processor on startup if queue has items
 const RETRY_WHEN_NO_TRANSPORTER_MS = 5 * 60 * 1000; // 5 min
-const MAX_WAIT_BEFORE_RECHECK_MS = 5 * 60 * 1000;   // Wake every 5 min when all items deferred (survives restarts)
+const MAX_WAIT_BEFORE_RECHECK_MS = 60 * 1000;      // Wake every 1 min when all items deferred
+const POLL_INTERVAL_MS = 60 * 1000;                 // Fallback: poll every 1 min no matter what
 
 (async () => {
   const n = await getQueueCount();
@@ -166,6 +167,15 @@ const MAX_WAIT_BEFORE_RECHECK_MS = 5 * 60 * 1000;   // Wake every 5 min when all
   if (n > 0) {
     newJobEmailProcessorScheduled = true;
     processNewJobEmailQueue();
+    // Fallback: poll every minute so we always catch due items
+    setInterval(() => {
+      getQueueCount().then((c) => {
+        if (c > 0) {
+          newJobEmailProcessorScheduled = true;
+          processNewJobEmailQueue();
+        }
+      });
+    }, POLL_INTERVAL_MS);
   }
 })();
 
@@ -180,7 +190,11 @@ async function processNewJobEmailQueue() {
       newJobEmailProcessorScheduled = false;
       return;
     }
-    // Compare in UTC – send_after is stored as UTC (06:20 UTC = 10:20 Tbilisi)
+    // Compare: send_after <= NOW() (both UTC in DB)
+    const debug = await db.raw("SELECT NOW() as db_now, (SELECT send_after FROM new_job_email_queue ORDER BY send_after LIMIT 1) as first_send_after").then((r) => r.rows?.[0]);
+    if (debug) {
+      console.log(`[Email queue] DB now: ${debug.db_now}, first send_after: ${debug.first_send_after}`);
+    }
     const row = await db("new_job_email_queue as q")
       .leftJoin("jobs as j", "j.id", "q.job_id")
       .select(
@@ -387,7 +401,7 @@ async function sendNewJobEmail(job, opts = {}) {
   await db("new_job_email_queue").insert({
     job_id: job.id,
     company_email_lower: companyEmail,
-    send_after: sendAfter,
+    send_after: db.raw("?::timestamptz", [sendAfter.toISOString()]),
   });
   if (!newJobEmailProcessorScheduled) {
     newJobEmailProcessorScheduled = true;
