@@ -77,7 +77,6 @@ async function getRecommendedJobs(db, visitorId, opts = {}) {
       "შემსრულებელი", "მუშაკი", "თანამშრომელი", "ვაკანსია", "სამუშაო",
     ].map((x) => x.toLowerCase())
   );
-
   const extractWords = (titles) =>
     titles
       .flatMap((t) => (t || "").trim().split(/\s+/).filter((w) => w.length >= 4 && !STOPWORDS.has(w.toLowerCase())))
@@ -561,7 +560,16 @@ app.get("/", async (req, res) => {
       : pageNum * limit;
 
     // Recommended jobs at top (personalized by visitor clicks + CV sends) – only when no filters
+    // Skip for append requests (load more) – client only needs jobs list
     let recommendedJobs = [];
+    let topSalaryJobs = [];
+    let topSalaryTotalCount = 0;
+    let topPopularJobs = [];
+    let topPopularTotalCount = 0;
+    let todayJobs = [];
+    let todayJobsCount = 0;
+
+    if (!isAppendRequest) {
     if (!filtersActive && (req.visitorId || req.session?.user?.uid)) {
       const rec = await getRecommendedJobs(db, req.visitorId, {
         limit: 20,
@@ -574,12 +582,6 @@ app.get("/", async (req, res) => {
     }
 
     // Top salary jobs slider – skip when any filters are active
-    let topSalaryJobs = [];
-    let topSalaryTotalCount = 0;
-    let topPopularJobs = [];
-    let topPopularTotalCount = 0;
-    let todayJobs = [];
-    let todayJobsCount = 0;
     if (!filtersActive) {
       // Top salary: slot 1 = highest paid non-boosted; slots 2-3 = premium first, then prioritized (premium > prioritize)
         const isBoosted = (j) => j.prioritize === true || j.prioritize === 1 || j.prioritize === "true" || ["premium", "premiumPlus"].includes(j.job_premium_status);
@@ -693,6 +695,7 @@ app.get("/", async (req, res) => {
       });
       todayJobsCount = todayJobs.length;
     }
+    }
 
     let query = db("jobs")
       .select("*")
@@ -786,7 +789,7 @@ app.get("/", async (req, res) => {
     // Deduplicate: same job name + company = keep first (by our sort order)
     const seenKey = new Set();
     jobs = jobs.filter((j) => {
-      const key = String(j.jobName || '').trim() + '|' + String(j.companyName || '').trim();
+      const key = String(j.jobName || "").trim() + "|" + String(j.companyName || "").trim();
       if (seenKey.has(key)) return false;
       seenKey.add(key);
       return true;
