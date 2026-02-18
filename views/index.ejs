@@ -98,7 +98,7 @@
     <div id="top-salary-scroll" class="top-salary-scroll flex w-full items-stretch gap-3 sm:gap-4 overflow-x-auto pb-4 pr-4 snap-x snap-mandatory" 
     style="scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;">
     <% topSalaryJobs.forEach(job => { %>
-   <div class="top-salary-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col">
+   <div class="top-salary-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col<%= (job.job_premium_status === 'premium' || job.job_premium_status === 'premiumPlus') ? ' premium-job-mobile-first' : '' %>"<%= (job.job_premium_status === 'premium' || job.job_premium_status === 'premiumPlus') ? ' data-premium="true"' : '' %>>
      <%- include('partials/jobItemCompact.ejs', { job, slugify, inSlider: true }) %>
    </div>
  <% }) %>
@@ -135,7 +135,7 @@
     <div id="top-popular-scroll" class="top-popular-scroll flex w-full items-stretch gap-3 sm:gap-4 overflow-x-auto pb-4 pr-4 snap-x snap-mandatory" 
     style="scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;">
     <% topPopularJobs.forEach(job => { %>
-   <div class="top-popular-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col">
+   <div class="top-popular-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col<%= (job.job_premium_status === 'premium' || job.job_premium_status === 'premiumPlus') ? ' premium-job-mobile-first' : '' %>"<%= (job.job_premium_status === 'premium' || job.job_premium_status === 'premiumPlus') ? ' data-premium="true"' : '' %>>
      <%- include('partials/jobItemCompact.ejs', { job, slugify, inSlider: true }) %>
    </div>
  <% }) %>

@@ -69,6 +69,15 @@ router.post("/", async (req, res) => {
 
     await db("job_form_submissions").insert(insertPayload);
 
+    try {
+      await db.raw(
+        "UPDATE jobs SET cvs_sent = COALESCE(cvs_sent, 0) + 1 WHERE id = ?",
+        [jobId]
+      );
+    } catch (incErr) {
+      console.error("cvs_sent increment error (form submit):", incErr);
+    }
+
     if (transporter && job.company_email) {
       const phoneStr = insertPayload.applicant_phone ? `\n<p>ტელეფონი: ${insertPayload.applicant_phone}</p>` : "";
       const msgStr = insertPayload.message ? `\n<p>შეტყობინება: ${insertPayload.message}</p>` : "";
