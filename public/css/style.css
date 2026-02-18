@@ -16,6 +16,7 @@
     --color-slate-200: oklch(0.929 0.013 255.508);
     --color-gray-100: oklch(0.967 0.003 264.542);
     --color-gray-200: oklch(0.928 0.006 264.531);
+    --color-gray-300: oklch(0.872 0.01 258.338);
     --color-gray-500: oklch(0.551 0.027 264.364);
     --color-gray-600: oklch(0.446 0.03 256.802);
     --color-gray-700: oklch(0.373 0.034 259.733);
@@ -499,6 +500,9 @@
   .min-w-\[48px\] {
     min-width: 48px;
   }
+  .min-w-\[296px\] {
+    min-width: 296px;
+  }
   .min-w-\[300px\] {
     min-width: 300px;
   }
@@ -520,6 +524,9 @@
   }
   .cursor-pointer {
     cursor: pointer;
+  }
+  .resize-none {
+    resize: none;
   }
   .snap-x {
     scroll-snap-type: x var(--tw-scroll-snap-strictness);
@@ -574,6 +581,13 @@
   }
   .gap-8 {
     gap: calc(var(--spacing) * 8);
+  }
+  .space-y-3 {
+    :where(& > :not(:last-child)) {
+      --tw-space-y-reverse: 0;
+      margin-block-start: calc(calc(var(--spacing) * 3) * var(--tw-space-y-reverse));
+      margin-block-end: calc(calc(var(--spacing) * 3) * calc(1 - var(--tw-space-y-reverse)));
+    }
   }
   .self-start {
     align-self: flex-start;
@@ -630,6 +644,9 @@
   }
   .border-gray-200 {
     border-color: var(--color-gray-200);
+  }
+  .border-gray-300 {
+    border-color: var(--color-gray-300);
   }
   .border-slate-200 {
     border-color: var(--color-slate-200);
@@ -771,6 +788,9 @@
   }
   .pl-2 {
     padding-left: calc(var(--spacing) * 2);
+  }
+  .pl-4 {
+    padding-left: calc(var(--spacing) * 4);
   }
   .pl-6 {
     padding-left: calc(var(--spacing) * 6);
@@ -1173,11 +1193,6 @@
       margin-bottom: calc(var(--spacing) * 6);
     }
   }
-  .lg\:block {
-    @media (width >= 64rem) {
-      display: block;
-    }
-  }
   .lg\:flex {
     @media (width >= 64rem) {
       display: flex;
@@ -1206,6 +1221,11 @@
   .lg\:max-w-\[200px\] {
     @media (width >= 64rem) {
       max-width: 200px;
+    }
+  }
+  .lg\:max-w-\[360px\] {
+    @media (width >= 64rem) {
+      max-width: 360px;
     }
   }
   .lg\:min-w-\[360px\] {
@@ -1314,6 +1334,11 @@
   syntax: "*";
   inherits: false;
   initial-value: proximity;
+}
+@property --tw-space-y-reverse {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
 }
 @property --tw-border-style {
   syntax: "*";
@@ -1508,6 +1533,7 @@
       --tw-skew-x: initial;
       --tw-skew-y: initial;
       --tw-scroll-snap-strictness: proximity;
+      --tw-space-y-reverse: 0;
       --tw-border-style: solid;
       --tw-gradient-position: initial;
       --tw-gradient-from: #0000;

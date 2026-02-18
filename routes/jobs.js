@@ -678,7 +678,7 @@ router.get("/:id", async (req, res) => {
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
-    const [acceptedRows, refusedRows] = await Promise.all([
+    const [acceptedRows, refusedRows, formSubmissions] = await Promise.all([
       db("job_applications as ja")
         .join("users as u", "u.user_uid", "ja.user_id")
         .leftJoin(
@@ -699,6 +699,7 @@ router.get("/:id", async (req, res) => {
         .where("cr.job_id", jobId)
         .select("cr.user_id", "cr.created_at", "cr.complaint_sent", "u.user_name", "u.user_email", "r.file_url as cv_url")
         .orderBy("cr.created_at", "desc"),
+      db("job_form_submissions").where("job_id", jobId).select("*").orderBy("created_at", "desc"),
     ]);
     const cv_accepted = acceptedRows.map((r) => ({
       user_id: r.user_id,
@@ -724,6 +725,7 @@ router.get("/:id", async (req, res) => {
       },
       cv_accepted,
       cv_refused,
+      form_submissions: formSubmissions || [],
     });
   } catch (err) {
     console.error("jobs get :id error:", err);
@@ -1067,35 +1069,68 @@ const JOB_UPDATE_WHITELIST = [
   "job_experience", "job_city", "job_address", "job_type", "jobIsUrgent", "category_id",
   "job_premium_status", "isHelio", "job_status", "cvs_sent", "company_logo", "jobSalary_min",
   "view_count", "expires_at", "prioritize", "dont_send_email", "marketing_email_sent",
-  "cv_submissions_email_sent", "updated_at",
+  "cv_submissions_email_sent", "disable_cv_filter", "accept_form_submissions", "updated_at",
 ];
+// Admin apps often send camelCase; map to DB column names
+const CAMEL_TO_SNAKE = {
+  acceptFormSubmissions: "accept_form_submissions",
+  disableCvFilter: "disable_cv_filter",
+};
 
-router.patch("/:id", (req, res) => {
-  const jobId = req.params.id;
-  const body = req.body;
-
-  const updateData = {};
-  for (const key of Object.keys(body)) {
-    if (JOB_UPDATE_WHITELIST.includes(key) && body[key] !== undefined) {
-      updateData[key] = body[key];
+const patchOrPutJob = async (req, res) => {
+  try {
+    const jobId = parseInt(req.params.id, 10);
+    if (!jobId || isNaN(jobId)) {
+      return res.status(400).json({ error: "Invalid job id" });
     }
-  }
+    const body = req.body;
 
-  if (Object.keys(updateData).length === 0) {
-    return res.status(400).json({ error: "No fields provided to update" });
-  }
+    console.log("[PATCH/PUT jobs] jobId=" + jobId + " body keys=" + Object.keys(body).join(",") + " accept_form_submissions=" + JSON.stringify(body.accept_form_submissions ?? body.acceptFormSubmissions));
 
-  db("jobs")
-    .where("id", jobId)
-    .update(updateData)
-    .then((count) => {
+    const updateData = {};
+    const booleanFields = new Set(["accept_form_submissions", "disable_cv_filter", "isHelio", "jobIsUrgent", "prioritize", "dont_send_email", "marketing_email_sent", "cv_submissions_email_sent"]);
+    for (const key of Object.keys(body)) {
+      const dbKey = CAMEL_TO_SNAKE[key] || key;
+      if (JOB_UPDATE_WHITELIST.includes(dbKey) && body[key] !== undefined) {
+        let val = body[key];
+        if (booleanFields.has(dbKey)) {
+          val = val === true || val === 1 || val === "true" || val === "1" || val === "on";
+        }
+        updateData[dbKey] = val;
+      }
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: "No fields provided to update" });
+    }
+
+    // Force accept_form_submissions via raw SQL (bypasses any Knex/pg serialization quirks)
+    if (updateData.accept_form_submissions !== undefined) {
+      const boolVal = !!updateData.accept_form_submissions;
+      const rawResult = await db.raw("UPDATE jobs SET accept_form_submissions = ? WHERE id = ?", [boolVal, jobId]);
+      const rowCount = rawResult.rowCount ?? rawResult[1] ?? 0;
+      if (rowCount === 0) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      delete updateData.accept_form_submissions;
+    }
+
+    if (Object.keys(updateData).length > 0) {
+      const count = await db("jobs").where("id", jobId).update(updateData);
       if (count === 0) {
         return res.status(404).json({ error: "Job not found" });
       }
-      res.status(200).json({ message: "Job updated successfully" });
-    })
-    .catch((err) => res.status(500).json({ error: err.message }));
-});
+    }
+
+    res.status(200).json({ message: "Job updated successfully" });
+  } catch (err) {
+    console.error("[PATCH jobs] error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+router.patch("/:id", patchOrPutJob);
+router.put("/:id", patchOrPutJob);
 
 // DELETE route to remove a job
 router.delete("/:id", (req, res) => {

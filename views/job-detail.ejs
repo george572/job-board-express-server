@@ -182,7 +182,7 @@
         <div class="flex items-center gap-2 mb-6"><a href="#!" onclick="history.back(); return false;" class="flex items-center gap-2 cursor-pointer"><svg width="5" height="8" viewBox="0 0 5 8" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M3.86089 7.1124L1.14214 4.39365C1.07964 4.33115 1.03589 4.26865 1.01089 4.20615C0.985889 4.14365 0.973389 4.0749 0.973389 3.9999C0.973389 3.9249 0.985889 3.85615 1.01089 3.79365C1.03589 3.73115 1.07964 3.66865 1.14214 3.60615L3.86089 0.887402C3.89839 0.849902 3.93901 0.821777 3.98276 0.803027C4.02651 0.784277 4.07339 0.774902 4.12339 0.774902C4.22339 0.774902 4.31089 0.809277 4.38589 0.878027C4.46089 0.946777 4.49839 1.0374 4.49839 1.1499V6.8499C4.49839 6.9624 4.46089 7.05303 4.38589 7.12178C4.31089 7.19053 4.22339 7.2249 4.12339 7.2249C4.09839 7.2249 4.01089 7.1874 3.86089 7.1124Z" fill="#151515"></path>
             </svg><span class="text-[14px]">ყველა ვაკანსია</span></a></div>
-        <section class=" bg-white rounded-lg border border-[#EBEBEB] self-start w-full lg:min-w-[360px] p-4 lg:p-8 relative">
+        <section class=" bg-white rounded-lg border border-[#EBEBEB] self-start w-full lg:min-w-[360px] lg:max-w-[360px] p-4 lg:p-8 relative">
           <header>
             <h1 class="mb-0 lg:mb-6 flex items-center gap-2 flex-wrap">
             <span class="text-[16px] text-[#151515] font-bold"><%= 'ვაკანსია' + ' - ' + job.jobName %></span>
@@ -248,8 +248,12 @@
             ვაკანსიის ვადა გაუვიდა
           </div>
           <% } else { %>
-          <div class="hidden lg:block">
+          <div class="hidden lg:flex flex-col items-start justify-center">
             <button id="openDialogBtn" class="bg-[#315EFF] w-[296px] h-[52px] text-white rounded-lg my-8 mb-1 text-[16px] mt-8 <% if (!user) { %>opacity-50 cursor-not-allowed<% } else { %>cursor-pointer<% } %>" <% if (!user) { %>disabled<% } %>> გააგზავნე რეზიუმე </button>
+            <p class="pl-4">ან შეავსე განაცხადის ფორმა</p>
+            <button type="button" id="openFormBtnDesktop" class=" w-[296px] h-[52px] border bg-[#315EFF] text-white rounded-lg text-[14px] font-[300] mt-2">
+              განაცხადის ფორმა
+            </button>
           </div>
           <% } %>
           <% } %>
@@ -306,6 +310,10 @@
       <% } else { %>
       <div>
         <button id="openDialogBtn2" class="bg-[#315EFF] mt-2 w-full min-h-[52px] text-white rounded-lg my-8 mt-0 mb-1 text-[16px] <% if (!user) { %>opacity-50 cursor-not-allowed<% } else { %>cursor-pointer<% } %>" <% if (!user) { %>disabled<% } %>> გააგზავნე რეზიუმე </button>
+        <p class="text-center">ან შეავსე განაცხადის ფორმა</p>
+        <button type="button" id="openFormBtn" class="cursor-pointer min-w-[296px] w-full h-[52px] border bg-[#315EFF] text-white rounded-lg text-[14px] font-[300] mt-2">
+          განაცხადის ფორმა
+        </button>
       </div>
       <% } %>
     </footer>
@@ -391,6 +399,27 @@
       </div>
     </dialog>
     <% } %>
+
+    <!-- Simple form dialog (opens from "განაცხადის ფორმა" button) -->
+    <dialog id="formDialog" class="slide-dialog">
+      <div class="dialog-backdrop" id="formDialogBackdrop"></div>
+      <div class="dialog-panel p-8">
+        <div class="w-full flex justify-between items-center mb-4">
+          <span class="text-[16px] font-[300]">განაცხადის ფორმა</span>
+          <button type="button" id="closeFormDialogBtn" class="cursor-pointer">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1.40098 14L0.000976562 12.6L5.60098 7L0.000976562 1.4L1.40098 0L7.00098 5.6L12.601 0L14.001 1.4L8.40098 7L14.001 12.6L12.601 14L7.00098 8.4L1.40098 14Z" fill="#151515"></path></svg>
+          </button>
+        </div>
+        <form id="simpleFormDialog" class="space-y-3">
+          <input type="hidden" name="job_id" value="<%= job.id %>" />
+          <input type="text" name="applicant_name" required placeholder="სახელი" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px]" />
+          <input type="tel" name="applicant_phone" placeholder="ტელეფონი" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px]" />
+          <textarea name="message" placeholder="ორიოდე სიტყვით თქვენს შესახებ" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] resize-none"></textarea>
+          <button type="submit" class="w-full h-[52px] bg-[#315EFF] text-white rounded-lg text-[16px] font-[300]">გაგზავნა</button>
+        </form>
+        <p id="formSuccessDialog" class="hidden text-[14px] text-green-600 mt-2 text-center">გამოგზავნილია!</p>
+      </div>
+    </dialog>
   </main>
 
   <script>
@@ -827,6 +856,74 @@
     });
   </script>
   <% } %>
+
+  <script>
+    (function() {
+      const jobId = parseInt(document.body.getAttribute('data-job-id') || '0', 10);
+      var formDialog = document.getElementById('formDialog');
+      function openFormDialog() {
+        if (formDialog) {
+          formDialog.showModal();
+          document.body.classList.add('dialog-open');
+          var formBackdrop = document.getElementById('formDialogBackdrop');
+          if (formBackdrop) formBackdrop.classList.add('active');
+        }
+      }
+      function closeFormDialog() {
+        if (formDialog) {
+          var formBackdrop = document.getElementById('formDialogBackdrop');
+          if (formBackdrop) formBackdrop.classList.remove('active');
+          formDialog.close();
+          document.body.classList.remove('dialog-open');
+        }
+      }
+      function submitForm(form, successEl) {
+        const fd = new FormData(form);
+        const body = {
+          job_id: jobId,
+          applicant_name: fd.get('applicant_name') || '',
+          applicant_phone: fd.get('applicant_phone') || '',
+          message: fd.get('message') || ''
+        };
+        fetch('/submit-job-form', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        })
+        .then(function(r) {
+          if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || 'შეცდომა'); });
+          return r.json();
+        })
+        .then(function() {
+          form.reset();
+          if (successEl) { successEl.classList.remove('hidden'); setTimeout(function() { successEl.classList.add('hidden'); }, 3000); }
+          closeFormDialog();
+        })
+        .catch(function(err) {
+          alert(err.message || 'გაგზავნა ვერ მოხერხდა');
+        });
+      }
+      document.addEventListener('DOMContentLoaded', function() {
+        var openFormBtn = document.getElementById('openFormBtn');
+        var openFormBtnDesktop = document.getElementById('openFormBtnDesktop');
+        var closeFormBtn = document.getElementById('closeFormDialogBtn');
+        var formBackdrop = document.getElementById('formDialogBackdrop');
+        if (openFormBtn) openFormBtn.addEventListener('click', openFormDialog);
+        if (openFormBtnDesktop) openFormBtnDesktop.addEventListener('click', openFormDialog);
+        if (closeFormBtn) closeFormBtn.addEventListener('click', closeFormDialog);
+        if (formBackdrop) formBackdrop.addEventListener('click', closeFormDialog);
+        var formPanel = formDialog && formDialog.querySelector('.dialog-panel');
+        if (formPanel) formPanel.addEventListener('click', function(e) { e.stopPropagation(); });
+        var formDialogForm = document.getElementById('simpleFormDialog');
+        if (formDialogForm) {
+          formDialogForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitForm(formDialogForm, document.getElementById('formSuccessDialog'));
+          });
+        }
+      });
+    })();
+  </script>
 
   <!-- Related jobs scroll (prev/next buttons) -->
   <script>

@@ -170,8 +170,11 @@ router.post("/", async (req, res) => {
     const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
     const pdfBase64 = pdfBuffer.toString("base64");
 
-    // Step B & C: Pass to Gemini and assess fit (silent – user always sees success)
-    const isFit = await assessCandidateFit(job, pdfBase64);
+    // Step B & C: Pass to Gemini and assess fit (skip if job.disable_cv_filter)
+    let isFit = true;
+    if (!job.disable_cv_filter) {
+      isFit = await assessCandidateFit(job, pdfBase64);
+    }
     if (!isFit) {
       try {
         await db("cv_refusals").insert({ user_id, job_id: job.id });

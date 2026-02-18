@@ -1151,8 +1151,10 @@ app.get("/vakansia/:slug", async (req, res) => {
         : job.jobName + " at " + job.companyName;
     const jobCanonical =
       "https://samushao.ge/vakansia/" + slugify(job.jobName) + "-" + job.id;
+    const acceptFormSubmissions = job.accept_form_submissions === true || job.accept_form_submissions === 1;
     res.render("job-detail", {
-      job,
+      job: { ...job, accept_form_submissions: acceptFormSubmissions },
+      acceptFormSubmissions,
       relatedJobs,
       slugify,
       userAlreadyApplied,
@@ -1423,6 +1425,10 @@ app.use("/upload-logo", companyLogosRouter);
 // send cv router
 const sendCvRouter = require("./routes/sendCv");
 app.use("/send-cv", sendCvRouter);
+
+// Job form submission (alternative to CV)
+const jobFormSubmitRouter = require("./routes/jobFormSubmit")(db);
+app.use("/submit-job-form", jobFormSubmitRouter);
 
 // Visitors API
 app.post("/api/visitors/record-duration", async (req, res) => {
