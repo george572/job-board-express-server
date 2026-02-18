@@ -1,6 +1,6 @@
 <article class="h-full">
   <a 
-    href="/vakansia/<%= slugify(job.jobName) %>-<%= job.id %>" 
+    href="/vakansia/<%= slugify(job.jobName) %>-<%= job.id %><%= (typeof fromRecommended !== 'undefined' && fromRecommended) ? '?from=recommended' : '' %>" 
     class="block min-w-[300px] h-full rounded-lg cursor-pointer p-4 text-sm border border-[#EBEBEB] text-secondary bg-white hover:shadow-sm transition-shadow flex flex-col"
     data-job-id="<%= job.id %>"
     data-job-title="<%- job.jobName.replace(/\"/g, '&quot;') %>"

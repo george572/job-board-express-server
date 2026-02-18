@@ -41,6 +41,34 @@
   <%- include('partials/header') %>
   <%- include('partials/filters') %>
 
+  <!-- Recommended jobs (personalized, at top – only when we have results) -->
+  <% if (recommendedJobs && recommendedJobs.length > 0) { %>
+  <section id="recommended-jobs-section" class="w-full mx-auto px-4 mt-6 mb-4">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+      <div class="flex flex-col gap-1 flex-1">
+        <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515]">
+          შენთვის რეკომენდებული ვაკანსიები
+        </h2>
+        <a href="/rekomendebuli-vakansiebi" class="text-sm text-[#315EFF] hover:underline">
+          ყველას ნახვა
+        </a>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" class="recommended-prev w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Prev">←</button>
+        <button type="button" class="recommended-next w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Next">→</button>
+      </div>
+    </div>
+    <div id="recommended-scroll" class="recommended-scroll flex w-full items-stretch gap-3 sm:gap-4 overflow-x-auto pb-4 pr-4 snap-x snap-mandatory" 
+    style="scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;">
+    <% recommendedJobs.forEach(job => { %>
+   <div class="recommended-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col">
+     <%- include('partials/jobItemCompact.ejs', { job, slugify, inSlider: true, fromRecommended: true }) %>
+   </div>
+ <% }) %>
+</div>
+  </section>
+  <% } %>
+
   <!-- Top salary jobs (scrollable, hidden when any filter is active) -->
   <% if (topSalaryJobs && topSalaryJobs.length > 0) { %>
   <section id="top-salary-slider-section" class="w-full mx-auto px-4 mt-6 mb-4" style="<%= filtersActive ? 'display:none' : '' %>">
@@ -141,17 +169,13 @@
   <!-- Jobs area (replaced without reload when filters change) -->
   <div id="jobs-area" data-current-page="<%= currentPage || 1 %>" data-total-pages="<%= totalPages || 1 %>">
   <h1 id="all-vacancies-heading" class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1 pb-4 w-full mx-auto px-4" style="<%= filtersActive ? 'display:none' : '' %>">
-    <%= typeof pageType === 'string' && pageType === 'top-salary' ? 'ყველაზე მაღალანაზღაურებადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'top-views' ? 'ყველაზე ნახვადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'today' ? 'დღევანდელი ვაკანსიები' : 'ყველა ვაკანსია')) %>
+    <%= typeof pageType === 'string' && pageType === 'top-salary' ? 'ყველაზე მაღალანაზღაურებადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'top-views' ? 'ყველაზე ნახვადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'today' ? 'დღევანდელი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'recommended' ? 'შენთვის რეკომენდებული ვაკანსიები' : 'ყველა ვაკანსია'))) %>
   </h1>
   <div class="w-full relative mx-auto px-4" id="jobs-container">
     <% if (jobs && jobs.length > 0) { %>
     <% jobs.forEach(job => { %>
-    <%- include('partials/jobItem.ejs', { job, slugify }) %>
+    <%- include('partials/jobItem.ejs', { job, slugify, fromRecommended: typeof pageType !== 'undefined' && pageType === 'recommended' }) %>
     <% }) %>
-    <% } else { %>
-    <div class="text-center py-12">
-      <p class="text-gray-500">სამუშაოები არ მოიძებნა</p>
-    </div>
     <% } %>
   </div>
 
@@ -436,6 +460,16 @@
       });
       if (popularScroll && popularNext) popularNext.addEventListener('click', function () {
         popularScroll.scrollBy({ left: 320, behavior: 'smooth' });
+      });
+
+      var recommendedScroll = document.getElementById('recommended-scroll');
+      var recommendedPrev = document.querySelector('.recommended-prev');
+      var recommendedNext = document.querySelector('.recommended-next');
+      if (recommendedScroll && recommendedPrev) recommendedPrev.addEventListener('click', function () {
+        recommendedScroll.scrollBy({ left: -320, behavior: 'smooth' });
+      });
+      if (recommendedScroll && recommendedNext) recommendedNext.addEventListener('click', function () {
+        recommendedScroll.scrollBy({ left: 320, behavior: 'smooth' });
       });
 
       // Most popular: click tracking

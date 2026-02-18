@@ -24,6 +24,253 @@ const TZ_GEORGIA = "Asia/Tbilisi";
 const DATE_IN_GEORGIA = `(created_at AT TIME ZONE '${TZ_GEORGIA}')::date`;
 const TODAY_IN_GEORGIA = `(NOW() AT TIME ZONE '${TZ_GEORGIA}')::date`;
 
+// Sentinel category ID for personalized recommendations (no jobs have this category_id)
+const RECOMMENDED_CATEGORY_ID = 9999;
+
+/**
+ * Get personalized job recommendations based on visitor's past clicks.
+ * Picks the top N jobs ranked by relevance: category match + title keyword overlap.
+ * Excludes already-clicked jobs. Sort: relevance DESC, then premium/prioritized, then created_at.
+ */
+async function getRecommendedJobs(db, visitorId, opts = {}) {
+  const {
+    limit = 20,
+    offset = 0,
+    min_salary,
+    job_experience,
+    job_type,
+    job_city,
+    searchQuery,
+    userUid,
+  } = opts;
+
+  if (!visitorId && !userUid) {
+    return { jobs: [], total: 0 };
+  }
+
+  const IGNORED_CATEGORY_OTHER = 19;
+  const STOPWORDS = new Set(
+    [
+      "მენეჯერი", "სპეციალისტი", "ასისტენტი", "ოპერატორი", "აგენტი",
+      "წარმომადგენელი", "კონსულტანტი", "ანალიტიკოსი", "ექსპერტი",
+      "შემსრულებელი", "მუშაკი", "თანამშრომელი", "ვაკანსია", "სამუშაო",
+    ].map((x) => x.toLowerCase())
+  );
+
+  const extractWords = (titles) =>
+    titles
+      .flatMap((t) => (t || "").trim().split(/\s+/).filter((w) => w.length >= 4 && !STOPWORDS.has(w.toLowerCase())))
+      .slice(0, 12);
+
+  let clickedJobIdsToExclude = [];
+  let clickedCategoryIds = [];
+  let titleWords = [];
+  let highVisitCategoryIds = [];
+  let clicks = [];
+  if (visitorId) {
+    clicks = await db("visitor_job_clicks")
+      .where("visitor_id", visitorId)
+      .select("job_id", "category_id", "job_title", "from_recommended");
+    if (clicks && clicks.length > 0) {
+      clickedJobIdsToExclude = [...new Set(
+        clicks.filter((c) => !c.from_recommended).map((c) => c.job_id).filter(Boolean)
+      )];
+      clickedCategoryIds = [...new Set(clicks.map((c) => c.category_id).filter((n) => n != null && !isNaN(n)))];
+      titleWords = extractWords(clicks.map((c) => c.job_title));
+      const categoryVisitCounts = {};
+      clicks.forEach((c) => {
+        if (c.category_id != null && !isNaN(c.category_id)) {
+          categoryVisitCounts[c.category_id] = (categoryVisitCounts[c.category_id] || 0) + 1;
+        }
+      });
+      highVisitCategoryIds = Object.keys(categoryVisitCounts)
+        .filter((cid) => categoryVisitCounts[cid] >= 3)
+        .map((n) => parseInt(n, 10));
+    }
+  }
+
+  let cvJobIds = [];
+  let cvCategoryIds = [];
+  let cvTitleWords = [];
+  let cvApplicationsQb = db("job_applications as ja")
+    .join("jobs as j", "j.id", "ja.job_id")
+    .where("j.job_status", "approved")
+    .whereRaw("(j.expires_at IS NULL OR j.expires_at > NOW())")
+    .select("ja.job_id", "j.category_id", "j.jobName");
+  if (visitorId && userUid) {
+    cvApplicationsQb = cvApplicationsQb.andWhere((qb) =>
+      qb.where("ja.visitor_id", visitorId).orWhere("ja.user_id", userUid)
+    );
+  } else if (visitorId) {
+    cvApplicationsQb = cvApplicationsQb.where("ja.visitor_id", visitorId);
+  } else if (userUid) {
+    cvApplicationsQb = cvApplicationsQb.where("ja.user_id", userUid);
+  } else {
+    cvApplicationsQb = cvApplicationsQb.whereRaw("1=0");
+  }
+  const cvApplications = await cvApplicationsQb;
+  if (cvApplications && cvApplications.length > 0) {
+    cvJobIds = [...new Set(cvApplications.map((a) => a.job_id).filter(Boolean))];
+    cvCategoryIds = [...new Set(cvApplications.map((a) => a.category_id).filter((n) => n != null && !isNaN(n)))];
+    cvTitleWords = extractWords(cvApplications.map((a) => a.jobName));
+  }
+
+  const appliedJobIdsToExclude = cvJobIds;
+  const allExclude = [...new Set([...clickedJobIdsToExclude, ...appliedJobIdsToExclude])];
+  const allCategoryIds = [...new Set([...clickedCategoryIds, ...cvCategoryIds])];
+  const kwWords = titleWords.slice(0, 8);
+  const cvKwWords = cvTitleWords.slice(0, 8);
+
+  if (allCategoryIds.length === 0 && kwWords.length === 0 && cvKwWords.length === 0 && highVisitCategoryIds.length === 0) {
+    return { jobs: [], total: 0 };
+  }
+
+  let baseQuery = db("jobs")
+    .select("*")
+    .where("job_status", "approved")
+    .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
+    .whereNot("category_id", IGNORED_CATEGORY_OTHER)
+    .whereNotIn("id", allExclude.length > 0 ? allExclude : [0]);
+
+  if (allCategoryIds.length > 0 || kwWords.length > 0 || cvKwWords.length > 0 || highVisitCategoryIds.length > 0) {
+    baseQuery = baseQuery.andWhere((qb) => {
+      let first = true;
+      if (allCategoryIds.length > 0) {
+        qb.whereIn("category_id", allCategoryIds);
+        first = false;
+      }
+      if (highVisitCategoryIds.length > 0) {
+        const extraCat = highVisitCategoryIds.filter((cid) => !allCategoryIds.includes(cid));
+        if (extraCat.length > 0) {
+          if (first) {
+            qb.whereIn("category_id", highVisitCategoryIds);
+            first = false;
+          } else {
+            qb.orWhereIn("category_id", highVisitCategoryIds);
+          }
+        }
+      }
+      for (const word of kwWords) {
+        const escaped = "%" + String(word).replace(/%/g, "\\%").replace(/_/g, "\\_") + "%";
+        if (first) {
+          qb.whereRaw('"jobName" ILIKE ?', [escaped]);
+          first = false;
+        } else {
+          qb.orWhereRaw('"jobName" ILIKE ?', [escaped]);
+        }
+      }
+      for (const word of cvKwWords) {
+        if (kwWords.includes(word)) continue;
+        const escaped = "%" + String(word).replace(/%/g, "\\%").replace(/_/g, "\\_") + "%";
+        if (first) {
+          qb.whereRaw('"jobName" ILIKE ?', [escaped]);
+          first = false;
+        } else {
+          qb.orWhereRaw('"jobName" ILIKE ?', [escaped]);
+        }
+      }
+    });
+  }
+
+  if (min_salary) {
+    const min = parseInt(min_salary, 10);
+    if (!isNaN(min)) baseQuery = baseQuery.where("jobSalary_min", ">=", min);
+  }
+  if (job_experience) {
+    const exp = Array.isArray(job_experience) ? job_experience : [job_experience];
+    if (exp.length > 0) baseQuery = baseQuery.whereIn("job_experience", exp);
+  }
+  if (job_type) {
+    const types = Array.isArray(job_type) ? job_type : [job_type];
+    if (types.length > 0) baseQuery = baseQuery.whereIn("job_type", types);
+  }
+  if (job_city) {
+    const cities = Array.isArray(job_city) ? job_city : [job_city];
+    if (cities.length > 0) baseQuery = baseQuery.whereIn("job_city", cities);
+  }
+  if (searchQuery && String(searchQuery).trim()) {
+    const term =
+      "%" + String(searchQuery).trim().replace(/%/g, "\\%").replace(/_/g, "\\_") + "%";
+    baseQuery = baseQuery.andWhereRaw(
+      '("jobName" ILIKE ? OR "companyName" ILIKE ? OR COALESCE("jobDescription", \'\') ILIKE ?)',
+      [term, term, term]
+    );
+  }
+
+  const candidates = await baseQuery.limit(500);
+
+  const cvTitles = [...new Set(cvApplications.map((a) => (a.jobName || "").trim()).filter((t) => t.length >= 5))];
+  const clickTitles = [...new Set(clicks.map((c) => (c.job_title || "").trim()).filter((t) => t.length >= 5))];
+
+  function scoreJob(job) {
+    let score = 0;
+    let keywordMatches = 0;
+    if (clickedCategoryIds.length > 0 && clickedCategoryIds.includes(job.category_id)) score += 2;
+    if (cvCategoryIds.length > 0 && cvCategoryIds.includes(job.category_id)) score += 4;
+    if (highVisitCategoryIds.length > 0 && highVisitCategoryIds.includes(job.category_id)) score += 3;
+    const jobNameLower = (job.jobName || "").toLowerCase();
+    for (const phrase of cvTitles.slice(0, 5)) {
+      if (phrase.length >= 6 && jobNameLower.includes(phrase.toLowerCase())) {
+        score += 5;
+        keywordMatches += 1;
+      }
+    }
+    for (const phrase of clickTitles.slice(0, 5)) {
+      if (phrase.length >= 6 && jobNameLower.includes(phrase.toLowerCase())) {
+        score += 3;
+        keywordMatches += 1;
+      }
+    }
+    for (const word of kwWords) {
+      if (jobNameLower.includes(word.toLowerCase())) {
+        score += 1;
+        keywordMatches += 1;
+      }
+    }
+    for (const word of cvKwWords) {
+      if (jobNameLower.includes(word.toLowerCase())) {
+        score += 3;
+        keywordMatches += 1;
+      }
+    }
+    return { score, keywordMatches };
+  }
+
+  const hasKeywordSignal = kwWords.length > 0 || cvKwWords.length > 0;
+  const scored = candidates
+    .map((j) => ({ job: j, ...scoreJob(j) }))
+    .filter((s) => {
+      if (s.score < 2) return false;
+      const isHighVisitCategory = highVisitCategoryIds.length > 0 && highVisitCategoryIds.includes(s.job.category_id);
+      if (hasKeywordSignal && s.keywordMatches === 0 && !isHighVisitCategory) return false;
+      return true;
+    });
+  scored.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    const ap = a.job.prioritize === true || a.job.prioritize === 1 || ["premium", "premiumPlus"].includes(a.job.job_premium_status);
+    const bp = b.job.prioritize === true || b.job.prioritize === 1 || ["premium", "premiumPlus"].includes(b.job.job_premium_status);
+    if (bp !== ap) return ap ? 1 : -1;
+    const aOrd = a.job.job_premium_status === "premiumPlus" ? 1 : a.job.job_premium_status === "premium" ? 2 : 3;
+    const bOrd = b.job.job_premium_status === "premiumPlus" ? 1 : b.job.job_premium_status === "premium" ? 2 : 3;
+    if (aOrd !== bOrd) return aOrd - bOrd;
+    return new Date(b.job.created_at) - new Date(a.job.created_at);
+  });
+
+  const seenKey = new Set();
+  const deduped = [];
+  for (const { job } of scored) {
+    const key = String(job.jobName || "").trim() + "|" + String(job.companyName || "").trim();
+    if (seenKey.has(key)) continue;
+    seenKey.add(key);
+    deduped.push(job);
+  }
+
+  const total = deduped.length;
+  const jobs = deduped.slice(offset, offset + limit);
+
+  return { jobs, total };
+}
+
 // Behind Fly/Heroku we must trust the proxy so secure cookies work
 if (process.env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
@@ -245,6 +492,19 @@ app.get("/", async (req, res) => {
       ? limit
       : pageNum * limit;
 
+    // Recommended jobs at top (personalized by visitor clicks + CV sends) – only when no filters
+    let recommendedJobs = [];
+    if (!filtersActive && (req.visitorId || req.session?.user?.uid)) {
+      const rec = await getRecommendedJobs(db, req.visitorId, {
+        limit: 20,
+        offset: 0,
+        userUid: req.session?.user?.uid,
+      });
+      if (rec.jobs && rec.jobs.length > 0) {
+        recommendedJobs = rec.jobs;
+      }
+    }
+
     // Top salary jobs slider – skip when any filters are active
     let topSalaryJobs = [];
     let topSalaryTotalCount = 0;
@@ -465,6 +725,7 @@ app.get("/", async (req, res) => {
     const canonical = baseUrl + (pageNum === 1 ? "/" : "/?page=" + pageNum);
     res.render("index", {
       jobs,
+      recommendedJobs,
       topSalaryJobs,
       topSalaryTotalCount,
       topPopularJobs,
@@ -691,6 +952,48 @@ app.get("/dgevandeli-vakansiebi", async (req, res) => {
   }
 });
 
+// Recommended jobs page (შენთვის რეკომენდებული ვაკანსიები)
+app.get("/rekomendebuli-vakansiebi", async (req, res) => {
+  try {
+    const rec = await getRecommendedJobs(db, req.visitorId, {
+      limit: 100,
+      offset: 0,
+      userUid: req.session?.user?.uid,
+    });
+    const jobs = rec.jobs || [];
+
+    res.render("index", {
+      jobs,
+      recommendedJobs: [],
+      topSalaryJobs: [],
+      topSalaryTotalCount: 0,
+      topPopularJobs: [],
+      topPopularTotalCount: 0,
+      todayJobs: [],
+      todayJobsCount: 0,
+      currentPage: 1,
+      totalPages: 1,
+      totalJobs: jobs.length,
+      filters: {},
+      filtersActive: false,
+      pageType: "recommended",
+      paginationBase: "/rekomendebuli-vakansiebi",
+      slugify,
+      seo: {
+        title: "შენთვის რეკომენდებული ვაკანსიები | Samushao.ge",
+        description:
+          "ვაკანსიები რომლებიც შეესაბამება იმას რაც უკვე დაინტერესებული იყავი.",
+        canonical: "https://samushao.ge/rekomendebuli-vakansiebi",
+        ogImage:
+          "https://res.cloudinary.com/dd7gz0aqv/image/upload/v1743605652/export_l1wpwr.png",
+      },
+    });
+  } catch (err) {
+    console.error("rekomendebuli-vakansiebi error:", err);
+    res.status(500).send(err.message);
+  }
+});
+
 // Privacy policy page
 app.get("/privacy-policy", (req, res) => {
   res.render("privacy-policy", {
@@ -804,13 +1107,15 @@ app.get("/vakansia/:slug", async (req, res) => {
         job_city: job.job_city || null,
         job_experience: job.job_experience || null,
         job_type: job.job_type || null,
+        from_recommended: req.query.from === "recommended",
       });
     }
 
     // Generate correct slug and redirect if URL doesn't match
     const correctSlug = slugify(job.jobName) + "-" + job.id;
     if (slug !== correctSlug) {
-      return res.redirect(301, `/vakansia/${correctSlug}`);
+      const qs = req.query.from === "recommended" ? "?from=recommended" : "";
+      return res.redirect(301, `/vakansia/${correctSlug}${qs}`);
     }
 
     // Related jobs: same category OR prioritized (from any category); prioritized and same-category first

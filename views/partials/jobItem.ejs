@@ -1,7 +1,7 @@
 <article data-job-id="<%= job.id %>">
   <!-- badges -->
   <a 
-    href="/vakansia/<%= slugify(job.jobName) %>-<%= job.id %>" 
+    href="/vakansia/<%= slugify(job.jobName) %>-<%= job.id %><%= (typeof fromRecommended !== 'undefined' && fromRecommended) ? '?from=recommended' : '' %>" 
     class="mx-auto my-4 mt-0 rounded-lg cursor-pointer p-6 sm:pb-6 text-sm flex flex-col sm:flex-row justify-center items-start md:items-center gap-8 border border-[#EBEBEB] text-secondary relative bg-white"
     data-job-id="<%= job.id %>"
     data-job-title="<%- job.jobName.replace(/\"/g, '&quot;') %>"
