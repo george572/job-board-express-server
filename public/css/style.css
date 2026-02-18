@@ -348,9 +348,6 @@
   .ml-1 {
     margin-left: calc(var(--spacing) * 1);
   }
-  .box-border {
-    box-sizing: border-box;
-  }
   .line-clamp-2 {
     overflow: hidden;
     display: -webkit-box;
@@ -464,9 +461,6 @@
   .w-\[296px\] {
     width: 296px;
   }
-  .w-auto {
-    width: auto;
-  }
   .w-full {
     width: 100%;
   }
@@ -520,9 +514,6 @@
   }
   .min-w-\[296px\] {
     min-width: 296px;
-  }
-  .min-w-\[300px\] {
-    min-width: 300px;
   }
   .flex-1 {
     flex: 1;
@@ -1133,11 +1124,6 @@
   .sm\:gap-8 {
     @media (width >= 40rem) {
       gap: calc(var(--spacing) * 8);
-    }
-  }
-  .sm\:pb-6 {
-    @media (width >= 40rem) {
-      padding-bottom: calc(var(--spacing) * 6);
     }
   }
   .sm\:text-base {

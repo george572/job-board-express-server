@@ -17,7 +17,13 @@
     "clean-descriptions": "node scripts/clean-job-descriptions.js",
     "send-propositional-emails": "node scripts/send-propositional-emails.js",
     "send-new-job-zero-cv": "node scripts/send-new-job-emails-to-zero-cv.js",
-    "clean-descriptions:apply": "node scripts/clean-job-descriptions.js --apply"
+    "clean-descriptions:apply": "node scripts/clean-job-descriptions.js --apply",
+    "recategorize-other": "node scripts/recategorize-other-jobs.js",
+    "recategorize-other:apply": "node scripts/recategorize-other-jobs.js --apply",
+    "assign-hr-jobs": "node scripts/assign-hr-jobs.js",
+    "assign-hr-jobs:apply": "node scripts/assign-hr-jobs.js --apply",
+    "revert-wrong-hr-jobs": "node scripts/revert-wrong-hr-jobs.js",
+    "revert-wrong-hr-jobs:apply": "node scripts/revert-wrong-hr-jobs.js --apply"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

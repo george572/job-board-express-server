@@ -49,7 +49,7 @@ async function cleanWithGemini(text) {
     throw new Error("GEMINI_API_KEY is missing in .env");
   }
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
   const prompt = CLEAN_PROMPT + "\n\n---\n\n" + text;
   const result = await model.generateContent(prompt);
   const response = result.response;

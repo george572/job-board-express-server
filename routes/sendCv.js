@@ -87,7 +87,7 @@ async function assessCandidateFit(job, pdfBase64) {
     throw new Error("GEMINI_CV_READER_API_KEY or GEMINI_API_KEY is missing in .env");
   }
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
   const jobDetails = [
     `Job title: ${job.jobName || "N/A"}`,
