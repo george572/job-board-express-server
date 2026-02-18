@@ -340,8 +340,14 @@ if (process.env.NODE_ENV === "production") {
 app.use(session(sessionOptions));
 
 // Then your res.locals middleware
+const ENLISTED_FB_COOKIE = "enlisted_fb";
+function hasEnlistedFbCookie(req) {
+  const raw = req?.headers?.cookie || "";
+  return new RegExp(`\\b${ENLISTED_FB_COOKIE}=([^;]+)`).test(raw);
+}
 app.use((req, res, next) => {
   res.locals.user = req.session?.user || null;
+  res.locals.enlistedInFb = hasEnlistedFbCookie(req);
   next();
 });
 
@@ -1251,7 +1257,34 @@ cloudinary.config({
   api_secret: "gRBZZuGtsxALJlZ7sxh8SCwgTVw",
 });
 
-// login router
+// FB promo enlist: record click, set cookie, redirect to Facebook
+const FB_GROUP_URL = "https://www.facebook.com/groups/964592739202329";
+app.get("/api/enlist-fb", async (req, res) => {
+  try {
+    if (!hasEnlistedFbCookie(req)) {
+      await db("enlisted_in_fb").insert({});
+      res.cookie(ENLISTED_FB_COOKIE, "1", {
+        maxAge: 365 * 24 * 60 * 60,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+      });
+    }
+  } catch (err) {
+    console.error("enlist-fb error:", err);
+  }
+  res.redirect(302, FB_GROUP_URL);
+});
+app.get("/api/enlist-fb/count", async (req, res) => {
+  try {
+    const [{ count }] = await db("enlisted_in_fb").count("id as count");
+    res.json({ count: parseInt(count, 10) || 0 });
+  } catch (err) {
+    console.error("enlist-fb count error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Filter counts (contextual: when category=2 active, other counts reflect jobs in that category)
 app.get("/api/filter-counts", async (req, res) => {
   try {
