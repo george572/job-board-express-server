@@ -168,6 +168,7 @@
 
   <!-- Jobs area (replaced without reload when filters change) -->
   <div id="jobs-area" data-current-page="<%= currentPage || 1 %>" data-total-pages="<%= totalPages || 1 %>">
+  <%- include('partials/facebookPromo') %>
   <h1 id="all-vacancies-heading" class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1 pb-4 w-full mx-auto px-4" style="<%= filtersActive ? 'display:none' : '' %>">
     <%= typeof pageType === 'string' && pageType === 'top-salary' ? 'ყველაზე მაღალანაზღაურებადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'top-views' ? 'ყველაზე ნახვადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'today' ? 'დღევანდელი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'recommended' ? 'შენთვის რეკომენდებული ვაკანსიები' : 'ყველა ვაკანსია'))) %>
   </h1>

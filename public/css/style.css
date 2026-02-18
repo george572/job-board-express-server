@@ -348,6 +348,9 @@
   .ml-1 {
     margin-left: calc(var(--spacing) * 1);
   }
+  .box-border {
+    box-sizing: border-box;
+  }
   .line-clamp-2 {
     overflow: hidden;
     display: -webkit-box;
@@ -461,8 +464,14 @@
   .w-\[296px\] {
     width: 296px;
   }
+  .w-auto {
+    width: auto;
+  }
   .w-full {
     width: 100%;
+  }
+  .w-max {
+    width: max-content;
   }
   .max-w-4xl {
     max-width: var(--container-4xl);
@@ -475,6 +484,9 @@
   }
   .max-w-\[300px\] {
     max-width: 300px;
+  }
+  .max-w-\[450px\] {
+    max-width: 450px;
   }
   .max-w-\[744px\] {
     max-width: 744px;
@@ -502,6 +514,9 @@
   }
   .min-w-\[48px\] {
     min-width: 48px;
+  }
+  .min-w-\[280px\] {
+    min-width: 280px;
   }
   .min-w-\[296px\] {
     min-width: 296px;

@@ -271,6 +271,8 @@
       </section>
     </article>
 
+    <%- include('partials/facebookPromo') %>
+
     <!-- Related jobs slider (same category) -->
     <% if (typeof relatedJobs !== 'undefined' && relatedJobs && relatedJobs.length > 0) { %>
     <section class="w-full mx-auto px-4 mt-8 mb-8">
@@ -286,7 +288,7 @@
         </div>
         <div id="related-jobs-scroll" class="related-jobs-scroll flex w-full items-stretch gap-3 sm:gap-4 overflow-x-auto pb-4 pl-6 pr-4 snap-x snap-mandatory" style="scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;">
           <% relatedJobs.forEach(function(relJob) { %>
-          <div class="related-jobs-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col">
+          <div class="related-jobs-card flex flex-shrink-0 min-w-[280px] w-max max-w-[450px] snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col">
             <%- include('partials/jobItemCompact.ejs', { job: relJob, slugify }) %>
           </div>
           <% }); %>
