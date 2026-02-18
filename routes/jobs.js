@@ -158,8 +158,13 @@ async function getQueueCount() {
 }
 
 // Start processor on startup if queue has items
+const RETRY_WHEN_NO_TRANSPORTER_MS = 5 * 60 * 1000; // 5 min
+const MAX_WAIT_BEFORE_RECHECK_MS = 5 * 60 * 1000;   // Wake every 5 min when all items deferred (survives restarts)
+
 (async () => {
   const n = await getQueueCount();
+  const transportOk = !!newJobTransporter;
+  console.log(`[Email queue] Startup: ${n} items in queue, transporter: ${transportOk ? "configured" : "NOT CONFIGURED (set PROPOSITIONAL_MAIL_USER/PASS)"}`);
   if (n > 0) {
     newJobEmailProcessorScheduled = true;
     processNewJobEmailQueue();
@@ -200,10 +205,12 @@ async function processNewJobEmailQueue() {
     if (!row) {
       const nextRow = await db("new_job_email_queue").select("send_after").orderBy("send_after").first();
       if (nextRow) {
-        const waitMs = Math.max(
-          MIN_DELAY_BETWEEN_SENDS_MS,
-          new Date(nextRow.send_after).getTime() - Date.now()
+        const idealWait = new Date(nextRow.send_after).getTime() - Date.now();
+        const waitMs = Math.min(
+          Math.max(MIN_DELAY_BETWEEN_SENDS_MS, idealWait),
+          MAX_WAIT_BEFORE_RECHECK_MS
         );
+        console.log(`[Email queue] All ${count} items scheduled for later; recheck in ${Math.round(waitMs / 1000)}s`);
         newJobEmailProcessorScheduled = true;
         setTimeout(processNewJobEmailQueue, waitMs);
       } else {
@@ -247,32 +254,35 @@ async function processNewJobEmailQueue() {
     }
 
     if (companyEmail && (await hasRecentlySentToCompany(companyEmail))) {
+      console.log(`[Email queue] Skip job #${row.job_id} → ${companyEmail}: already sent in last 24h`);
       await db("new_job_email_queue").where("id", row.queue_id).del();
       processNewJobEmailQueue();
       return;
     }
     const claimed = companyEmail && (await claimAndSendToCompany(companyEmail));
     if (companyEmail && !claimed) {
+      console.log(`[Email queue] Skip job #${row.job_id} → ${companyEmail}: claim failed (another process or rate limit)`);
       await db("new_job_email_queue").where("id", row.queue_id).del();
       processNewJobEmailQueue();
       return;
     }
     if (!newJobTransporter) {
-      await db("new_job_email_queue").where("id", row.queue_id).del();
-      processNewJobEmailQueue();
+      console.error("[Email queue] PROPOSITIONAL_MAIL_USER/PASS not set – NOT deleting queue item, will retry in 5 min. Set env vars to send emails.");
+      newJobEmailProcessorScheduled = true;
+      setTimeout(processNewJobEmailQueue, RETRY_WHEN_NO_TRANSPORTER_MS);
       return;
     }
     const job = {
       id: row.job_id,
       jobName: row.jobName,
       companyName: row.companyName,
-      company_email: row.company_email,
+      company_email: row.company_email || companyEmail,
       jobSalary: row.jobSalary,
       jobSalary_min: row.jobSalary_min,
     };
     newJobEmailLastSentAt = Date.now();
     const jobLink = `${SITE_BASE_URL}/vakansia/${slugify(job.jobName)}-${job.id}`;
-    const toEmail = (job.company_email || "").trim().split(/[,;]/)[0].trim();
+    const toEmail = (job.company_email || "").trim().split(/[,;]/)[0].trim() || companyEmail;
     const mailOptions = {
       from: NEW_JOB_MAIL_USER,
       to: toEmail || job.company_email?.trim(),
