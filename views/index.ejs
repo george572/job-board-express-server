@@ -49,7 +49,7 @@
         <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515]">
           შენთვის რეკომენდებული ვაკანსიები
         </h2>
-        <a href="/rekomendebuli-vakansiebi" class="text-sm text-[#315EFF] hover:underline">
+        <a id="recommended-see-all-link" href="/rekomendebuli-vakansiebi" class="text-sm text-[#315EFF] hover:underline">
           ყველას ნახვა
         </a>
       </div>
@@ -471,6 +471,59 @@
       if (recommendedScroll && recommendedNext) recommendedNext.addEventListener('click', function () {
         recommendedScroll.scrollBy({ left: 320, behavior: 'smooth' });
       });
+
+      // Recommended: job click tracking
+      const recommendedCards = document.querySelectorAll('.recommended-card a[data-job-id]');
+      recommendedCards.forEach(function (card) {
+        card.addEventListener('click', function () {
+          try {
+            if (window.amplitude) {
+              const categoryId = this.getAttribute('data-job-category');
+              window.amplitude.track('Recommended Job Clicked', {
+                job_id: this.getAttribute('data-job-id'),
+                job_category: categoryNames[categoryId] || categoryId,
+                job_title: this.getAttribute('data-job-title'),
+                salary_range: this.getAttribute('data-salary-range'),
+                title: this.getAttribute('data-job-title'),
+                company: this.getAttribute('data-job-company'),
+                location: this.getAttribute('data-job-location')
+              });
+            }
+          } catch (e) {}
+        });
+      });
+
+      // Recommended: swipe/scroll tracking
+      if (recommendedScroll) {
+        var lastRecommendedScrollLeft = recommendedScroll.scrollLeft;
+        var recommendedScrollTimeout;
+        recommendedScroll.addEventListener('scroll', function () {
+          clearTimeout(recommendedScrollTimeout);
+          recommendedScrollTimeout = setTimeout(function () {
+            var now = recommendedScroll.scrollLeft;
+            if (now !== lastRecommendedScrollLeft && window.amplitude) {
+              try {
+                window.amplitude.track('Recommended Slider Swiped', {
+                  direction: now > lastRecommendedScrollLeft ? 'left' : 'right'
+                });
+              } catch (e) {}
+              lastRecommendedScrollLeft = now;
+            }
+          }, 150);
+        });
+      }
+
+      // Recommended: "See all" click tracking
+      const recommendedSeeAllLink = document.getElementById('recommended-see-all-link');
+      if (recommendedSeeAllLink) {
+        recommendedSeeAllLink.addEventListener('click', function () {
+          try {
+            if (window.amplitude) {
+              window.amplitude.track('Recommended See All Clicked');
+            }
+          } catch (e) {}
+        });
+      }
 
       // Most popular: click tracking
       const popularCards = document.querySelectorAll('.top-popular-card a[data-job-id]');
