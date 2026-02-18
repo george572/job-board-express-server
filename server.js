@@ -9,7 +9,8 @@ const knex = require("knex");
 const knexfile = require("./knexfile");
 const environment = process.env.NODE_ENV || "development";
 const db = knex(knexfile[environment]);
-const { slugify, extractIdFromSlug } = require("./utils/slugify"); // ← Add this
+const { slugify, extractIdFromSlug } = require("./utils/slugify");
+const { parseJobIdsFromCookie } = require("./utils/formSubmittedCookie");
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -1181,13 +1182,15 @@ app.get("/vakansia/:slug", async (req, res) => {
       userAlreadyApplied = !!application;
     }
 
-    // Has this user/visitor already submitted the simple form?
-    let userAlreadySubmittedForm = false;
-    const formSubQ = db("job_form_submissions").where("job_id", jobId);
-    if (req.session?.user?.uid) {
-      userAlreadySubmittedForm = !!(await formSubQ.clone().where("user_id", req.session.user.uid).first());
-    } else if (req.visitorId) {
-      userAlreadySubmittedForm = !!(await formSubQ.clone().where("visitor_id", req.visitorId).first());
+    // Has this user/visitor already submitted the simple form? (DB + cookie)
+    let userAlreadySubmittedForm = parseJobIdsFromCookie(req).has(jobId);
+    if (!userAlreadySubmittedForm) {
+      const formSubQ = db("job_form_submissions").where("job_id", jobId);
+      if (req.session?.user?.uid) {
+        userAlreadySubmittedForm = !!(await formSubQ.clone().where("user_id", req.session.user.uid).first());
+      } else if (req.visitorId) {
+        userAlreadySubmittedForm = !!(await formSubQ.clone().where("visitor_id", req.visitorId).first());
+      }
     }
 
     const jobDescription =

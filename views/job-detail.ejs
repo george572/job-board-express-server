@@ -903,7 +903,10 @@
           body: JSON.stringify(body)
         })
         .then(function(r) {
-          if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || 'შეცდომა'); });
+          if (!r.ok) return r.json().then(function(d) {
+            if (r.status === 400 && /უკვე გააგზავნეთ/.test(d.error || '')) setAppliedState();
+            throw new Error(d.error || 'შეცდომა');
+          });
           return r.json();
         })
         .then(function() {

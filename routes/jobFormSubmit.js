@@ -8,6 +8,7 @@ const nodemailer = require("nodemailer");
 const path = require("path");
 
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+const { parseJobIdsFromCookie, setFormSubmittedCookie } = require("../utils/formSubmittedCookie");
 
 module.exports = (db) => {
 const router = express.Router();
@@ -57,6 +58,20 @@ router.post("/", async (req, res) => {
       return res.status(410).json({ error: "This vacancy has expired" });
     }
 
+    // Block duplicate submissions: cookie + DB
+    const cookieIds = parseJobIdsFromCookie(req);
+    if (cookieIds.has(jobId)) {
+      return res.status(400).json({ error: "თქვენ უკვე გააგზავნეთ განაცხადი ამ ვაკანსიაზე" });
+    }
+    const formSubQ = db("job_form_submissions").where("job_id", jobId);
+    if (req.session?.user?.uid) {
+      const existing = await formSubQ.clone().where("user_id", req.session.user.uid).first();
+      if (existing) return res.status(400).json({ error: "თქვენ უკვე გააგზავნეთ განაცხადი ამ ვაკანსიაზე" });
+    } else if (req.visitorId) {
+      const existing = await formSubQ.clone().where("visitor_id", req.visitorId).first();
+      if (existing) return res.status(400).json({ error: "თქვენ უკვე გააგზავნეთ განაცხადი ამ ვაკანსიაზე" });
+    }
+
     const insertPayload = {
       job_id: jobId,
       applicant_name: name,
@@ -89,6 +104,8 @@ router.post("/", async (req, res) => {
 <p>სახელი: ${name}</p>${phoneStr}${msgStr}`,
       });
     }
+
+    setFormSubmittedCookie(res, cookieIds, jobId);
 
     return res.json({
       message: "Form submitted successfully",
