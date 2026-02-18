@@ -498,12 +498,19 @@ router.get("/", async (req, res) => {
   }
 });
 
-// admin only
+// admin only – optional ?q= filters by HR email, job name, or company name
 router.get("/adm", async (req, res) => {
   try {
-    const rows = await db("jobs")
-      .select("*")
-      .orderBy("created_at", "desc");
+    const q = String(req.query.q || "").trim();
+    let query = db("jobs").select("*").orderBy("created_at", "desc");
+    if (q) {
+      const pattern = "%" + q.replace(/%/g, "\\%").replace(/_/g, "\\_") + "%";
+      query = query.whereRaw(
+        '"company_email" ILIKE ? OR "jobName" ILIKE ? OR "companyName" ILIKE ?',
+        [pattern, pattern, pattern]
+      );
+    }
+    const rows = await query;
     const jobIds = rows.map((r) => r.id);
     if (jobIds.length === 0) {
       return res.json({ data: rows.map((j) => ({ ...j, cv_stats: { tried: 0, succeeded: 0, failed: 0 }, cv_accepted: [], cv_refused: [] })) });
