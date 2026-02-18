@@ -374,6 +374,14 @@ app.use(
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static("uploads"));
 
+// Redirect trailing slash to clean URL (prevents duplicate canonicals)
+app.use((req, res, next) => {
+  if (req.path.endsWith("/") && req.path.length > 1) {
+    return res.redirect(301, req.path.slice(0, -1) + (req.url.slice(req.path.length) || ""));
+  }
+  next();
+});
+
 // Set up view engine
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
@@ -1165,11 +1173,15 @@ app.get("/vakansia/:slug", async (req, res) => {
       });
     }
 
-    // Generate correct slug and redirect if URL doesn't match
+    // Generate correct slug and redirect if URL doesn't match (always to clean URL for SEO)
     const correctSlug = slugify(job.jobName) + "-" + job.id;
     if (slug !== correctSlug) {
-      const qs = req.query.from === "recommended" ? "?from=recommended" : "";
-      return res.redirect(301, `/vakansia/${correctSlug}${qs}`);
+      return res.redirect(301, `/vakansia/${correctSlug}`);
+    }
+
+    // Redirect ?from=recommended etc. to clean URL – prevents "Duplicate, Google chose different canonical"
+    if (Object.keys(req.query).length > 0) {
+      return res.redirect(301, `/vakansia/${correctSlug}`);
     }
 
     // Related jobs: same category OR prioritized/premium (from any category); premium in slot 2
