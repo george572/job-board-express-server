@@ -2,7 +2,7 @@
   <!-- badges -->
   <a 
     href="/vakansia/<%= slugify(job.jobName) %>-<%= job.id %><%= (typeof fromRecommended !== 'undefined' && fromRecommended) ? '?from=recommended' : '' %>" 
-    class="mx-auto my-4 mt-0 rounded-lg cursor-pointer p-6 sm:pb-6 text-sm flex flex-col sm:flex-row justify-center items-start md:items-center gap-8 border border-[#EBEBEB] text-secondary relative bg-white"
+    class="mx-auto my-4 mt-0 rounded-lg cursor-pointer text-sm flex flex-col justify-start items-start gap-2 text-secondary relative bg-white <%= (job.job_premium_status === 'premium' || job.job_premium_status === 'premiumPlus') ? 'pt-2 px-6 pb-6 border-2 border-[#315EFF]' : 'p-6 border border-[#EBEBEB]' %>"
     data-job-id="<%= job.id %>"
     data-job-title="<%- job.jobName.replace(/\"/g, '&quot;') %>"
     data-job-company="<%- job.companyName.replace(/\"/g, '&quot;') %>"
@@ -10,6 +10,8 @@
     data-job-category="<%- (job.category_id || '').toString().replace(/\"/g, '&quot;') %>"
     data-salary-range="<%- (job.jobSalary || '').replace(/\"/g, '&quot;') %>"
   >
+    <% if (job.job_premium_status === 'premiumPlus' || job.job_premium_status === 'premium') { %><div class="w-full flex-shrink-0"><span class="text-[10px] px-1.5 py-0.5 rounded bg-[#315EFF] text-white font-[400]"><%= job.job_premium_status === 'premiumPlus' ? 'პრემიუმ+' : 'პრემიუმი' %></span></div><% } %>
+    <div class="flex flex-col sm:flex-row w-full gap-8">
     <header class="w-full md:w-1/3 text-sm flex justify-between">
       <div class="flex gap-2 items-center">
         <% if (job.company_logo) { %>
@@ -65,7 +67,7 @@
       </div>
     </section>
 
-    <footer class="block w-full md:w-1/3 text-[12px] text-start md:text-end">
+    <footer class="block w-full md:w-1/3 text-[12px] text-start md:text-end flex-shrink-0">
       <time class="font-[500] mb-4">
         <% 
         const startDate = new Date(job.created_at);
@@ -78,6 +80,7 @@
         <%= startFormatted %> - <%= endFormatted %>
       </time>
     </footer>
+    </div>
   </a>
 
   <div class="flex w-full md:w-auto items-center"></div>

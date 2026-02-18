@@ -247,9 +247,12 @@ async function getRecommendedJobs(db, visitorId, opts = {}) {
     });
   scored.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
-    const ap = a.job.prioritize === true || a.job.prioritize === 1 || ["premium", "premiumPlus"].includes(a.job.job_premium_status);
-    const bp = b.job.prioritize === true || b.job.prioritize === 1 || ["premium", "premiumPlus"].includes(b.job.job_premium_status);
-    if (bp !== ap) return ap ? 1 : -1;
+    const aPremium = ["premium", "premiumPlus"].includes(a.job.job_premium_status);
+    const bPremium = ["premium", "premiumPlus"].includes(b.job.job_premium_status);
+    if (aPremium !== bPremium) return aPremium ? -1 : 1;
+    const aPrior = a.job.prioritize === true || a.job.prioritize === 1;
+    const bPrior = b.job.prioritize === true || b.job.prioritize === 1;
+    if (aPrior !== bPrior) return aPrior ? -1 : 1;
     const aOrd = a.job.job_premium_status === "premiumPlus" ? 1 : a.job.job_premium_status === "premium" ? 2 : 3;
     const bOrd = b.job.job_premium_status === "premiumPlus" ? 1 : b.job.job_premium_status === "premium" ? 2 : 3;
     if (aOrd !== bOrd) return aOrd - bOrd;
@@ -266,7 +269,19 @@ async function getRecommendedJobs(db, visitorId, opts = {}) {
   }
 
   const total = deduped.length;
-  const jobs = deduped.slice(offset, offset + limit);
+  let jobs = deduped.slice(offset, offset + limit);
+
+  // Premium (not prioritized) in second position: move first premium job to slot 2 (index 1)
+  if (jobs.length >= 2) {
+    const isPremium = (j) => ["premium", "premiumPlus"].includes(j.job_premium_status);
+    const premiumIdx = jobs.findIndex((j) => isPremium(j));
+    if (premiumIdx > 1) {
+      const [first, , ...rest] = jobs;
+      const premium = jobs[premiumIdx];
+      const restWithoutPremium = jobs.filter((_, i) => i !== 0 && i !== premiumIdx);
+      jobs = [first, premium, ...restWithoutPremium];
+    }
+  }
 
   return { jobs, total };
 }
@@ -513,8 +528,8 @@ app.get("/", async (req, res) => {
     let todayJobs = [];
     let todayJobsCount = 0;
     if (!filtersActive) {
-      // Top salary: slot 1 = highest paid (prefer non-prioritized); slots 2-3 = prioritized with salary (fetched separately so today's jobs qualify)
-        const isPrioritized = (j) => j.prioritize === true || j.prioritize === 1 || j.prioritize === "true";
+      // Top salary: slot 1 = highest paid non-boosted; slots 2-3 = premium first, then prioritized (premium > prioritize)
+        const isBoosted = (j) => j.prioritize === true || j.prioritize === 1 || j.prioritize === "true" || ["premium", "premiumPlus"].includes(j.job_premium_status);
         let topSalaryRaw = await db("jobs")
           .select("*")
           .where("job_status", "approved")
@@ -526,8 +541,9 @@ app.get("/", async (req, res) => {
           .select("*")
           .where("job_status", "approved")
           .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
-          .where("prioritize", true)
+          .where((qb) => qb.where("prioritize", true).orWhereIn("job_premium_status", ["premium", "premiumPlus"]))
           .whereNotNull("jobSalary_min")
+          .orderByRaw(`CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 ELSE 3 END`)
           .orderBy("jobSalary_min", "desc")
           .limit(2);
         const topSeen = new Set();
@@ -546,15 +562,28 @@ app.get("/", async (req, res) => {
             dedupePrioritized.push(j);
           }
         }
-        const nonPrioritized = topSalaryRaw.filter((j) => !isPrioritized(j));
-        const slot1 = (nonPrioritized[0] || topSalaryRaw[0]);
+        const nonBoosted = topSalaryRaw.filter((j) => !isBoosted(j));
+        const slot1 = (nonBoosted[0] || topSalaryRaw[0]);
         const prioritizedFor23 = dedupePrioritized.slice(0, 2);
         const usedIds = new Set([slot1?.id, ...prioritizedFor23.map((j) => j.id)].filter(Boolean));
         const restBySalary = topSalaryRaw.filter((j) => !usedIds.has(j.id));
-        topSalaryJobs = [slot1, ...prioritizedFor23, ...restBySalary].filter(Boolean).slice(0, 20);
+        const minPremiumSalaryForTopSalary = 2000;
+        const includePremiumInTopSalary = (j) => {
+          if (!j) return false;
+          const isPremium = ["premium", "premiumPlus"].includes(j.job_premium_status);
+          if (isPremium) {
+            const salary = parseInt(j.jobSalary_min, 10) || 0;
+            return salary >= minPremiumSalaryForTopSalary;
+          }
+          return true;
+        };
+        topSalaryJobs = [slot1, ...prioritizedFor23, ...restBySalary]
+          .filter(Boolean)
+          .filter(includePremiumInTopSalary)
+          .slice(0, 20);
         topSalaryTotalCount = topSalaryJobs.length;
 
-      // Top popular (most viewed): slot 1 = most viewed non-prioritized; slots 2-3 = prioritized (regardless of views)
+      // Top popular: slot 1 = most viewed non-boosted; slots 2-3 = premium first, then prioritized
         let topPopularRaw = await db("jobs")
           .select("*")
           .where("job_status", "approved")
@@ -565,7 +594,8 @@ app.get("/", async (req, res) => {
           .select("*")
           .where("job_status", "approved")
           .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
-          .where("prioritize", true)
+          .where((qb) => qb.where("prioritize", true).orWhereIn("job_premium_status", ["premium", "premiumPlus"]))
+          .orderByRaw(`CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 ELSE 3 END`)
           .orderByRaw("COALESCE(view_count, 0) DESC")
           .limit(2);
         const seenPop = new Set();
@@ -584,8 +614,8 @@ app.get("/", async (req, res) => {
             dedupePrioritizedPop.push(j);
           }
         }
-        const nonPrioritizedPop = topPopularRaw.filter((j) => !isPrioritized(j));
-        const slot1Pop = (nonPrioritizedPop[0] || topPopularRaw[0]);
+        const nonBoostedPop = topPopularRaw.filter((j) => !isBoosted(j));
+        const slot1Pop = (nonBoostedPop[0] || topPopularRaw[0]);
         const prioritizedFor23Pop = dedupePrioritizedPop.slice(0, 2);
         const usedIdsPop = new Set([slot1Pop?.id, ...prioritizedFor23Pop.map((j) => j.id)].filter(Boolean));
         const restByViews = topPopularRaw.filter((j) => !usedIdsPop.has(j.id));
@@ -598,10 +628,8 @@ app.get("/", async (req, res) => {
         .where("job_status", "approved")
         .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
         .whereRaw(`${DATE_IN_GEORGIA} = ${TODAY_IN_GEORGIA}`)
+        .orderByRaw(`CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END`)
         .orderByRaw("(CASE WHEN prioritize THEN 1 ELSE 0 END) DESC")
-        .orderByRaw(
-          `CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END`
-        )
         .orderBy("created_at", "desc")
         .orderBy("id", "desc");
       const seenToday = new Set();
@@ -696,17 +724,10 @@ app.get("/", async (req, res) => {
     const totalPages = Math.ceil(total / Number(limit));
 
     let jobs = await query
-      .orderByRaw("(CASE WHEN prioritize THEN 1 ELSE 0 END) DESC")
       .orderByRaw(
-        `
-        CASE job_premium_status
-          WHEN 'premiumPlus' THEN 1
-          WHEN 'premium' THEN 2
-          WHEN 'regular' THEN 3
-          ELSE 4
-        END
-      `,
+        `CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END`
       )
+      .orderByRaw("(CASE WHEN prioritize THEN 1 ELSE 0 END) DESC")
       .orderBy("created_at", "desc")
       .orderBy("id", "desc")
       .limit(fetchLimit)
@@ -753,11 +774,11 @@ app.get("/", async (req, res) => {
   }
 });
 
-// Most popular jobs page – 20 most viewed; prioritized in slots 2-3 (same structure as highest paid)
+// Most popular jobs page – 20 most viewed; slots 2-3 = premium first, then prioritized
 app.get("/kvelaze-motkhovnadi-vakansiebi", async (req, res) => {
   try {
     const topLimit = 20;
-    const isPrioritized = (j) => j.prioritize === true || j.prioritize === 1 || j.prioritize === "true";
+    const isBoosted = (j) => j.prioritize === true || j.prioritize === 1 || ["premium", "premiumPlus"].includes(j.job_premium_status);
     let jobsRaw = await db("jobs")
       .select("*")
       .where("job_status", "approved")
@@ -768,7 +789,8 @@ app.get("/kvelaze-motkhovnadi-vakansiebi", async (req, res) => {
       .select("*")
       .where("job_status", "approved")
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
-      .where("prioritize", true)
+      .where((qb) => qb.where("prioritize", true).orWhereIn("job_premium_status", ["premium", "premiumPlus"]))
+      .orderByRaw(`CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 ELSE 3 END`)
       .orderByRaw("COALESCE(view_count, 0) DESC")
       .limit(2);
     const seenKey = new Set();
@@ -787,8 +809,8 @@ app.get("/kvelaze-motkhovnadi-vakansiebi", async (req, res) => {
         dedupePrioritized.push(j);
       }
     }
-    const nonPrioritized = jobsRaw.filter((j) => !isPrioritized(j));
-    const slot1 = (nonPrioritized[0] || jobsRaw[0]);
+    const nonBoosted = jobsRaw.filter((j) => !isBoosted(j));
+    const slot1 = (nonBoosted[0] || jobsRaw[0]);
     const prioritizedFor23 = dedupePrioritized.slice(0, 2);
     const usedIds = new Set([slot1?.id, ...prioritizedFor23.map((j) => j.id)].filter(Boolean));
     const restByViews = jobsRaw.filter((j) => !usedIds.has(j.id));
@@ -830,8 +852,8 @@ app.get("/kvelaze-magalanazgaurebadi-vakansiebi", async (req, res) => {
   try {
     const topLimit = 20;
 
-    // Top salary: slot 1 = highest paid (prefer non-prioritized); slots 2-3 = prioritized with salary (fetched separately so today's jobs qualify)
-    const isPrioritized = (j) => j.prioritize === true || j.prioritize === 1 || j.prioritize === "true";
+    // Top salary: slot 1 = highest paid non-boosted; slots 2-3 = premium first, then prioritized
+    const isBoosted = (j) => j.prioritize === true || j.prioritize === 1 || ["premium", "premiumPlus"].includes(j.job_premium_status);
     let jobsRaw = await db("jobs")
       .select("*")
       .where("job_status", "approved")
@@ -843,8 +865,9 @@ app.get("/kvelaze-magalanazgaurebadi-vakansiebi", async (req, res) => {
       .select("*")
       .where("job_status", "approved")
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
-      .where("prioritize", true)
+      .where((qb) => qb.where("prioritize", true).orWhereIn("job_premium_status", ["premium", "premiumPlus"]))
       .whereNotNull("jobSalary_min")
+      .orderByRaw(`CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 ELSE 3 END`)
       .orderBy("jobSalary_min", "desc")
       .limit(2);
     const seenKey = new Set();
@@ -863,8 +886,8 @@ app.get("/kvelaze-magalanazgaurebadi-vakansiebi", async (req, res) => {
         dedupePrioritized.push(j);
       }
     }
-    const nonPrioritized = jobsRaw.filter((j) => !isPrioritized(j));
-    const slot1 = (nonPrioritized[0] || jobsRaw[0]);
+    const nonBoosted = jobsRaw.filter((j) => !isBoosted(j));
+    const slot1 = (nonBoosted[0] || jobsRaw[0]);
     const prioritizedFor23 = dedupePrioritized.slice(0, 2);
     const usedIds = new Set([slot1?.id, ...prioritizedFor23.map((j) => j.id)].filter(Boolean));
     const restBySalary = jobsRaw.filter((j) => !usedIds.has(j.id));
@@ -910,10 +933,8 @@ app.get("/dgevandeli-vakansiebi", async (req, res) => {
       .where("job_status", "approved")
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
       .whereRaw(`${DATE_IN_GEORGIA} = ${TODAY_IN_GEORGIA}`)
+      .orderByRaw(`CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END`)
       .orderByRaw("(CASE WHEN prioritize THEN 1 ELSE 0 END) DESC")
-      .orderByRaw(
-        `CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END`
-      )
       .orderBy("created_at", "desc")
       .orderBy("id", "desc");
 
@@ -1121,18 +1142,33 @@ app.get("/vakansia/:slug", async (req, res) => {
       return res.redirect(301, `/vakansia/${correctSlug}${qs}`);
     }
 
-    // Related jobs: same category OR prioritized (from any category); prioritized and same-category first
-    const relatedJobs = await db("jobs")
+    // Related jobs: same category OR prioritized/premium (from any category); premium in slot 2
+    let relatedJobsRaw = await db("jobs")
+      .select("*")
       .where("job_status", "approved")
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
       .where((qb) => {
-        qb.where("category_id", job.category_id).orWhere("prioritize", true);
+        qb.where("category_id", job.category_id)
+          .orWhere("prioritize", true)
+          .orWhereIn("job_premium_status", ["premium", "premiumPlus"]);
       })
       .whereNot("id", jobId)
+      .orderByRaw("CASE job_premium_status WHEN 'premiumPlus' THEN 1 WHEN 'premium' THEN 2 ELSE 3 END")
       .orderByRaw("(CASE WHEN prioritize THEN 1 ELSE 0 END) DESC")
       .orderByRaw("(CASE WHEN category_id = ? THEN 1 ELSE 0 END) DESC", [job.category_id])
       .orderBy("created_at", "desc")
-      .limit(5);
+      .limit(10);
+    const isPremium = (j) => ["premium", "premiumPlus"].includes(j.job_premium_status);
+    const premiumIdx = relatedJobsRaw.findIndex((j) => isPremium(j));
+    let relatedJobs;
+    if (relatedJobsRaw.length >= 2 && premiumIdx > 1) {
+      const [first, , ...rest] = relatedJobsRaw;
+      const premium = relatedJobsRaw[premiumIdx];
+      const restWithoutPremium = relatedJobsRaw.filter((_, i) => i !== 0 && i !== premiumIdx);
+      relatedJobs = [first, premium, ...restWithoutPremium].slice(0, 5);
+    } else {
+      relatedJobs = relatedJobsRaw.slice(0, 5);
+    }
 
     const isExpired = job.expires_at && new Date(job.expires_at) <= new Date();
 

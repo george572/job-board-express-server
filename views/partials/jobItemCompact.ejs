@@ -1,7 +1,7 @@
 <article class="h-full">
   <a 
     href="/vakansia/<%= slugify(job.jobName) %>-<%= job.id %><%= (typeof fromRecommended !== 'undefined' && fromRecommended) ? '?from=recommended' : '' %>" 
-    class="block min-w-[300px] h-full rounded-lg cursor-pointer p-4 text-sm border border-[#EBEBEB] text-secondary bg-white hover:shadow-sm transition-shadow flex flex-col"
+    class="block min-w-[300px] h-full rounded-lg cursor-pointer text-sm text-secondary bg-white hover:shadow-sm transition-shadow flex flex-col <%= (job.job_premium_status === 'premium' || job.job_premium_status === 'premiumPlus') ? 'pt-2 px-4 pb-4 border-2 border-[#315EFF]' : 'p-4 border border-[#EBEBEB]' %>"
     data-job-id="<%= job.id %>"
     data-job-title="<%- job.jobName.replace(/\"/g, '&quot;') %>"
     data-job-company="<%- job.companyName.replace(/\"/g, '&quot;') %>"
@@ -9,6 +9,7 @@
     data-job-category="<%- (job.category_id || '').toString().replace(/\"/g, '&quot;') %>"
     data-salary-range="<%- (job.jobSalary || '').replace(/\"/g, '&quot;') %>"
   >
+    <% if (job.job_premium_status === 'premiumPlus' || job.job_premium_status === 'premium') { %><div class="w-full mb-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-[#315EFF] text-white font-[400]"><%= job.job_premium_status === 'premiumPlus' ? 'პრემიუმ+' : 'პრემიუმი' %></span></div><% } %>
     <header class="w-full text-sm flex justify-between">
       <div class="flex gap-2 items-center">
         <% if (job.company_logo) { %>
