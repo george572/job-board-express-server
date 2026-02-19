@@ -719,6 +719,7 @@ router.get("/:id/top-candidates", async (req, res) => {
       .whereIn("user_uid", userIds)
       .select("user_uid", "user_name", "user_email");
     const userMap = Object.fromEntries(users.map((u) => [u.user_uid, u]));
+
     const resumeRows = await db("resumes")
       .whereIn("user_id", userIds)
       .orderBy("updated_at", "desc")
@@ -726,6 +727,16 @@ router.get("/:id/top-candidates", async (req, res) => {
     const resumeMap = {};
     resumeRows.forEach((r) => {
       if (!resumeMap[r.user_id]) resumeMap[r.user_id] = r;
+    });
+
+    // Last visit info per user: aggregate from visitors table
+    const lastSeenRows = await db("visitors")
+      .whereIn("user_id", userIds)
+      .groupBy("user_id")
+      .max("last_seen as last_seen");
+    const lastSeenMap = {};
+    lastSeenRows.forEach((row) => {
+      lastSeenMap[row.user_id] = row.last_seen;
     });
     const candidates = qualifiedMatches.map((m) => {
       const u = userMap[m.id];
@@ -736,6 +747,7 @@ router.get("/:id/top-candidates", async (req, res) => {
         user_name: u?.user_name || null,
         user_email: u?.user_email || null,
         cv_url: r?.file_url || null,
+        last_seen_at: lastSeenMap[m.id] || null,
       };
     });
     res.json({ job_id: jobId, candidates });

@@ -249,6 +249,58 @@ router.post("/", async (req, res) => {
   }
 });
 
+// Endpoint to notify HRs about AI-selected candidates for a specific vacancy
+router.post("/hr-email", async (req, res) => {
+  const { hr_email, company_name, job_name, last_seen_at } = req.body || {};
+
+  if (!hr_email || !job_name) {
+    return res.status(400).json({ error: "hr_email and job_name are required" });
+  }
+
+  if (!marketingTransporter || !MARKETING_MAIL_USER || !MARKETING_MAIL_PASS) {
+    return res.status(500).json({ error: "HR email service is not configured" });
+  }
+
+  const subject = `კანდიდატები ვაკანსია ${job_name}-სთვის.`;
+
+  const lastSeenLine = last_seen_at
+    ? `\nამ კანდიდატის ბოლო ვიზიტი samushao.ge-ზე: ${last_seen_at}\n`
+    : "";
+
+  const text = `კანდიდატები ვაკანსია ${job_name}-სთვის.
+ჩვენ ვიპოვეთ რამდენიმე კარგი კანდიდატი თქვენი ვაკანსიისთვის.
+
+გთხოვთ გადახედოთ რეზიუმეებს და გაგვიზიაროთ თქვენი შეფასება.
+
+რეზიუმეები გადარჩეულია ხელოვნური ინტელექტის მიერ.${lastSeenLine}`;
+
+  const mailOptions = {
+    from: `"გიორგი Samushao.ge" <${MARKETING_MAIL_USER || "giorgi@samushao.ge"}>`,
+    to: hr_email,
+    subject,
+    text,
+  };
+
+  try {
+    await new Promise((resolve, reject) => {
+      marketingTransporter.sendMail(mailOptions, (err) => {
+        if (err) {
+          console.error("HR email sending error:", err);
+          reject(new Error("Failed to send HR email: " + err.message));
+        } else {
+          resolve();
+        }
+      });
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    if (res.headersSent) return;
+    console.error("hr-email error:", err);
+    res.status(500).json({ error: err.message || "Failed to send HR email" });
+  }
+});
+
 // Complaint endpoint removed – users no longer see refusal, so no appeal UI
 
 module.exports = router;
