@@ -86,23 +86,25 @@ async function upsertCandidate(userId, cvText) {
 
 /**
  * Build a search query string with structured metadata for better matching.
- * Emphasizes job_role, job_experience, job_type, job_city so semantic search
- * aligns with candidates by profession and experience.
+ * Leads with full job description (richest signal), then adds role/experience/location
+ * so semantic search aligns with candidates by profession and experience.
  *
  * @param {object} opts - { job_role (or jobName), job_experience, job_type, job_city, jobDescription }
  */
 function buildJobSearchText(opts) {
-  const role = (opts.job_role || opts.jobName || opts.jobDescription || "").trim();
+  const role = (opts.job_role || opts.jobName || "").trim();
   const exp = (opts.job_experience || "").trim();
   const type = (opts.job_type || "").trim();
   const city = (opts.job_city || "").trim();
   const desc = (opts.jobDescription || "").trim();
 
   const parts = [];
-  if (role) parts.push(`job_role: ${role}. Required experience: ${exp || "any"}. Role: ${role}.`);
-  if (type) parts.push(`job_type: ${type}.`);
-  if (city) parts.push(`job_city: ${city}.`);
+  // Lead with full description so embeddings capture real requirements
   if (desc) parts.push(desc);
+  if (role) parts.push(`Position: ${role}.`);
+  if (exp) parts.push(`Required experience: ${exp}.`);
+  if (type) parts.push(`Employment type: ${type}.`);
+  if (city) parts.push(`Location: ${city}.`);
 
   return parts.filter(Boolean).join(" ");
 }
@@ -124,8 +126,8 @@ async function getTopCandidatesForJob(jobInput, topK = 100) {
   const ns = index.namespace(NAMESPACE);
   const actualTopK = Math.max(1, Math.min(parseInt(topK, 10) || 100, 100));
 
-  // Fetch more candidates for reranking, then rerank to actualTopK
-  const fetchK = Math.min(actualTopK * 2, 200); // 2x for reranking pool
+  // bge-reranker-v2-m3 max 100 docs; fetch up to that for reranking pool
+  const fetchK = Math.min(actualTopK * 2, 100);
 
   const response = await ns.searchRecords({
     query: {

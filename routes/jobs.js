@@ -679,7 +679,9 @@ router.get("/:id/top-candidates", async (req, res) => {
   try {
     const jobId = parseInt(req.params.id, 10);
     const topK = Math.min(100, Math.max(1, parseInt(req.query.topK, 10) || 100)); // Default 100, max 100
-    const minScore = parseFloat(req.query.minScore) || 0.7; // Only return candidates with score >= minScore
+    // Default 0.5: CV-job reranker scores rarely reach 0.9; 0.5–0.7 = decent match. Use minScore=0.7+ for stricter.
+    const minScore = parseFloat(req.query.minScore);
+    const effectiveMinScore = Number.isFinite(minScore) ? minScore : 0.5;
     if (isNaN(jobId)) {
       return res.status(400).json({ error: "Invalid job ID" });
     }
@@ -695,12 +697,12 @@ router.get("/:id/top-candidates", async (req, res) => {
         job_experience: job.job_experience || "",
         job_type: job.job_type || "",
         job_city: job.job_city || "",
-        jobDescription: job.jobDescription || "",
+        jobDescription: job.jobDescription || job.job_description || "",
       },
       topK
     );
     // Only return candidates that pass the score threshold
-    const qualifiedMatches = matches.filter((m) => (m.score || 0) >= minScore);
+    const qualifiedMatches = matches.filter((m) => (m.score || 0) >= effectiveMinScore);
     const userIds = qualifiedMatches.map((m) => m.id).filter(Boolean);
     if (userIds.length === 0) {
       return res.json({ job_id: jobId, candidates: [] });

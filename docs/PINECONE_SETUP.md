@@ -60,7 +60,7 @@ Already wired: when a user uploads or updates their CV via `POST /resumes`, the 
 
 ## 5. Phase 3 — Get Top Candidates for a Job
 
-**Endpoint:** `GET /jobs/:id/top-candidates?topK=100&minScore=0.7`
+**Endpoint:** `GET /jobs/:id/top-candidates?topK=100&minScore=0.5`
 
 Returns the top matching candidates using:
 - **Metadata-enriched query**: job_role, job_experience, job_type, job_city in the search text
