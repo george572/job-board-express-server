@@ -836,19 +836,10 @@ router.post("/:id/refusals/:userId/reset-complaint", async (req, res) => {
   }
 });
 
-// create a new job
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  },
-});
+// create a new job (company_logo is a string URL from admin, not a file upload)
+const upload = multer();
 
-const upload = multer({ storage });
-
-router.post("/", upload.single("company_logo"), async (req, res) => {
+router.post("/", upload.none(), async (req, res) => {
   const {
     companyName,
     jobName,
@@ -858,6 +849,7 @@ router.post("/", upload.single("company_logo"), async (req, res) => {
     user_uid,
     category_id,
     company_email,
+    company_logo,
     job_experience,
     job_city,
     job_address,
@@ -915,6 +907,7 @@ router.post("/", upload.single("company_logo"), async (req, res) => {
         user_uid,
         category_id,
         company_email,
+        company_logo: company_logo || null,
         job_experience,
         job_city,
         job_address,
