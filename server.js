@@ -1296,6 +1296,7 @@ app.get("/api/enlist-fb", async (req, res) => {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
+        path: "/",
       });
     }
   } catch (err) {
