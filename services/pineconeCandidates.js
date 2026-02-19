@@ -1,13 +1,12 @@
 /**
- * Pinecone candidate–job matching using Pinecone integrated embeddings.
+ * Pinecone candidate–job matching using multilingual-e5-large embeddings.
  *
  * Flow:
  * - Phase 1: Backfill – extract CV text, upsert as text records (Pinecone embeds them)
  * - Phase 2/4: On CV upload/update – extract text, upsert (overwrites by id)
- * - Phase 3: On job post – search by job description text, get top K candidate IDs
+ * - Phase 3: On job post – search by job description + metadata, rerank, get top K
  *
- * No OpenAI required. Index must be created with integrated embeddings, e.g.:
- *   pc index create -n samushao-candidates -m cosine -c aws -r us-east-1 --model llama-text-embed-v2 --field_map text=content
+ * Index must use multilingual-e5-large. Create via: node scripts/create-pinecone-index-e5.js
  */
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
@@ -86,26 +85,59 @@ async function upsertCandidate(userId, cvText) {
 }
 
 /**
- * Get top K candidates for a job description (Phase 3).
- * Query is embedded by Pinecone; returns matching candidate IDs.
- * Caller should filter by minScore (e.g. 0.7) to get only qualified candidates.
+ * Build a search query string with structured metadata for better matching.
+ * Emphasizes job_role, job_experience, job_type, job_city so semantic search
+ * aligns with candidates by profession and experience.
  *
- * @param {string} jobDescription - Full job description text
- * @param {number} topK - Number of candidates to request from Pinecone (default 100, max 100)
+ * @param {object} opts - { job_role (or jobName), job_experience, job_type, job_city, jobDescription }
+ */
+function buildJobSearchText(opts) {
+  const role = (opts.job_role || opts.jobName || opts.jobDescription || "").trim();
+  const exp = (opts.job_experience || "").trim();
+  const type = (opts.job_type || "").trim();
+  const city = (opts.job_city || "").trim();
+  const desc = (opts.jobDescription || "").trim();
+
+  const parts = [];
+  if (role) parts.push(`job_role: ${role}. Required experience: ${exp || "any"}. Role: ${role}.`);
+  if (type) parts.push(`job_type: ${type}.`);
+  if (city) parts.push(`job_city: ${city}.`);
+  if (desc) parts.push(desc);
+
+  return parts.filter(Boolean).join(" ");
+}
+
+/**
+ * Get top K candidates for a job (Phase 3).
+ * Uses metadata-enriched query, hybrid-ready (multilingual-e5-large), and reranking.
+ *
+ * @param {string|object} jobInput - Job description string, or { jobDescription, job_role, job_experience, job_type, job_city }
+ * @param {number} topK - Number of candidates to return after reranking (default 100, max 100)
  * @returns {Promise<Array<{ id: string, score: number, metadata?: object }>>}
  */
-async function getTopCandidatesForJob(jobDescription, topK = 100) {
-  const text = (jobDescription || "").trim();
-  if (!text) return [];
+async function getTopCandidatesForJob(jobInput, topK = 100) {
+  const opts = typeof jobInput === "string" ? { jobDescription: jobInput } : jobInput;
+  const text = buildJobSearchText(opts);
+  if (!text.trim()) return [];
 
   const index = getIndex();
   const ns = index.namespace(NAMESPACE);
   const actualTopK = Math.max(1, Math.min(parseInt(topK, 10) || 100, 100));
 
+  // Fetch more candidates for reranking, then rerank to actualTopK
+  const fetchK = Math.min(actualTopK * 2, 200); // 2x for reranking pool
+
   const response = await ns.searchRecords({
     query: {
-      topK: actualTopK,
+      topK: fetchK,
       inputs: { text },
+    },
+    fields: ["text"],
+    rerank: {
+      model: "bge-reranker-v2-m3",
+      rankFields: ["text"],
+      topN: actualTopK,
+      parameters: { truncate: "END" },
     },
   });
 

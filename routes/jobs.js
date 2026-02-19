@@ -688,27 +688,17 @@ router.get("/:id/top-candidates", async (req, res) => {
       return res.status(404).json({ error: "Job not found" });
     }
     const { getTopCandidatesForJob } = require("../services/pineconeCandidates");
-    // Emphasize job title and required experience so we match candidates by profession/experience,
-    // not just generic words (e.g. Sales Manager should not match HR Manager).
-    const jobTitle = (job.jobName || "").trim();
-    const jobExperience = (job.job_experience || "").trim();
-    const rest = [
-      job.jobDescription || "",
-      job.job_type || "",
-      job.job_city || "",
-    ]
-      .filter(Boolean)
-      .join(" ");
-    const description = [
-      jobTitle && `Job title: ${jobTitle}. Required experience: ${jobExperience || "any"}. Role: ${jobTitle}.`,
-      rest,
-    ]
-      .filter(Boolean)
-      .join(" ");
-    if (!description.trim()) {
-      return res.json({ job_id: jobId, candidates: [] });
-    }
-    const matches = await getTopCandidatesForJob(description, topK);
+    // Pass job metadata (job_role, job_experience, etc.) for metadata-enriched search + reranking
+    const matches = await getTopCandidatesForJob(
+      {
+        job_role: job.jobName || "",
+        job_experience: job.job_experience || "",
+        job_type: job.job_type || "",
+        job_city: job.job_city || "",
+        jobDescription: job.jobDescription || "",
+      },
+      topK
+    );
     // Only return candidates that pass the score threshold
     const qualifiedMatches = matches.filter((m) => (m.score || 0) >= minScore);
     const userIds = qualifiedMatches.map((m) => m.id).filter(Boolean);

@@ -25,7 +25,8 @@
     "revert-wrong-hr-jobs": "node scripts/revert-wrong-hr-jobs.js",
     "revert-wrong-hr-jobs:apply": "node scripts/revert-wrong-hr-jobs.js --apply",
     "backfill-pinecone": "node scripts/backfill-pinecone-candidates.js",
-    "backfill-pinecone:retry": "node scripts/backfill-pinecone-candidates.js --retry-failed"
+    "backfill-pinecone:retry": "node scripts/backfill-pinecone-candidates.js --retry-failed",
+    "create-pinecone-index": "node scripts/create-pinecone-index-e5.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

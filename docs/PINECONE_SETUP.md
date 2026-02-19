@@ -2,22 +2,31 @@
 
 ## Overview
 
-This system uses **Pinecone integrated embeddings** (no OpenAI): CV text is sent to Pinecone, which embeds and indexes it. When a job is posted, you query by job description text and get the top matching candidates.
+This system uses **Pinecone multilingual-e5-large** for embeddings, **metadata-enriched queries** (job_role, job_experience, etc.), and **reranking** (bge-reranker-v2-m3) for better candidate matching. CV text is sent to Pinecone, which embeds and indexes it. Searches use structured metadata and two-stage retrieval (search → rerank).
 
 ## 1. Create Pinecone Index
 
-Create an index **with integrated embeddings** (Pinecone embeds the text for you):
+Create an index with **multilingual-e5-large** (recommended for multilingual/Georgian content):
 
 ```bash
-# If not installed: brew tap pinecone-io/tap && brew install pinecone-io/tap/pinecone
-# If PINECONE_API_KEY is already in .env, load it first:
-source .env
-export PINECONE_API_KEY   # CLI reads from env
-
-pc index create -n samushao-candidates -m cosine -c aws -r us-east-1 --model llama-text-embed-v2 --field_map text=content
+npm run create-pinecone-index
 ```
 
-Get your API key from [https://app.pinecone.io/](https://app.pinecone.io/) (only needed if not already in `.env`).
+Or manually:
+
+```bash
+node scripts/create-pinecone-index-e5.js
+```
+
+**If you have an existing index** (e.g. with llama-text-embed-v2), you must either:
+- Delete it first and create the new one with the same name, or
+- Create the new index with a different name and set `PINECONE_INDEX` in `.env`
+
+The script creates an index with:
+- Model: `multilingual-e5-large`
+- Field map: `text` → `text`
+- Write: `input_type: passage`, `truncate: END`
+- Read: `input_type: query`, `truncate: END`
 
 ## 2. Environment Variables
 
@@ -42,7 +51,8 @@ This will:
 
 - Fetch all candidates with resumes from the DB
 - Extract text from each CV (PDF/DOC/DOCX)
-- Upsert text to Pinecone (Pinecone generates embeddings; id = user_uid)
+- Structure text to emphasize profession and experience
+- Upsert to Pinecone (Pinecone generates embeddings; id = user_uid)
 
 ## 4. Phase 2 & 4 — New CV Upload / Update
 
@@ -50,40 +60,39 @@ Already wired: when a user uploads or updates their CV via `POST /resumes`, the 
 
 ## 5. Phase 3 — Get Top Candidates for a Job
 
-**Endpoint:** `GET /jobs/:id/top-candidates?topK=100&minScore=0.7` (request up to 100 candidates, return only those with score >= minScore; default topK=100, max 100)
+**Endpoint:** `GET /jobs/:id/top-candidates?topK=100&minScore=0.7`
 
-Returns the top matching candidates for a job based on semantic similarity between job description and CVs.
+Returns the top matching candidates using:
+- **Metadata-enriched query**: job_role, job_experience, job_type, job_city in the search text
+- **Reranking**: bge-reranker-v2-m3 for two-stage retrieval (higher accuracy)
 
-Example:
+**Admin UI:** See [ADMIN_TOP_CANDIDATES.md](./ADMIN_TOP_CANDIDATES.md).
 
-```bash
-curl "http://localhost:3000/jobs/123/top-candidates?topK=20"
-```
+---
 
-**Admin UI:** See [ADMIN_TOP_CANDIDATES.md](./ADMIN_TOP_CANDIDATES.md) for how to add a "Request candidates" button in the admin app.
+## Hybrid Search (Advanced)
 
-Response:
+Hybrid search (semantic + lexical) combines dense (multilingual-e5-large) and sparse (pinecone-sparse-english-v0) vectors. It requires:
 
-```json
-{
-  "job_id": 123,
-  "candidates": [
-    {
-      "user_id": "abc-uid-123",
-      "score": 0.89,
-      "user_name": "John Doe",
-      "user_email": "john@example.com",
-      "cv_url": "https://..."
-    }
-  ]
-}
-```
+- A **hybrid index** (dense, metric dotproduct, dimension 1024)
+- Manual embedding at upsert and query via `pc.inference.embed`
+- Standalone reranking after the hybrid query
+
+The current implementation uses the **integrated index** (multilingual-e5 + reranking), which is simpler and supports integrated reranking. To migrate to hybrid search, you would:
+
+1. Create a hybrid index (dense + sparse support)
+2. Use `pc.inference.embed` for both dense and sparse models
+3. Upsert with `values` + `sparse_values`
+4. Query with both vectors
+5. Call `pc.inference.rerank` as a separate step
+
+See [Pinecone hybrid search docs](https://docs.pinecone.io/guides/data/encode-sparse-vectors) for details.
 
 ---
 
 ## Failed candidates and retry
 
-After a backfill run, failed candidates are written to **`scripts/backfill-pinecone-failed.json`** with `user_id`, `file_url`, `file_name`, and **`error`** (the real reason, e.g. corrupt docx, no body element, zip error).
+After a backfill run, failed candidates are written to **`scripts/backfill-pinecone-failed.json`** with `user_id`, `file_url`, `file_name`, and **`error`**.
 
 **Re-run only failed:**
 
@@ -91,25 +100,18 @@ After a backfill run, failed candidates are written to **`scripts/backfill-pinec
 npm run backfill-pinecone:retry
 ```
 
-**If you ran the backfill before this feature** and don’t have the JSON file, build it from a list of failed `user_id`s (one per line):
-
-```bash
-# Paste the 53 user_ids into failed-ids.txt, then:
-node scripts/backfill-pinecone-build-failed-list.js < failed-ids.txt
-npm run backfill-pinecone:retry
-```
-
 **Typical failure reasons:**
 
-- **"Can't find end of central directory"** — Corrupt or incomplete .docx (docx is a zip); re-upload or use PDF.
-- **"Could not find the body element: are you sure this is a docx file?"** — Old .doc (Word 97) or malformed docx; mammoth only supports .docx. Re-save as .docx or upload PDF.
-- **"no text extracted (text too short or empty)"** — PDF/DOCX parse returned little or no text (e.g. image-only PDF, empty file).
+- **"Can't find end of central directory"** — Corrupt or incomplete .docx
+- **"Could not find the body element"** — Old .doc (Word 97); use .docx or PDF
+- **"no text extracted"** — Image-only PDF, empty file
 
 ---
 
 ## Troubleshooting
 
 - **"PINECONE_API_KEY required"** — Add to `.env`
-- **Index not found / wrong index type** — Create the index with **integrated embeddings** (the `pc index create ... --model llama-text-embed-v2 --field_map text=content` command above). Do not use a dimension-only (serverless) index.
-- **No text extracted from CV** — Check that CVs are PDF or DOC/DOCX; some formats may fail
+- **Index not found** — Run `npm run create-pinecone-index`
+- **Wrong model / embeddings** — Delete the index and recreate with the e5 script
+- **No text extracted from CV** — Check that CVs are PDF or DOC/DOCX
 - **Rate limits** — Backfill uses batching and delays; reduce `BATCH_SIZE` if needed

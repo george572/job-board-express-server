@@ -55,28 +55,31 @@ GET /jobs/123/top-candidates?topK=100&minScore=0
 2. **Filter**: We keep only candidates with `score >= minScore` (default 0.7).
 3. **Response**: You get back only those that pass the threshold (0 to 100). No large payloads.
 
-## How the request is sent to Pinecone (title & experience emphasis)
+## How the request is sent to Pinecone
 
-We want matches by **job title and experience**, not by generic words (e.g. "Sales Manager" should not match "HR Manager" just because of "manager").
+**Model:** multilingual-e5-large (multilingual, good for Georgian + English CVs)
 
-**Job side (query):**
+**Metadata-enriched query:**
 
-- The text we send to Pinecone is built to emphasize **job title** and **required experience**:
-  - `Job title: Sales Manager. Required experience: 3 years. Role: Sales Manager. [rest of job description]`
-- Pinecone embeds this text and runs a vector similarity search. Leading with "Job title: … Required experience: … Role: …" makes the embedding focus on the actual role and experience level.
+- The search text includes structured fields: `job_role`, `job_experience`, `job_type`, `job_city`
+- Example: `job_role: Sales Manager. Required experience: 3 years. Role: Sales Manager. job_type: full-time. job_city: Tbilisi. [job description]`
+- This helps match by profession and experience, not generic words (e.g. "Sales Manager" vs "HR Manager")
 
 **Candidate side (indexed CVs):**
 
-- When we index a CV, we structure the text so **profession and work experience** are emphasized:
-  - We take the first ~12,000 characters of the CV (where title and experience usually appear) and label them:  
-    `Candidate profession and work experience: [first part of CV] … Additional details: [rest]`
-- So the candidate vector aligns more with their actual title and past roles than with every word in the CV.
+- CV text is structured: `Candidate profession and work experience: [first ~12k chars] … Additional details: [rest]`
+- So the vector aligns with the candidate's actual title and past roles.
+
+**Reranking:**
+
+- We fetch 2× topK candidates, then rerank with **bge-reranker-v2-m3** and return topK.
+- Reranking improves quality by scoring query–document relevance more accurately.
 
 **Flow:**
 
-1. Backend builds the job query string (title + experience first), then calls Pinecone `searchRecords({ query: { topK, inputs: { text: description } } })`.
-2. Pinecone embeds the job text with the same model used for the index (e.g. llama-text-embed-v2), returns top K by similarity.
-3. Backend filters by `minScore` and enriches with user/resume data from the DB.
+1. Backend builds job query with metadata (`job_role`, `job_experience`, etc.), calls Pinecone `searchRecords` with `inputs: { text }`, `fields: ['text']`, and `rerank: { model: 'bge-reranker-v2-m3', rankFields: ['text'], topN }`.
+2. Pinecone embeds the query (multilingual-e5-large), runs similarity search, reranks, returns top N.
+3. Backend filters by `minScore` and enriches with user/resume from the DB.
 
 ## CORS
 
