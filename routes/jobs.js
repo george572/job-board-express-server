@@ -688,12 +688,20 @@ router.get("/:id/top-candidates", async (req, res) => {
       return res.status(404).json({ error: "Job not found" });
     }
     const { getTopCandidatesForJob } = require("../services/pineconeCandidates");
-    const description = [
-      job.jobName || "",
+    // Emphasize job title and required experience so we match candidates by profession/experience,
+    // not just generic words (e.g. Sales Manager should not match HR Manager).
+    const jobTitle = (job.jobName || "").trim();
+    const jobExperience = (job.job_experience || "").trim();
+    const rest = [
       job.jobDescription || "",
-      job.job_experience || "",
       job.job_type || "",
       job.job_city || "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const description = [
+      jobTitle && `Job title: ${jobTitle}. Required experience: ${jobExperience || "any"}. Role: ${jobTitle}.`,
+      rest,
     ]
       .filter(Boolean)
       .join(" ");

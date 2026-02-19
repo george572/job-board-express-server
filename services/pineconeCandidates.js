@@ -37,9 +37,30 @@ function getIndex() {
   return pc.index({ name: getIndexName() });
 }
 
+/** Max chars for the "profession/experience" lead block (title and past roles usually appear here). */
+const CANDIDATE_LEAD_CHARS = 12000;
+
+/** Max total chars sent to Pinecone per candidate. */
+const CANDIDATE_TEXT_CAP = 30000;
+
+/**
+ * Build text for embedding so profession/title and work experience are emphasized.
+ * CVs usually have title and experience at the top; we label and repeat that block
+ * so the vector aligns more with "Sales Manager, 5 years sales" than generic words.
+ */
+function buildCandidateTextForEmbedding(cvText) {
+  const raw = (cvText || "").trim();
+  if (!raw) return "";
+  const lead = raw.slice(0, CANDIDATE_LEAD_CHARS).trim();
+  const tail = raw.slice(CANDIDATE_LEAD_CHARS).trim().slice(0, CANDIDATE_TEXT_CAP - lead.length - 200);
+  if (!tail) return lead.slice(0, CANDIDATE_TEXT_CAP);
+  return `Candidate profession and work experience: ${lead}\n\nAdditional details: ${tail}`.slice(0, CANDIDATE_TEXT_CAP);
+}
+
 /**
  * Upsert a single candidate's CV to Pinecone (text is embedded by Pinecone).
  * ID = user_id; overwrites if already exists (Phase 2 & 4).
+ * Text is structured so job title and past experience are emphasized for matching.
  *
  * @param {string} userId - user_uid (candidate id)
  * @param {string} cvText - Raw text extracted from CV (field_map text=content)
@@ -47,7 +68,7 @@ function getIndex() {
  */
 async function upsertCandidate(userId, cvText) {
   if (!userId) return false;
-  const text = (cvText || "").trim().slice(0, 30000); // reasonable cap for CV text
+  const text = buildCandidateTextForEmbedding(cvText);
   if (!text) return false;
 
   const index = getIndex();

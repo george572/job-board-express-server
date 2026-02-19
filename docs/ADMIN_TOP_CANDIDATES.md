@@ -55,6 +55,29 @@ GET /jobs/123/top-candidates?topK=100&minScore=0
 2. **Filter**: We keep only candidates with `score >= minScore` (default 0.7).
 3. **Response**: You get back only those that pass the threshold (0 to 100). No large payloads.
 
+## How the request is sent to Pinecone (title & experience emphasis)
+
+We want matches by **job title and experience**, not by generic words (e.g. "Sales Manager" should not match "HR Manager" just because of "manager").
+
+**Job side (query):**
+
+- The text we send to Pinecone is built to emphasize **job title** and **required experience**:
+  - `Job title: Sales Manager. Required experience: 3 years. Role: Sales Manager. [rest of job description]`
+- Pinecone embeds this text and runs a vector similarity search. Leading with "Job title: … Required experience: … Role: …" makes the embedding focus on the actual role and experience level.
+
+**Candidate side (indexed CVs):**
+
+- When we index a CV, we structure the text so **profession and work experience** are emphasized:
+  - We take the first ~12,000 characters of the CV (where title and experience usually appear) and label them:  
+    `Candidate profession and work experience: [first part of CV] … Additional details: [rest]`
+- So the candidate vector aligns more with their actual title and past roles than with every word in the CV.
+
+**Flow:**
+
+1. Backend builds the job query string (title + experience first), then calls Pinecone `searchRecords({ query: { topK, inputs: { text: description } } })`.
+2. Pinecone embeds the job text with the same model used for the index (e.g. llama-text-embed-v2), returns top K by similarity.
+3. Backend filters by `minScore` and enriches with user/resume data from the DB.
+
 ## CORS
 
 The server allows the admin origin (e.g. `https://samushao-admin.web.app`). If you use a different admin URL, add it to the CORS config in `server.js`.
