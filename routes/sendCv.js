@@ -356,7 +356,8 @@ router.post("/user-vacancy-email", async (req, res) => {
 
 // Endpoint to notify HRs about AI-selected candidates for a specific vacancy
 router.post("/hr-email", async (req, res) => {
-  const { hr_email, company_name, job_name, last_seen_at } = req.body || {};
+  const { hr_email, company_name, job_name, last_seen_at, users_list } =
+    req.body || {};
 
   if (!hr_email || !job_name) {
     return res
@@ -372,14 +373,45 @@ router.post("/hr-email", async (req, res) => {
 
   const subject = `კანდიდატები ვაკანსია ${job_name}-სთვის.`;
 
+  const list = Array.isArray(users_list) ? users_list : [];
+  const usersText =
+    list.length > 0
+      ? list
+          .map((u) => {
+            const name =
+              u.user_name ?? u.userName ?? u.name ?? "—";
+            const email =
+              u.user_email ?? u.userEmail ?? u.email ?? "—";
+            const url =
+              u.cv_url ?? u.cvUrl ?? u.resume_url ?? u.file_url ?? "—";
+            return `Name : ${name}\nemail : ${email}\ncv url : ${url}`;
+          })
+          .join("\n\n")
+      : "";
+
+  const candidatesBlock =
+    list.length > 0
+      ? `კანდიდატები:\n\n${usersText}\n\n`
+      : "";
+
+  const countLine =
+    list.length > 0
+      ? `ჩვენ ვიპოვეთ ${list.length} კარგი კანდიდატი თქვენი ვაკანსიისთვის.`
+      : "ჩვენ ვიპოვეთ რამდენიმე კარგი კანდიდატი თქვენი ვაკანსიისთვის.";
+
   const text = `კანდიდატები ვაკანსია ${job_name}-სთვის.
-ჩვენ ვიპოვეთ რამდენიმე კარგი კანდიდატი თქვენი ვაკანსიისთვის.
 
-კანდიდატებმა იციან რომ ჩვენ მოვახდინეთ მათი იდენტიფიცირება და თანახმა არიან რომ დაეკონტაქტოთ.`;
+${countLine}
 
+${candidatesBlock}კანდიდატებმა იციან რომ ჩვენ მოვახდინეთ მათი იდენტიფიცირება და თანახმა არიან რომ დაეკონტაქტოთ.
+
+პატივისცემით,
+გიორგი Samushao.ge`;
+
+  const fromAddr = MARKETING_MAIL_USER || "giorgi@samushao.ge";
   const mailOptions = {
-    from: `<${MARKETING_MAIL_USER || "giorgi@samushao.ge"}>`,
-    to: hr_email,
+    from: `"გიორგი Samushao.ge" <${fromAddr}>`,
+    to: hr_email.trim(),
     subject,
     text,
   };
@@ -389,7 +421,7 @@ router.post("/hr-email", async (req, res) => {
       marketingTransporter.sendMail(mailOptions, (err) => {
         if (err) {
           console.error("HR email sending error:", err);
-          reject(new Error("Failed to send HR email: " + err.message));
+          reject(err);
         } else {
           resolve();
         }
@@ -400,7 +432,8 @@ router.post("/hr-email", async (req, res) => {
   } catch (err) {
     if (res.headersSent) return;
     console.error("hr-email error:", err);
-    res.status(500).json({ error: err.message || "Failed to send HR email" });
+    const msg = err?.message || "Failed to send HR email";
+    res.status(500).json({ error: msg });
   }
 });
 
