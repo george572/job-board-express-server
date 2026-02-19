@@ -16,7 +16,7 @@
     </div>
     <div class="flex items-center gap-4 relative">
       <div class="hidden sm:block font-[300]">
-        <a href="/privacy-policy" class=" block"> მონაცემთა დაცვის პოლიტიკა </a>
+        <a href="/terms-of-use" class=" block"> გამოყენების წესები </a>
       </div>
       <div class="flex items-center gap-4 relative font-mrgvlovani">
         <div class="hidden sm:block font-[300]">
@@ -51,7 +51,7 @@
       <div id="responsiveNav" class="fixed top-[62px] md:top-[128px] right-0 w-1/2 h-screen bg-white border-l border-gray-200 z-40 p-4 transform translate-x-full transition-transform duration-300 ease-in-out">
         <div class="flex flex-col gap-4">
           <a href="/pricing" class="block font-[300]">ფასები</a>
-          <a href="/privacy-policy" class="block font-[300]">მონაცემთა დაცვის პოლიტიკა</a>
+          <a href="/terms-of-use" class="block font-[300]">გამოყენების წესები</a>
         </div>
       </div>
     </div>
@@ -74,6 +74,13 @@
     </div>
   </header>
 </div>
+
+<% if (typeof showConsentBanner !== 'undefined' && showConsentBanner) { %>
+  <%- include('consentBanner') %>
+<% } %>
+<% if (typeof showCvConsentBanner !== 'undefined' && showCvConsentBanner) { %>
+  <%- include('cvConsentBanner') %>
+<% } %>
 <style>
   #burgerToggle.active .burger-line:nth-child(1) {
     transform: rotate(45deg) translateY(12px);

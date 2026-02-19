@@ -353,13 +353,55 @@ app.use(session(sessionOptions));
 
 // Then your res.locals middleware
 const ENLISTED_FB_COOKIE = "enlisted_fb";
-function hasEnlistedFbCookie(req) {
+const CONSENT_COOKIE = "samushao_consent";
+const CV_CONSENT_COOKIE = "samushao_cv_consent";
+function hasCookie(req, name) {
   const raw = req?.headers?.cookie || "";
-  return new RegExp(`\\b${ENLISTED_FB_COOKIE}=([^;]+)`).test(raw);
+  return new RegExp(`\\b${name}=([^;]+)`).test(raw);
+}
+function hasEnlistedFbCookie(req) {
+  return hasCookie(req, ENLISTED_FB_COOKIE);
 }
 app.use((req, res, next) => {
   res.locals.user = req.session?.user || null;
-  res.locals.enlistedInFb = hasEnlistedFbCookie(req);
+  res.locals.enlistedInFb = hasCookie(req, ENLISTED_FB_COOKIE);
+  // default: don't show banner until we decide below
+  res.locals.showConsentBanner = false;
+  next();
+});
+
+// Consent banner middleware: show until user or cookie has consented
+app.use(async (req, res, next) => {
+  try {
+    let hasConsent = hasCookie(req, CONSENT_COOKIE);
+
+    if (!hasConsent && req.session?.user?.uid) {
+      const userRow = await db("users")
+        .where("user_uid", req.session.user.uid)
+        .select("consent")
+        .first();
+      if (userRow && userRow.consent === true) {
+        hasConsent = true;
+      }
+    }
+
+    res.locals.showConsentBanner = !hasConsent;
+  } catch (e) {
+    // On error, don't block the request; just hide banner
+    res.locals.showConsentBanner = false;
+  }
+  next();
+});
+
+// CV auto-send consent banner: show only for logged-in users (type 'user') who haven't chosen yet
+app.use((req, res, next) => {
+  res.locals.showCvConsentBanner = false;
+  if (
+    req.session?.user?.user_type === "user" &&
+    !hasCookie(req, CV_CONSENT_COOKIE)
+  ) {
+    res.locals.showCvConsentBanner = true;
+  }
   next();
 });
 
@@ -1107,6 +1149,17 @@ app.get("/privacy-policy", (req, res) => {
   });
 });
 
+// Terms of use page
+app.get("/terms-of-use", (req, res) => {
+  res.render("terms-of-use", {
+    seo: {
+      title: "გამოყენების პირობები | Samushao.ge",
+      description: "Samushao.ge გამოყენების პირობები.",
+      canonical: "https://samushao.ge/terms-of-use",
+    },
+  });
+});
+
 // Test route to verify Sentry (remove in production if desired)
 app.get("/debug-sentry", function mainHandler(req, res) {
   Sentry.captureException(new Error("My first Sentry error!"));
@@ -1147,8 +1200,25 @@ app.get("/my-applications", async (req, res) => {
     // Preserve order by application date (newest first)
     const jobById = new Map(jobs.map((j) => [j.id, j]));
     const orderedJobs = jobIds.map((id) => jobById.get(id)).filter(Boolean);
+
+    // Load user's automatic CV sending preference (default: true)
+    let wantsCvAuto = true;
+    try {
+      const userRow = await db("users")
+        .where("user_uid", req.session.user.uid)
+        .first();
+      if (userRow && (userRow.wants_cv_to_be_sent === false || userRow.wants_cv_to_be_sent === 0)) {
+        wantsCvAuto = false;
+      } else {
+        wantsCvAuto = true;
+      }
+    } catch (prefErr) {
+      console.error("Failed to load user CV auto-send preference:", prefErr);
+    }
+
     res.render("sent-cvs", {
       jobs: orderedJobs,
+      wantsCvAuto,
       slugify,
       seo: {
         title: "გაგზავნილი CV-ები | Samushao.ge",
@@ -1159,6 +1229,89 @@ app.get("/my-applications", async (req, res) => {
   } catch (err) {
     console.error("my-applications error:", err);
     res.status(500).send(err.message);
+  }
+});
+
+// Accept consent (privacy / cookies) – set cookie and optional user flag
+app.post("/consent/accept", async (req, res) => {
+  const redirectTo =
+    (req.body && req.body.redirect) ||
+    req.get("Referrer") ||
+    "/";
+  try {
+    if (req.session?.user?.uid) {
+      await db("users")
+        .where("user_uid", req.session.user.uid)
+        .update({
+          consent: true,
+          consent_updated_at: db.fn.now(),
+        });
+    }
+    res.cookie(CONSENT_COOKIE, "1", {
+      maxAge: 365 * 24 * 60 * 60 * 1000,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+    });
+  } catch (err) {
+    console.error("consent/accept error:", err);
+  }
+  return res.redirect(303, redirectTo);
+});
+
+// CV auto-send consent: set wants_cv_to_be_sent and cookie (authorized users only)
+app.post("/api/cv-consent", async (req, res) => {
+  if (!req.session?.user || req.session.user.user_type !== "user") {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  const accept = req.body?.accept;
+  if (typeof accept !== "boolean") {
+    return res.status(400).json({ error: "accept (boolean) required" });
+  }
+  try {
+    await db("users")
+      .where("user_uid", req.session.user.uid)
+      .update({
+        wants_cv_to_be_sent: accept,
+        consent_updated_at: db.fn.now(),
+      });
+    res.cookie(CV_CONSENT_COOKIE, "1", {
+      maxAge: 365 * 24 * 60 * 60 * 1000,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+    });
+    return res.json({ success: true, wants_cv_to_be_sent: accept });
+  } catch (err) {
+    console.error("cv-consent error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Toggle automatic CV sending preference for current user
+app.post("/my-applications/auto-send-toggle", async (req, res) => {
+  if (!req.session?.user || req.session.user.user_type !== "user") {
+    return res.redirect("/");
+  }
+  try {
+    const current = await db("users")
+      .where("user_uid", req.session.user.uid)
+      .first();
+    const currentValue =
+      current && (current.wants_cv_to_be_sent === true || current.wants_cv_to_be_sent === 1);
+    const nextValue = !currentValue;
+    await db("users")
+      .where("user_uid", req.session.user.uid)
+      .update({
+        wants_cv_to_be_sent: nextValue,
+        consent_updated_at: db.fn.now(),
+      });
+    return res.redirect("/my-applications");
+  } catch (err) {
+    console.error("auto-send-toggle error:", err);
+    return res.redirect("/my-applications");
   }
 });
 

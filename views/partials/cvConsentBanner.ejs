@@ -1,0 +1,36 @@
+<div id="cvConsentBanner" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+  <div class="bg-white rounded-2xl shadow-xl border border-gray-200 max-w-md w-full p-6 text-center">
+    <p class="text-secondary text-[15px] leading-relaxed mb-6 font-markgeo">
+      Samushao.ge ზოგ შემთხვევაში ავტომატურად გაგზავნის ვაკანსიაზე თქვენს რეზიუმეს, თუ ვაკანსიის მოთხოვნებს სრულად შეესაბამებით.
+    </p>
+    <p class="text-sm text-gray-600 mb-5">მისაღებია?</p>
+    <div class="flex gap-3 justify-center">
+      <button type="button" id="cvConsentYes" class="px-5 py-2.5 rounded-xl bg-primary text-white font-medium hover:bg-primary/90 transition">
+        კი
+      </button>
+      <button type="button" id="cvConsentNo" class="px-5 py-2.5 rounded-xl bg-gray-200 text-gray-800 font-medium hover:bg-gray-300 transition">
+        არა
+      </button>
+    </div>
+  </div>
+</div>
+<script>
+(function() {
+  var banner = document.getElementById('cvConsentBanner');
+  if (!banner) return;
+  function hide() { banner.style.display = 'none'; }
+  function send(accept) {
+    fetch('/api/cv-consent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accept: accept }),
+      credentials: 'same-origin'
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(data) { if (data.success) hide(); })
+      .catch(function() { hide(); });
+  }
+  banner.querySelector('#cvConsentYes').addEventListener('click', function() { send(true); });
+  banner.querySelector('#cvConsentNo').addEventListener('click', function() { send(false); });
+})();
+</script>

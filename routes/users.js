@@ -65,6 +65,7 @@ router.post("/auth", (req, res) => {
           user_name,
           user_email,
           user_type: "user",
+          wants_cv_to_be_sent: true,
         })
         .then(() => {
           res.status(201).json({

@@ -90,9 +90,10 @@ function isAfter1830() {
   const pts = new Intl.DateTimeFormat("en-US", { timeZone: TZ_GEORGIA, hour: "numeric", minute: "numeric", hour12: false }).formatToParts(new Date());
   const hour = parseInt(pts.find((p) => p.type === "hour").value, 10);
   const minute = parseInt(pts.find((p) => p.type === "minute").value, 10);
-  return hour > 18 || (hour === 18 && minute >= 30);
+  // Treat everything from 18:00 onwards as "end of day" – defer to next morning
+  return hour > 18 || (hour === 18 && minute >= 0);
 }
-/** Returns Date for next calendar day 10:20 Tbilisi, stored as UTC (10:20 Tbilisi = 06:20 UTC) */
+/** Returns Date for next calendar day 10:00 Tbilisi, stored as UTC (10:00 Tbilisi = 06:00 UTC) */
 function getNextDay1020Georgia() {
   const now = new Date();
   const opts = { timeZone: TZ_GEORGIA, year: "numeric", month: "2-digit", day: "2-digit" };
@@ -100,9 +101,9 @@ function getNextDay1020Georgia() {
   const y = parseInt(parts.find((p) => p.type === "year").value, 10);
   const m = parseInt(parts.find((p) => p.type === "month").value, 10);
   const d = parseInt(parts.find((p) => p.type === "day").value, 10);
-  return new Date(Date.UTC(y, m - 1, d + 1, 6, 20, 0)); // 06:20 UTC = 10:20 Tbilisi
+  return new Date(Date.UTC(y, m - 1, d + 1, 6, 0, 0)); // 06:00 UTC = 10:00 Tbilisi
 }
-/** Returns Date for next calendar day 09:00 Tbilisi (05:00 UTC) */
+/** Returns Date for next calendar day 10:00 Tbilisi (06:00 UTC) */
 function getNextDay0900Georgia() {
   const now = new Date();
   const opts = { timeZone: TZ_GEORGIA, year: "numeric", month: "2-digit", day: "2-digit" };
@@ -110,7 +111,7 @@ function getNextDay0900Georgia() {
   const y = parseInt(parts.find((p) => p.type === "year").value, 10);
   const m = parseInt(parts.find((p) => p.type === "month").value, 10);
   const d = parseInt(parts.find((p) => p.type === "day").value, 10);
-  return new Date(Date.UTC(y, m - 1, d + 1, 5, 0, 0)); // 05:00 UTC = 09:00 Tbilisi
+  return new Date(Date.UTC(y, m - 1, d + 1, 6, 0, 0)); // 06:00 UTC = 10:00 Tbilisi
 }
 
 // Bulk emails spread over 2 hours
@@ -241,7 +242,7 @@ async function processNewJobEmailQueue() {
       }
       return;
     }
-    // No sends after 18:30 Georgia: reschedule to next day 09:00, 09:07, 09:14… (spread)
+    // No sends after 18:00 Georgia: reschedule to next day 10:00, 10:07, 10:14… (spread)
     if (isAfter1830()) {
       const next0900 = getNextDay0900Georgia();
       const windowEnd = new Date(next0900.getTime() + BULK_SPREAD_MS);
@@ -416,15 +417,16 @@ async function sendNewJobEmail(job, opts = {}) {
 
   const now = Date.now();
   let sendAfterMs;
-  const deferToNextDay = isAfter1830();
   if (opts.batchTotal != null && opts.batchTotal > 0 && opts.batchIndex != null) {
     const totalWindow = BULK_SPREAD_MS;
     const slotSize = totalWindow / opts.batchTotal;
     const base = opts.batchIndex * slotSize;
     const jitter = (Math.random() - 0.5) * slotSize * 0.4;
-    const baseTime = deferToNextDay ? getNextDay1020Georgia().getTime() : now;
+    // Bulk uploads: always send next morning between 10:00–12:00 Tbilisi
+    const baseTime = getNextDay1020Georgia().getTime();
     sendAfterMs = baseTime + Math.max(0, base + jitter);
   } else {
+    const deferToNextDay = isAfter1830();
     sendAfterMs = deferToNextDay ? getNextDay1020Georgia().getTime() : now;
   }
   const sendAfter = new Date(sendAfterMs);

@@ -17,17 +17,53 @@
       გაგზავნილი CV-ები
     </h1>
 
-    <div class="w-full relative mx-auto" id="jobs-container">
-      <% if (jobs && jobs.length > 0) { %>
-        <% jobs.forEach(job => { %>
-          <%- include('partials/jobItem.ejs', { job, slugify }) %>
-        <% }) %>
-      <% } else { %>
-        <div class="text-center py-12 border border-[#EBEBEB] rounded-lg bg-white">
-          <p class="text-gray-500">ჯერ არც ერთ ვაკანსიაზე არ გაგიგზავნიათ CV.</p>
-          <a href="/" class="inline-block mt-4 text-primary font-medium hover:underline">ვაკანსიების ნახვა</a>
+    <div class="space-y-10">
+      <!-- CVs submitted automatically by Samushao.ge -->
+      <section>
+        <div class="flex flex-col md:flex-row items-center justify-between mb-4 gap-4">
+          <h2 class="text-xl font-medium text-[#151515]">
+            Samushao.ge-ს მიერ გაგზავნილი
+          </h2>
+          <form method="post" action="/my-applications/auto-send-toggle" class="flex items-center gap-2">
+            <button
+              type="submit"
+              class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-medium transition
+                     <%= wantsCvAuto ? 'bg-white text-red-600 border-red-600 hover:bg-red-50' : 'bg-white text-[#151515] border-[#D0D0D0] hover:bg-gray-50' %>">
+              <span>
+                <%= wantsCvAuto ? 'გამორთე ავტომატური გაგზავნა' : 'ჩართე ავტომატური გაგზავნა' %>
+              </span>
+            </button>
+          </form>
         </div>
-      <% } %>
+
+        <% if (wantsCvAuto) { %>
+          <p class="text-sm text-gray-600 mb-4">
+            აქ გამოჩნდება ის ვაკანსიები, სადაც თქვენი CV ავტომატურად გაიგზავნება Samushao.ge-ს რეკომენდაციის საფუძველზე.
+          </p>
+          <div class="border border-dashed border-[#EBEBEB] rounded-lg bg-white/60 px-4 py-6 text-sm text-gray-500">
+            ჯერ არ გვაქვს შენს სახელზე ავტომატურად გაგზავნილი CV-ები.
+          </div>
+        <% } %>
+      </section>
+
+      <!-- User-submitted CVs -->
+      <section>
+        <h2 class="text-xl font-medium text-[#151515] mb-4">
+          ჩემ მიერ გაგზავნილი
+        </h2>
+        <div class="w-full relative mx-auto" id="jobs-container">
+          <% if (jobs && jobs.length > 0) { %>
+            <% jobs.forEach(job => { %>
+              <%- include('partials/jobItem.ejs', { job, slugify }) %>
+            <% }) %>
+          <% } else { %>
+            <div class="text-center py-12 border border-[#EBEBEB] rounded-lg bg-white">
+              <p class="text-gray-500">ჯერ არც ერთ ვაკანსიაზე არ გაგიგზავნიათ CV.</p>
+              <a href="/" class="inline-block mt-4 text-primary font-medium hover:underline">ვაკანსიების ნახვა</a>
+            </div>
+          <% } %>
+        </div>
+      </section>
     </div>
   </main>
 </body>
