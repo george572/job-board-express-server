@@ -21,8 +21,18 @@ const MAIL_USER = "info@samushao.ge";
 const MAIL_PASS = (process.env.MAIL_PSW || "").trim();
 
 // Marketing email on 3rd CV – from giorgi@samushao.ge
-const MARKETING_MAIL_USER = (process.env.APPLICANTS_MAIL_USER || process.env.MARKETING_MAIL_USER || "").trim();
-const MARKETING_MAIL_PASS = (process.env.APPLICANTS_MAIL_PASS || process.env.MARKETING_MAIL_PASS || "").trim().replace(/\s/g, "");
+const MARKETING_MAIL_USER = (
+  process.env.APPLICANTS_MAIL_USER ||
+  process.env.MARKETING_MAIL_USER ||
+  ""
+).trim();
+const MARKETING_MAIL_PASS = (
+  process.env.APPLICANTS_MAIL_PASS ||
+  process.env.MARKETING_MAIL_PASS ||
+  ""
+)
+  .trim()
+  .replace(/\s/g, "");
 
 const marketingTransporter =
   MARKETING_MAIL_USER && MARKETING_MAIL_PASS
@@ -34,17 +44,48 @@ const marketingTransporter =
       })
     : null;
 
+// User vacancy notification – from g.khutiashvili@gmail.com (env: USER_NOTIFICATION_MAIL_USER / USER_NOTIFICATION_MAIL_PASS)
+const PROPOSITIONAL_MAIL_USER = (
+  process.env.PROPOSITIONAL_MAIL_USER || "g.khutiashvili@gmail.com"
+).trim();
+const PROPOSITIONAL_MAIL_PASS = (process.env.PROPOSITIONAL_MAIL_PASS || "")
+  .trim()
+  .replace(/\s/g, "");
+
+const userNotificationTransporter =
+  PROPOSITIONAL_MAIL_USER && PROPOSITIONAL_MAIL_PASS
+    ? nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false,
+        auth: {
+          user: PROPOSITIONAL_MAIL_USER,
+          pass: PROPOSITIONAL_MAIL_PASS,
+        },
+      })
+    : null;
+
 // Marketing email scheduling: if after 18:30 Georgia time, schedule for next day 10:20 Georgia
 const TZ_GEORGIA = "Asia/Tbilisi";
 function isAfter1830() {
-  const pts = new Intl.DateTimeFormat("en-US", { timeZone: TZ_GEORGIA, hour: "numeric", minute: "numeric", hour12: false }).formatToParts(new Date());
+  const pts = new Intl.DateTimeFormat("en-US", {
+    timeZone: TZ_GEORGIA,
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
+  }).formatToParts(new Date());
   const hour = parseInt(pts.find((p) => p.type === "hour").value, 10);
   const minute = parseInt(pts.find((p) => p.type === "minute").value, 10);
   return hour > 18 || (hour === 18 && minute >= 30);
 }
 function getNextDay1020Georgia() {
   const now = new Date();
-  const opts = { timeZone: TZ_GEORGIA, year: "numeric", month: "2-digit", day: "2-digit" };
+  const opts = {
+    timeZone: TZ_GEORGIA,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  };
   const parts = new Intl.DateTimeFormat("en-US", opts).formatToParts(now);
   const y = parseInt(parts.find((p) => p.type === "year").value, 10);
   const m = parseInt(parts.find((p) => p.type === "month").value, 10);
@@ -82,9 +123,12 @@ const transporter = nodemailer.createTransport({
  * @returns {Promise<boolean>} true if fit, false if not fit
  */
 async function assessCandidateFit(job, pdfBase64) {
-  const apiKey = process.env.GEMINI_CV_READER_API_KEY || process.env.GEMINI_API_KEY;
+  const apiKey =
+    process.env.GEMINI_CV_READER_API_KEY || process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error("GEMINI_CV_READER_API_KEY or GEMINI_API_KEY is missing in .env");
+    throw new Error(
+      "GEMINI_CV_READER_API_KEY or GEMINI_API_KEY is missing in .env",
+    );
   }
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
@@ -149,7 +193,12 @@ router.post("/", async (req, res) => {
     }
 
     if (job.expires_at && new Date(job.expires_at) <= new Date()) {
-      return res.status(410).json({ error: "This vacancy has expired and is no longer accepting applications" });
+      return res
+        .status(410)
+        .json({
+          error:
+            "This vacancy has expired and is no longer accepting applications",
+        });
     }
 
     const resume = await db("resumes").where("user_id", user_id).first();
@@ -165,7 +214,9 @@ router.post("/", async (req, res) => {
     // Step A: Fetch PDF from Cloudinary URL
     const pdfResponse = await fetch(resume.file_url);
     if (!pdfResponse.ok) {
-      return res.status(502).json({ error: "Failed to fetch resume PDF from storage" });
+      return res
+        .status(502)
+        .json({ error: "Failed to fetch resume PDF from storage" });
     }
     const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
     const pdfBase64 = pdfBuffer.toString("base64");
@@ -244,8 +295,63 @@ router.post("/", async (req, res) => {
   } catch (err) {
     if (res.headersSent) return;
     console.error("send-cv error:", err);
-    const message = err?.message || err?.error || "An unexpected error occurred";
+    const message =
+      err?.message || err?.error || "An unexpected error occurred";
     return res.status(500).json({ error: message });
+  }
+});
+
+// Endpoint to notify a user about a vacancy that matches their resume (from g.khutiashvili@gmail.com)
+router.post("/user-vacancy-email", async (req, res) => {
+  const { user_email, job_name, job_link } = req.body || {};
+
+  if (!user_email || !job_name) {
+    return res
+      .status(400)
+      .json({ error: "user_email and job_name are required" });
+  }
+
+  if (!userNotificationTransporter) {
+    return res
+      .status(500)
+      .json({
+        error:
+          "User notification email is not configured (USER_NOTIFICATION_MAIL_PASS)",
+      });
+  }
+
+  const link = (job_link || "").trim() || `${SITE_BASE_URL}/`;
+  const subject = `ვაკანსია - ${job_name}`;
+  const text = `Samushao.ge-ზე არის ვაკანსია, რომელიც შეესაბამება თქვენს რეზიუმეს, ნებას თუ მოგვცემთ თქვენს რეზიუმეს გავუზიარებთ დამსაქმებელს.
+ვაკანსია იხილეთ ამ ლინკზე: ${link}`;
+
+  const mailOptions = {
+    from: PROPOSITIONAL_MAIL_USER,
+    to: user_email.trim(),
+    subject,
+    text,
+  };
+
+  try {
+    await new Promise((resolve, reject) => {
+      userNotificationTransporter.sendMail(mailOptions, (err) => {
+        if (err) {
+          console.error("User vacancy email error:", err);
+          reject(
+            new Error("Failed to send user vacancy email: " + err.message),
+          );
+        } else {
+          resolve();
+        }
+      });
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    if (res.headersSent) return;
+    console.error("user-vacancy-email error:", err);
+    res
+      .status(500)
+      .json({ error: err.message || "Failed to send user vacancy email" });
   }
 });
 
@@ -254,28 +360,26 @@ router.post("/hr-email", async (req, res) => {
   const { hr_email, company_name, job_name, last_seen_at } = req.body || {};
 
   if (!hr_email || !job_name) {
-    return res.status(400).json({ error: "hr_email and job_name are required" });
+    return res
+      .status(400)
+      .json({ error: "hr_email and job_name are required" });
   }
 
   if (!marketingTransporter || !MARKETING_MAIL_USER || !MARKETING_MAIL_PASS) {
-    return res.status(500).json({ error: "HR email service is not configured" });
+    return res
+      .status(500)
+      .json({ error: "HR email service is not configured" });
   }
 
   const subject = `კანდიდატები ვაკანსია ${job_name}-სთვის.`;
 
-  const lastSeenLine = last_seen_at
-    ? `\nამ კანდიდატის ბოლო ვიზიტი samushao.ge-ზე: ${last_seen_at}\n`
-    : "";
-
   const text = `კანდიდატები ვაკანსია ${job_name}-სთვის.
 ჩვენ ვიპოვეთ რამდენიმე კარგი კანდიდატი თქვენი ვაკანსიისთვის.
 
-გთხოვთ გადახედოთ რეზიუმეებს და გაგვიზიაროთ თქვენი შეფასება.
-
-რეზიუმეები გადარჩეულია ხელოვნური ინტელექტის მიერ.${lastSeenLine}`;
+კანდიდატებმა იციან რომ ჩვენ მოვახდინეთ მათი იდენტიფიცირება და თანახმა არიან რომ დაეკონტაქტოთ.`;
 
   const mailOptions = {
-    from: `"გიორგი Samushao.ge" <${MARKETING_MAIL_USER || "giorgi@samushao.ge"}>`,
+    from: `<${MARKETING_MAIL_USER || "giorgi@samushao.ge"}>`,
     to: hr_email,
     subject,
     text,
