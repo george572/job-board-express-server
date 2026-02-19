@@ -1,7 +1,7 @@
 <article data-job-id="<%= job.id %>">
   <!-- badges -->
   <a 
-    href="/vakansia/<%= slugify(job.jobName) %>-<%= job.id %><%= (typeof fromRecommended !== 'undefined' && fromRecommended) ? '?from=recommended' : '' %>" 
+    href="/vakansia/<%= slugify(job.jobName) %>-<%= job.id %><%= (typeof fromTopCvFit !== 'undefined' && fromTopCvFit) ? '?from=top-cv-fit' : ((typeof fromRecommended !== 'undefined' && fromRecommended) ? '?from=recommended' : '') %>" 
     class="mx-auto my-4 mt-0 rounded-lg cursor-pointer text-sm flex flex-col justify-start items-start gap-2 text-secondary relative bg-white <%= (job.job_premium_status === 'premium' || job.job_premium_status === 'premiumPlus') ? 'pt-2 px-6 pb-6 border-2 border-[#315EFF]' : 'p-6 border border-[#EBEBEB]' %>"
     data-job-id="<%= job.id %>"
     data-job-title="<%- job.jobName.replace(/\"/g, '&quot;') %>"

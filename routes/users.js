@@ -1,8 +1,13 @@
 const cors = require("cors");
 const express = require("express");
 const knex = require("knex");
+const path = require("path");
 const router = express.Router();
-const db = knex(require("../knexfile").development);  // assuming knexfile.js is configured properly
+
+require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+const knexConfig = require("../knexfile");
+const environment = process.env.NODE_ENV || "development";
+const db = knex(knexConfig[environment]);
 
 router.use(cors()); // Ensure CORS is applied to this router
 
@@ -23,6 +28,41 @@ router.get("/", (req, res) => {
       res.json(rows); // Return all users
     })
     .catch((err) => res.status(500).json({ error: err.message }));
+});
+
+// Top jobs for a user (jobs where this user is a great fit, via Pinecone)
+router.get("/:id/top-jobs", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const topK = Math.min(50, Math.max(1, parseInt(req.query.topK, 10) || 50));
+    const minScore = parseFloat(req.query.minScore);
+    const effectiveMinScore = Number.isFinite(minScore) ? minScore : 0.4;
+
+    const { getTopJobsForUser } = require("../services/pineconeJobs");
+    const matches = await getTopJobsForUser(userId, topK, effectiveMinScore);
+    const jobIds = matches.map((m) => parseInt(m.id, 10)).filter((id) => !isNaN(id));
+    if (jobIds.length === 0) {
+      return res.json({ user_id: userId, jobs: [] });
+    }
+
+    const jobs = await db("jobs")
+      .whereIn("id", jobIds)
+      .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
+      .select("id", "jobName", "companyName", "job_city", "job_experience", "job_type", "jobSalary", "job_premium_status", "prioritize");
+    const scoreMap = Object.fromEntries(matches.map((m) => [parseInt(m.id, 10), m.score]));
+    const sorted = jobIds
+      .map((id) => {
+        const job = jobs.find((j) => j.id === id);
+        if (!job) return null;
+        return { ...job, score: scoreMap[id] ?? 0 };
+      })
+      .filter(Boolean);
+
+    res.json({ user_id: userId, jobs: sorted });
+  } catch (err) {
+    console.error("users top-jobs error:", err);
+    res.status(500).json({ error: err.message || "Failed to get top jobs" });
+  }
 });
 
 // Route to get a user

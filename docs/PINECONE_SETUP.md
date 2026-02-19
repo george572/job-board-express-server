@@ -71,6 +71,48 @@ Returns the top matching candidates using:
 
 ---
 
+## Jobs Index — Top Jobs for a User
+
+A separate **jobs index** powers "jobs where this user is a great fit" (inverse of top-candidates).
+
+### Setup
+
+1. Create the jobs index:
+
+```bash
+npm run create-pinecone-jobs-index
+```
+
+2. Add to `.env` (optional; defaults to `samushao-jobs`):
+
+```
+PINECONE_JOBS_INDEX=samushao-jobs
+```
+
+3. Backfill all active jobs:
+
+```bash
+npm run backfill-pinecone-jobs
+```
+
+### Auto-Indexing and Cleanup
+
+- **New jobs**: Indexed automatically when created via `POST /jobs` or `POST /jobs/bulk`
+- **Job updates**: Re-indexed when `jobName`, `jobDescription`, `job_experience`, `job_type`, `job_city` are PATCHed
+- **Expired jobs**: Removed from Pinecone when `expires_at` passes (periodic cleanup on `/` and `/vakansia/:slug` requests, or run manually):
+
+```bash
+npm run remove-expired-jobs-pinecone
+```
+
+### API
+
+**Endpoint:** `GET /users/:id/top-jobs?topK=20&minScore=0.5`
+
+Returns jobs where the user (by CV embedding) is a great fit. Requires the user to have an indexed CV in the candidates index.
+
+---
+
 ## Hybrid Search (Advanced)
 
 Hybrid search (semantic + lexical) combines dense (multilingual-e5-large) and sparse (pinecone-sparse-english-v0) vectors. It requires:

@@ -9,6 +9,7 @@ const multer = require("multer");
 
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 const { slugify } = require("../utils/slugify");
+const { upsertJob, deleteJob } = require("../services/pineconeJobs");
 const { parsePremiumUntil } = require("../utils/parsePremiumUntil");
 
 // Use the same environment-based Knex config as the main app
@@ -1015,6 +1016,14 @@ router.post("/", upload.none(), async (req, res) => {
         jobSalary,
         dont_send_email: dont_send_email === true || dont_send_email === "true",
       });
+      // Index job in Pinecone for "jobs for user" recommendations
+      upsertJob(inserted.id, {
+        jobName: jName,
+        jobDescription,
+        job_experience,
+        job_city,
+        job_type,
+      }).catch((err) => console.error("[pinecone] Failed to index job:", err.message));
     }
 
     res.status(201).json({ message: "Job created", jobId: inserted?.id });
@@ -1132,6 +1141,18 @@ router.post("/bulk", async (req, res) => {
 
     const ids = await db("jobs").insert(toInsert).returning("id");
 
+    // Index each new job in Pinecone for "jobs for user" recommendations
+    const insertedJobs = toInsert.map((j, i) => ({ ...j, id: ids[i]?.id ?? ids[i] }));
+    for (const j of insertedJobs) {
+      upsertJob(j.id, {
+        jobName: j.jobName,
+        jobDescription: j.jobDescription,
+        job_experience: j.job_experience,
+        job_city: j.job_city,
+        job_type: j.job_type,
+      }).catch((err) => console.error("[pinecone] Failed to index job:", err.message));
+    }
+
     // Send one email per company (group by company_email to avoid duplicates when company uploads multiple jobs)
     const jobsWithIds = toInsert.map((j, i) => ({ ...j, id: ids[i]?.id ?? ids[i] }))
       .filter((j) => !j.dont_send_email && (j.company_email || "").trim());
@@ -1240,6 +1261,25 @@ const patchOrPutJob = async (req, res) => {
       if (count === 0) {
         return res.status(404).json({ error: "Job not found" });
       }
+      // Re-index or remove from Pinecone when job content/expiry changes
+      const pineconeFields = ["jobName", "jobDescription", "job_experience", "job_type", "job_city", "expires_at"];
+      const touchedPinecone = Object.keys(updateData).some((k) => pineconeFields.includes(k));
+      if (touchedPinecone) {
+        const job = await db("jobs").where("id", jobId).select("jobName", "jobDescription", "job_description", "job_experience", "job_type", "job_city", "expires_at").first();
+        if (job) {
+          if (job.expires_at && new Date(job.expires_at) <= new Date()) {
+            deleteJob(jobId).catch((err) => console.error("[pinecone] Failed to delete job:", err.message));
+          } else {
+            upsertJob(jobId, {
+              jobName: job.jobName,
+              jobDescription: job.jobDescription || job.job_description,
+              job_experience: job.job_experience,
+              job_type: job.job_type,
+              job_city: job.job_city,
+            }).catch((err) => console.error("[pinecone] Failed to re-index job:", err.message));
+          }
+        }
+      }
     }
 
     res.status(200).json({ message: "Job updated successfully" });
@@ -1253,19 +1293,19 @@ router.patch("/:id", patchOrPutJob);
 router.put("/:id", patchOrPutJob);
 
 // DELETE route to remove a job
-router.delete("/:id", (req, res) => {
+router.delete("/:id", async (req, res) => {
   const jobId = req.params.id;
 
-  db("jobs")
-    .where("id", jobId)
-    .del()
-    .then((count) => {
-      if (count === 0) {
-        return res.status(404).json({ error: "Job not found" });
-      }
-      res.status(200).json({ message: "Job deleted successfully" });
-    })
-    .catch((err) => res.status(500).json({ error: err.message }));
+  try {
+    const count = await db("jobs").where("id", jobId).del();
+    if (count === 0) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    deleteJob(jobId).catch((err) => console.error("[pinecone] Failed to delete job:", err.message));
+    res.status(200).json({ message: "Job deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.getEmailQueueStatus = async () => {

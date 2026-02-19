@@ -26,6 +26,7 @@ const DATE_IN_GEORGIA = `(created_at AT TIME ZONE '${TZ_GEORGIA}')::date`;
 const TODAY_IN_GEORGIA = `(NOW() AT TIME ZONE '${TZ_GEORGIA}')::date`;
 
 let lastPremiumExpiryCleanup = 0;
+let lastPineconeExpiredJobsCleanup = 0;
 const PREMIUM_EXPIRY_CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 min
 
 async function runPremiumExpiryCleanup() {
@@ -42,6 +43,26 @@ async function runPremiumExpiryCleanup() {
     if (n > 0) console.log("[premium expiry] Cleared", n, "expired premium job(s)");
   } catch (e) {
     console.error("premium expiry cleanup error:", e?.message);
+  }
+}
+
+async function runExpiredJobsPineconeCleanup() {
+  if (Date.now() - lastPineconeExpiredJobsCleanup < PREMIUM_EXPIRY_CLEANUP_INTERVAL_MS) return;
+  if (!(process.env.PINECONE_API_KEY || "").trim()) return;
+  lastPineconeExpiredJobsCleanup = Date.now();
+  try {
+    const { deleteJobs } = require("./services/pineconeJobs");
+    const rows = await db("jobs")
+      .whereNotNull("expires_at")
+      .where("expires_at", "<", db.fn.now())
+      .select("id");
+    const ids = rows.map((r) => r.id);
+    if (ids.length > 0) {
+      await deleteJobs(ids);
+      console.log("[pinecone] Removed", ids.length, "expired job(s) from jobs index");
+    }
+  } catch (e) {
+    console.error("pinecone expired jobs cleanup error:", e?.message);
   }
 }
 
@@ -578,6 +599,7 @@ app.get("/sitemap.xml", async (req, res) => {
 app.get("/", async (req, res) => {
   try {
     await runPremiumExpiryCleanup();
+    await runExpiredJobsPineconeCleanup();
 
     const {
       category,
@@ -636,6 +658,8 @@ app.get("/", async (req, res) => {
     let topPopularTotalCount = 0;
     let todayJobs = [];
     let todayJobsCount = 0;
+    let topCvFitJobs = [];
+    let topCvFitTotalCount = 0;
 
     if (!isAppendRequest) {
     if (!filtersActive && (req.visitorId || req.session?.user?.uid)) {
@@ -763,6 +787,33 @@ app.get("/", async (req, res) => {
       });
       todayJobsCount = todayJobs.length;
     }
+
+    // Top CV-fit jobs (ვაკანსიები სადაც შენი CV ზუსტად ერგება) – when user is logged in and has CV embedding
+    if (!filtersActive && req.session?.user?.uid) {
+      try {
+        const { getTopJobsForUser } = require("./services/pineconeJobs");
+        const matches = await getTopJobsForUser(req.session.user.uid, 50, 0.4);
+        const jobIds = matches.map((m) => parseInt(m.id, 10)).filter((id) => !isNaN(id));
+        if (jobIds.length > 0) {
+          const jobsFromDb = await db("jobs")
+            .whereIn("id", jobIds)
+            .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
+            .select("*");
+          const scoreMap = Object.fromEntries(matches.map((m) => [parseInt(m.id, 10), m.score]));
+          const sorted = jobIds
+            .map((id) => {
+              const job = jobsFromDb.find((j) => j.id === id);
+              if (!job) return null;
+              return { ...job, score: scoreMap[id] ?? 0 };
+            })
+            .filter(Boolean);
+          topCvFitJobs = sorted;
+          topCvFitTotalCount = sorted.length;
+        }
+      } catch (e) {
+        console.error("topCvFitJobs fetch error:", e?.message);
+      }
+    }
     }
 
     let query = db("jobs")
@@ -872,6 +923,8 @@ app.get("/", async (req, res) => {
       topSalaryTotalCount,
       topPopularJobs,
       topPopularTotalCount,
+      topCvFitJobs: topCvFitJobs || [],
+      topCvFitTotalCount: topCvFitTotalCount || 0,
       todayJobs,
       todayJobsCount,
       currentPage: pageNum,
@@ -1138,6 +1191,68 @@ app.get("/rekomendebuli-vakansiebi", async (req, res) => {
   }
 });
 
+// Jobs where your CV fits (ვაკანსიები სადაც შენი CV ზუსტად ერგება) – requires login, uses Pinecone CV matching
+app.get("/vakansiebi-shentvis", async (req, res) => {
+  try {
+    let jobs = [];
+    const userUid = req.session?.user?.uid;
+    if (userUid) {
+      try {
+        const { getTopJobsForUser } = require("./services/pineconeJobs");
+        const matches = await getTopJobsForUser(userUid, 50, 0.4);
+        const jobIds = matches.map((m) => parseInt(m.id, 10)).filter((id) => !isNaN(id));
+        if (jobIds.length > 0) {
+          const jobsFromDb = await db("jobs")
+            .whereIn("id", jobIds)
+            .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
+            .select("*");
+          const scoreMap = Object.fromEntries(matches.map((m) => [parseInt(m.id, 10), m.score]));
+          jobs = jobIds
+            .map((id) => {
+              const job = jobsFromDb.find((j) => j.id === id);
+              if (!job) return null;
+              return { ...job, score: scoreMap[id] ?? 0 };
+            })
+            .filter(Boolean);
+        }
+      } catch (e) {
+        console.error("vakansiebi-shentvis fetch error:", e?.message);
+      }
+    }
+
+    res.render("index", {
+      jobs,
+      recommendedJobs: [],
+      topSalaryJobs: [],
+      topSalaryTotalCount: 0,
+      topPopularJobs: [],
+      topPopularTotalCount: 0,
+      topCvFitJobs: [],
+      topCvFitTotalCount: jobs.length,
+      todayJobs: [],
+      todayJobsCount: 0,
+      currentPage: 1,
+      totalPages: 1,
+      totalJobs: jobs.length,
+      filters: {},
+      filtersActive: false,
+      pageType: "top-cv-fit",
+      paginationBase: "/vakansiebi-shentvis",
+      slugify,
+      seo: {
+        title: "ვაკანსიები სადაც შენი CV ზუსტად ერგება | Samushao.ge",
+        description: "ვაკანსიები რომლებიც ზუსტად შეესაბამება შენი CV-ს.",
+        canonical: "https://samushao.ge/vakansiebi-shentvis",
+        ogImage:
+          "https://res.cloudinary.com/dd7gz0aqv/image/upload/v1743605652/export_l1wpwr.png",
+      },
+    });
+  } catch (err) {
+    console.error("vakansiebi-shentvis error:", err);
+    res.status(500).send(err.message);
+  }
+});
+
 // Privacy policy page
 app.get("/privacy-policy", (req, res) => {
   res.render("privacy-policy", {
@@ -1319,6 +1434,7 @@ app.post("/my-applications/auto-send-toggle", async (req, res) => {
 app.get("/vakansia/:slug", async (req, res) => {
   try {
     await runPremiumExpiryCleanup();
+    await runExpiredJobsPineconeCleanup();
 
     const slug = req.params.slug;
     const jobIdRaw = extractIdFromSlug(slug);

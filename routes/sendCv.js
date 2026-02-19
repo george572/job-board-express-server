@@ -384,7 +384,7 @@ router.post("/hr-email", async (req, res) => {
               u.user_email ?? u.userEmail ?? u.email ?? "—";
             const url =
               u.cv_url ?? u.cvUrl ?? u.resume_url ?? u.file_url ?? "—";
-            return `Name : ${name}\nemail : ${email}\ncv url : ${url}`;
+            return `სახელი : ${name}\nიმეილი : ${email}\nCV ლინკი : ${url}`;
           })
           .join("\n\n")
       : "";
@@ -399,7 +399,7 @@ router.post("/hr-email", async (req, res) => {
       ? `ჩვენ ვიპოვეთ ${list.length} კარგი კანდიდატი თქვენი ვაკანსიისთვის.`
       : "ჩვენ ვიპოვეთ რამდენიმე კარგი კანდიდატი თქვენი ვაკანსიისთვის.";
 
-  const text = `კანდიდატები ვაკანსია ${job_name}-სთვის.
+  const text = `
 
 ${countLine}
 

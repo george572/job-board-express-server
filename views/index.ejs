@@ -69,6 +69,43 @@
   </section>
   <% } %>
 
+  <!-- Top CV-fit jobs (ვაკანსიები სადაც შენი CV ზუსტად ერგება) – slider, hidden when any filter is active -->
+  <% if (typeof topCvFitJobs !== 'undefined' && topCvFitJobs && topCvFitJobs.length > 0) { %>
+  <section id="top-cv-fit-slider-section" class="w-full mx-auto px-4 mt-6 mb-4" style="<%= filtersActive ? 'display:none' : '' %>">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+      <div class="flex flex-col gap-1 flex-1">
+        <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515]">
+          ვაკანსიები სადაც შენი CV ზუსტად ერგება
+        </h2>
+        <% if (typeof topCvFitTotalCount !== 'undefined' && topCvFitTotalCount > 0) { %>
+        <a href="/vakansiebi-shentvis" class="text-sm text-[#315EFF] hover:underline hidden sm:inline-block">
+          ყველას ნახვა (<%= topCvFitTotalCount %>)
+        </a>
+        <% } %>
+      </div>
+      <div class="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0">
+        <% if (typeof topCvFitTotalCount !== 'undefined' && topCvFitTotalCount > 0) { %>
+        <a href="/vakansiebi-shentvis" class="text-sm text-[#315EFF] hover:underline sm:hidden">
+          ყველას ნახვა (<%= topCvFitTotalCount %>)
+        </a>
+        <% } %>
+        <div class="flex items-center gap-2">
+          <button type="button" class="top-cv-fit-prev w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Prev">←</button>
+          <button type="button" class="top-cv-fit-next w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Next">→</button>
+        </div>
+      </div>
+    </div>
+    <div id="top-cv-fit-scroll" class="top-cv-fit-scroll flex w-full items-stretch gap-3 sm:gap-4 overflow-x-auto pb-4 pr-4 snap-x snap-mandatory" 
+    style="scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;">
+    <% topCvFitJobs.forEach(job => { %>
+   <div class="top-cv-fit-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col<%= (job.job_premium_status === 'premium' || job.job_premium_status === 'premiumPlus') ? ' premium-job-mobile-first' : '' %>"<%= (job.job_premium_status === 'premium' || job.job_premium_status === 'premiumPlus') ? ' data-premium="true"' : '' %>>
+     <%- include('partials/jobItemCompact.ejs', { job, slugify, inSlider: true, fromTopCvFit: true }) %>
+   </div>
+ <% }) %>
+</div>
+  </section>
+  <% } %>
+
   <!-- Top salary jobs (scrollable, hidden when any filter is active) -->
   <% if (topSalaryJobs && topSalaryJobs.length > 0) { %>
   <section id="top-salary-slider-section" class="w-full mx-auto px-4 mt-6 mb-4" style="<%= filtersActive ? 'display:none' : '' %>">
@@ -172,12 +209,12 @@
   <div id="jobs-area" data-current-page="<%= currentPage || 1 %>" data-total-pages="<%= totalPages || 1 %>">
   <% if (filtersActive) { %><%- include('partials/facebookPromo') %><% } %>
   <h1 id="all-vacancies-heading" class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1 pb-4 w-full mx-auto px-4" style="<%= filtersActive ? 'display:none' : '' %>">
-    <%= typeof pageType === 'string' && pageType === 'top-salary' ? 'ყველაზე მაღალანაზღაურებადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'top-views' ? 'ყველაზე ნახვადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'today' ? 'დღევანდელი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'recommended' ? 'შენთვის რეკომენდებული ვაკანსიები' : 'ყველა ვაკანსია'))) %>
+    <%= typeof pageType === 'string' && pageType === 'top-salary' ? 'ყველაზე მაღალანაზღაურებადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'top-views' ? 'ყველაზე ნახვადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'today' ? 'დღევანდელი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'recommended' ? 'შენთვის რეკომენდებული ვაკანსიები' : (typeof pageType === 'string' && pageType === 'top-cv-fit' ? 'ვაკანსიები სადაც შენი CV ზუსტად ერგება' : 'ყველა ვაკანსია')))) %>
   </h1>
   <div class="w-full relative mx-auto px-4" id="jobs-container">
     <% if (jobs && jobs.length > 0) { %>
     <% jobs.forEach(job => { %>
-    <%- include('partials/jobItem.ejs', { job, slugify, fromRecommended: typeof pageType !== 'undefined' && pageType === 'recommended' }) %>
+    <%- include('partials/jobItem.ejs', { job, slugify, fromRecommended: typeof pageType !== 'undefined' && pageType === 'recommended', fromTopCvFit: typeof pageType !== 'undefined' && pageType === 'top-cv-fit' }) %>
     <% }) %>
     <% } %>
   </div>
@@ -498,6 +535,16 @@
         recommendedScroll.scrollBy({ left: 320, behavior: 'smooth' });
       });
 
+      var topCvFitScroll = document.getElementById('top-cv-fit-scroll');
+      var topCvFitPrev = document.querySelector('.top-cv-fit-prev');
+      var topCvFitNext = document.querySelector('.top-cv-fit-next');
+      if (topCvFitScroll && topCvFitPrev) topCvFitPrev.addEventListener('click', function () {
+        topCvFitScroll.scrollBy({ left: -320, behavior: 'smooth' });
+      });
+      if (topCvFitScroll && topCvFitNext) topCvFitNext.addEventListener('click', function () {
+        topCvFitScroll.scrollBy({ left: 320, behavior: 'smooth' });
+      });
+
       // Recommended: job click tracking
       const recommendedCards = document.querySelectorAll('.recommended-card a[data-job-id]');
       recommendedCards.forEach(function (card) {
@@ -593,6 +640,27 @@
           }, 150);
         });
       }
+
+      const topCvFitCards = document.querySelectorAll('.top-cv-fit-card a[data-job-id]');
+      topCvFitCards.forEach(function (card) {
+        card.addEventListener('click', function () {
+          try {
+            if (window.amplitude) {
+              const categoryId = this.getAttribute('data-job-category');
+              window.amplitude.track('Top CV Fit Job Clicked', {
+                job_id: this.getAttribute('data-job-id'),
+                job_category: categoryNames[categoryId] || categoryId,
+                job_title: this.getAttribute('data-job-title'),
+                salary_range: this.getAttribute('data-salary-range'),
+                title: this.getAttribute('data-job-title'),
+                company: this.getAttribute('data-job-company'),
+                location: this.getAttribute('data-job-location')
+              });
+              trackPremiumPrioritizedClicks(this, 'top_cv_fit');
+            }
+          } catch (e) {}
+        });
+      });
 
       const cards = document.querySelectorAll('.top-salary-card a[data-job-id]');
       cards.forEach(function (card) {
