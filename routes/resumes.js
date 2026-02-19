@@ -78,6 +78,11 @@ router.post("/", upload.single("resume"), async (req, res) => {
           })
           .then(() => {
             res.json({ message: "File uploaded successfully" });
+            // Phase 2 & 4: Index CV in Pinecone for job-candidate matching (fire-and-forget)
+            const { indexCandidateFromCvUrl } = require("../services/pineconeCandidates");
+            indexCandidateFromCvUrl(user_id, downloadUrl, req.file.originalname).catch((err) => {
+              console.warn("[Pinecone] Failed to index CV for user", user_id, err.message);
+            });
           })
           .catch((err) => res.status(500).json({ error: err.message }));
       }

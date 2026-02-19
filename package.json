@@ -23,10 +23,13 @@
     "assign-hr-jobs": "node scripts/assign-hr-jobs.js",
     "assign-hr-jobs:apply": "node scripts/assign-hr-jobs.js --apply",
     "revert-wrong-hr-jobs": "node scripts/revert-wrong-hr-jobs.js",
-    "revert-wrong-hr-jobs:apply": "node scripts/revert-wrong-hr-jobs.js --apply"
+    "revert-wrong-hr-jobs:apply": "node scripts/revert-wrong-hr-jobs.js --apply",
+    "backfill-pinecone": "node scripts/backfill-pinecone-candidates.js",
+    "backfill-pinecone:retry": "node scripts/backfill-pinecone-candidates.js --retry-failed"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@pinecone-database/pinecone": "^7.0.0",
     "@sentry/node": "^10.38.0",
     "@tailwindcss/cli": "^4.1.18",
     "aa-sqlite": "^1.0.29",
@@ -40,9 +43,12 @@
     "infinite-scroll": "^5.0.0",
     "jsonwebtoken": "^9.0.2",
     "knex": "^3.1.0",
+    "mammoth": "^1.11.0",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.10.0",
     "nodemon": "^3.1.9",
+    "openai": "^6.22.0",
+    "pdf-parse": "^2.4.5",
     "pg": "^8.14.0",
     "sqlite3": "^5.1.7"
   },

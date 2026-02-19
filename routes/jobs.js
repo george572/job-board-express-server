@@ -674,6 +674,68 @@ router.get("/searchterms", (req, res) => {
     .catch((err) => res.status(500).json({ error: err.message }));
 });
 
+// Phase 3: Top candidate matches for a job (Pinecone semantic search)
+router.get("/:id/top-candidates", async (req, res) => {
+  try {
+    const jobId = parseInt(req.params.id, 10);
+    const topKParam = req.query.topK;
+    // Support "all" or 0 to get all candidates; otherwise use number (default 10)
+    const topK = topKParam === "all" || topKParam === "0" ? "all" : parseInt(topKParam, 10) || 10;
+    if (isNaN(jobId)) {
+      return res.status(400).json({ error: "Invalid job ID" });
+    }
+    const job = await db("jobs").where("id", jobId).first();
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    const { getTopCandidatesForJob } = require("../services/pineconeCandidates");
+    const description = [
+      job.jobName || "",
+      job.jobDescription || "",
+      job.job_experience || "",
+      job.job_type || "",
+      job.job_city || "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    if (!description.trim()) {
+      return res.json({ job_id: jobId, candidates: [] });
+    }
+    const matches = await getTopCandidatesForJob(description, topK);
+    const userIds = matches.map((m) => m.id).filter(Boolean);
+    if (userIds.length === 0) {
+      return res.json({ job_id: jobId, candidates: [] });
+    }
+    const users = await db("users")
+      .whereIn("user_uid", userIds)
+      .select("user_uid", "user_name", "user_email");
+    const userMap = Object.fromEntries(users.map((u) => [u.user_uid, u]));
+    const resumeRows = await db("resumes")
+      .whereIn("user_id", userIds)
+      .orderBy("updated_at", "desc")
+      .select("user_id", "file_url", "file_name");
+    const resumeMap = {};
+    resumeRows.forEach((r) => {
+      if (!resumeMap[r.user_id]) resumeMap[r.user_id] = r;
+    });
+    const candidates = matches.map((m) => {
+      const u = userMap[m.id];
+      const r = resumeMap[m.id];
+      return {
+        user_id: m.id,
+        score: m.score,
+        user_name: u?.user_name || null,
+        user_email: u?.user_email || null,
+        cv_url: r?.file_url || null,
+      };
+    });
+    res.json({ job_id: jobId, candidates });
+  } catch (err) {
+    console.error("jobs top-candidates error:", err);
+    res.status(500).json({ error: err.message || "Failed to get top candidates" });
+  }
+});
+
 // CV attempt stats for a job: how many tried, how many failed (Gemini NOT_FIT)
 router.get("/:id/cv-stats", async (req, res) => {
   try {
