@@ -69,6 +69,10 @@ async function runExpiredJobsPineconeCleanup() {
 // Sentinel category ID for personalized recommendations (no jobs have this category_id)
 const RECOMMENDED_CATEGORY_ID = 9999;
 
+// In-memory cache for top CV-fit Pinecone results (user_uid -> { matches, expiresAt }), TTL 2 hours
+const TOP_CV_FIT_CACHE_TTL_MS = 2 * 60 * 60 * 1000;
+const topCvFitCache = new Map();
+
 /**
  * Get personalized job recommendations based on visitor's past clicks.
  * Picks the top N jobs ranked by relevance: category match + title keyword overlap.
@@ -374,7 +378,7 @@ app.use(session(sessionOptions));
 
 // Then your res.locals middleware
 const ENLISTED_FB_COOKIE = "enlisted_fb";
-const CONSENT_COOKIE = "samushao_consent";
+const CONSENT_COOKIE = "samushao_consent_v2";
 const CV_CONSENT_COOKIE = "samushao_cv_consent";
 function hasCookie(req, name) {
   const raw = req?.headers?.cookie || "";
@@ -791,8 +795,19 @@ app.get("/", async (req, res) => {
     // Top CV-fit jobs (ვაკანსიები სადაც შენი CV ზუსტად ერგება) – when user is logged in and has CV embedding
     if (!filtersActive && req.session?.user?.uid) {
       try {
-        const { getTopJobsForUser } = require("./services/pineconeJobs");
-        const matches = await getTopJobsForUser(req.session.user.uid, 50, 0.4);
+        const userId = req.session.user.uid;
+        let matches;
+        const cached = topCvFitCache.get(userId);
+        if (cached && cached.expiresAt > Date.now()) {
+          matches = cached.matches;
+        } else {
+          const { getTopJobsForUser } = require("./services/pineconeJobs");
+          matches = await getTopJobsForUser(userId, 50, 0.4);
+          topCvFitCache.set(userId, {
+            matches,
+            expiresAt: Date.now() + TOP_CV_FIT_CACHE_TTL_MS,
+          });
+        }
         const jobIds = matches.map((m) => parseInt(m.id, 10)).filter((id) => !isNaN(id));
         if (jobIds.length > 0) {
           const jobsFromDb = await db("jobs")
@@ -800,15 +815,29 @@ app.get("/", async (req, res) => {
             .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
             .select("*");
           const scoreMap = Object.fromEntries(matches.map((m) => [parseInt(m.id, 10), m.score]));
-          const sorted = jobIds
+          const withScore = jobIds
             .map((id) => {
               const job = jobsFromDb.find((j) => j.id === id);
               if (!job) return null;
               return { ...job, score: scoreMap[id] ?? 0 };
             })
             .filter(Boolean);
-          topCvFitJobs = sorted;
-          topCvFitTotalCount = sorted.length;
+          // Prioritize premium/premiumPlus first, then prioritize, then rest by score
+          const isBoosted = (j) => j.prioritize === true || j.prioritize === 1 || j.prioritize === "true" || ["premium", "premiumPlus"].includes(j.job_premium_status);
+          const sortRank = (j) => {
+            if (["premiumPlus", "premium"].includes(j.job_premium_status) && isBoosted(j)) return j.job_premium_status === "premiumPlus" ? 0 : 1;
+            if (j.job_premium_status === "premiumPlus") return 2;
+            if (j.job_premium_status === "premium") return 3;
+            if (j.prioritize) return 4;
+            return 5;
+          };
+          topCvFitJobs = withScore.sort((a, b) => {
+            const ra = sortRank(a);
+            const rb = sortRank(b);
+            if (ra !== rb) return ra - rb;
+            return (b.score ?? 0) - (a.score ?? 0);
+          });
+          topCvFitTotalCount = topCvFitJobs.length;
         }
       } catch (e) {
         console.error("topCvFitJobs fetch error:", e?.message);
@@ -1177,7 +1206,7 @@ app.get("/rekomendebuli-vakansiebi", async (req, res) => {
       paginationBase: "/rekomendebuli-vakansiebi",
       slugify,
       seo: {
-        title: "შენთვის რეკომენდებული ვაკანსიები | Samushao.ge",
+        title: "მსგავს ვაკანსიებს ხშირად სტუმრობ | Samushao.ge",
         description:
           "ვაკანსიები რომლებიც შეესაბამება იმას რაც უკვე დაინტერესებული იყავი.",
         canonical: "https://samushao.ge/rekomendebuli-vakansiebi",
@@ -1198,8 +1227,18 @@ app.get("/vakansiebi-shentvis", async (req, res) => {
     const userUid = req.session?.user?.uid;
     if (userUid) {
       try {
-        const { getTopJobsForUser } = require("./services/pineconeJobs");
-        const matches = await getTopJobsForUser(userUid, 50, 0.4);
+        let matches;
+        const cached = topCvFitCache.get(userUid);
+        if (cached && cached.expiresAt > Date.now()) {
+          matches = cached.matches;
+        } else {
+          const { getTopJobsForUser } = require("./services/pineconeJobs");
+          matches = await getTopJobsForUser(userUid, 50, 0.4);
+          topCvFitCache.set(userUid, {
+            matches,
+            expiresAt: Date.now() + TOP_CV_FIT_CACHE_TTL_MS,
+          });
+        }
         const jobIds = matches.map((m) => parseInt(m.id, 10)).filter((id) => !isNaN(id));
         if (jobIds.length > 0) {
           const jobsFromDb = await db("jobs")
@@ -1207,13 +1246,27 @@ app.get("/vakansiebi-shentvis", async (req, res) => {
             .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
             .select("*");
           const scoreMap = Object.fromEntries(matches.map((m) => [parseInt(m.id, 10), m.score]));
-          jobs = jobIds
+          const withScore = jobIds
             .map((id) => {
               const job = jobsFromDb.find((j) => j.id === id);
               if (!job) return null;
               return { ...job, score: scoreMap[id] ?? 0 };
             })
             .filter(Boolean);
+          const isBoosted = (j) => j.prioritize === true || j.prioritize === 1 || j.prioritize === "true" || ["premium", "premiumPlus"].includes(j.job_premium_status);
+          const sortRank = (j) => {
+            if (["premiumPlus", "premium"].includes(j.job_premium_status) && isBoosted(j)) return j.job_premium_status === "premiumPlus" ? 0 : 1;
+            if (j.job_premium_status === "premiumPlus") return 2;
+            if (j.job_premium_status === "premium") return 3;
+            if (j.prioritize) return 4;
+            return 5;
+          };
+          jobs = withScore.sort((a, b) => {
+            const ra = sortRank(a);
+            const rb = sortRank(b);
+            if (ra !== rb) return ra - rb;
+            return (b.score ?? 0) - (a.score ?? 0);
+          });
         }
       } catch (e) {
         console.error("vakansiebi-shentvis fetch error:", e?.message);

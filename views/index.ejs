@@ -41,41 +41,13 @@
   <%- include('partials/header') %>
   <%- include('partials/filters') %>
 
-  <!-- Recommended jobs (personalized, at top – only when we have results) -->
-  <% if (typeof recommendedJobs !== 'undefined' && recommendedJobs && recommendedJobs.length > 0) { %>
-  <section id="recommended-jobs-section" class="w-full mx-auto px-4 mt-6 mb-4">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
-      <div class="flex flex-col gap-1 flex-1">
-        <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515]">
-          შენთვის რეკომენდებული ვაკანსიები
-        </h2>
-        <a id="recommended-see-all-link" href="/rekomendebuli-vakansiebi" class="text-sm text-[#315EFF] hover:underline">
-          ყველას ნახვა
-        </a>
-      </div>
-      <div class="flex items-center gap-2">
-        <button type="button" class="recommended-prev w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Prev">←</button>
-        <button type="button" class="recommended-next w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Next">→</button>
-      </div>
-    </div>
-    <div id="recommended-scroll" class="recommended-scroll flex w-full items-stretch gap-3 sm:gap-4 overflow-x-auto pb-4 pr-4 snap-x snap-mandatory" 
-    style="scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;">
-    <% recommendedJobs.forEach(job => { %>
-   <div class="recommended-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col">
-     <%- include('partials/jobItemCompact.ejs', { job, slugify, inSlider: true, fromRecommended: true }) %>
-   </div>
- <% }) %>
-</div>
-  </section>
-  <% } %>
-
-  <!-- Top CV-fit jobs (ვაკანსიები სადაც შენი CV ზუსტად ერგება) – slider, hidden when any filter is active -->
+  <!-- Top CV-fit jobs (ვაკანსიები სადაც შენი CV ზუსტად ერგება) – at top, slider, hidden when any filter is active -->
   <% if (typeof topCvFitJobs !== 'undefined' && topCvFitJobs && topCvFitJobs.length > 0) { %>
   <section id="top-cv-fit-slider-section" class="w-full mx-auto px-4 mt-6 mb-4" style="<%= filtersActive ? 'display:none' : '' %>">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
       <div class="flex flex-col gap-1 flex-1">
         <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515]">
-          ვაკანსიები სადაც შენი CV ზუსტად ერგება
+          ვაკანსიები სადაც შენი CV ერგება
         </h2>
         <% if (typeof topCvFitTotalCount !== 'undefined' && topCvFitTotalCount > 0) { %>
         <a href="/vakansiebi-shentvis" class="text-sm text-[#315EFF] hover:underline hidden sm:inline-block">
@@ -100,6 +72,34 @@
     <% topCvFitJobs.forEach(job => { %>
    <div class="top-cv-fit-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col<%= (job.job_premium_status === 'premium' || job.job_premium_status === 'premiumPlus') ? ' premium-job-mobile-first' : '' %>"<%= (job.job_premium_status === 'premium' || job.job_premium_status === 'premiumPlus') ? ' data-premium="true"' : '' %>>
      <%- include('partials/jobItemCompact.ejs', { job, slugify, inSlider: true, fromTopCvFit: true }) %>
+   </div>
+ <% }) %>
+</div>
+  </section>
+  <% } %>
+
+  <!-- Recommended jobs (personalized – only when we have results) -->
+  <% if (typeof recommendedJobs !== 'undefined' && recommendedJobs && recommendedJobs.length > 0) { %>
+  <section id="recommended-jobs-section" class="w-full mx-auto px-4 mt-6 mb-4">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+      <div class="flex flex-col gap-1 flex-1">
+        <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515]">
+          მსგავს ვაკანსიებს ხშირად სტუმრობ
+        </h2>
+        <a id="recommended-see-all-link" href="/rekomendebuli-vakansiebi" class="text-sm text-[#315EFF] hover:underline">
+          ყველას ნახვა
+        </a>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" class="recommended-prev w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Prev">←</button>
+        <button type="button" class="recommended-next w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-[#F5F8FF] text-sm sm:text-base cursor-pointer" aria-label="Next">→</button>
+      </div>
+    </div>
+    <div id="recommended-scroll" class="recommended-scroll flex w-full items-stretch gap-3 sm:gap-4 overflow-x-auto pb-4 pr-4 snap-x snap-mandatory" 
+    style="scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;">
+    <% recommendedJobs.forEach(job => { %>
+   <div class="recommended-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col">
+     <%- include('partials/jobItemCompact.ejs', { job, slugify, inSlider: true, fromRecommended: true }) %>
    </div>
  <% }) %>
 </div>
