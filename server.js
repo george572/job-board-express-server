@@ -410,9 +410,12 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static("uploads"));
 
 // Redirect trailing slash to clean URL (prevents duplicate canonicals)
+// Only for GET/HEAD – redirecting POST etc. would lose the request body
 app.use((req, res, next) => {
-  if (req.path.endsWith("/") && req.path.length > 1) {
-    return res.redirect(301, req.path.slice(0, -1) + (req.url.slice(req.path.length) || ""));
+  if (req.method === "GET" || req.method === "HEAD") {
+    if (req.path.endsWith("/") && req.path.length > 1) {
+      return res.redirect(301, req.path.slice(0, -1) + (req.url.slice(req.path.length) || ""));
+    }
   }
   next();
 });
