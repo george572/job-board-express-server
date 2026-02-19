@@ -322,7 +322,8 @@ router.post("/user-vacancy-email", async (req, res) => {
 
   const link = (job_link || "").trim() || `${SITE_BASE_URL}/`;
   const subject = `ვაკანსია - ${job_name}`;
-  const text = `Samushao.ge-ზე არის ვაკანსია, რომელიც შეესაბამება თქვენს რეზიუმეს, ნებას თუ მოგვცემთ თქვენს რეზიუმეს გავუზიარებთ დამსაქმებელს.;`
+  const text = `Samushao.ge-ზე არის ვაკანსია, რომელიც შეესაბამება თქვენს რეზიუმეს, ნებას თუ მოგვცემთ თქვენს რეზიუმეს გავუზიარებთ დამსაქმებელს.
+  პირობებზე და დეტალებზე შეგიძლიათ დამსაქმებელს გაესაუბროთ როცა დაგიკავშირდებიან;`
   const mailOptions = {
     from: PROPOSITIONAL_MAIL_USER,
     to: user_email.trim(),
