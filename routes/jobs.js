@@ -732,6 +732,7 @@ router.get("/:id/top-candidates", async (req, res) => {
     // Last visit info per user: aggregate from visitors table
     const lastSeenRows = await db("visitors")
       .whereIn("user_id", userIds)
+      .select("user_id")
       .groupBy("user_id")
       .max("last_seen as last_seen");
     const lastSeenMap = {};
