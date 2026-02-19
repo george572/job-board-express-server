@@ -50,7 +50,7 @@ Already wired: when a user uploads or updates their CV via `POST /resumes`, the 
 
 ## 5. Phase 3 — Get Top Candidates for a Job
 
-**Endpoint:** `GET /jobs/:id/top-candidates?topK=N` (default topK=10, max 10000, or use `topK=all` to get all candidates)
+**Endpoint:** `GET /jobs/:id/top-candidates?topK=100&minScore=0.7` (request up to 100 candidates, return only those with score >= minScore; default topK=100, max 100)
 
 Returns the top matching candidates for a job based on semantic similarity between job description and CVs.
 

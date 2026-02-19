@@ -67,28 +67,19 @@ async function upsertCandidate(userId, cvText) {
 /**
  * Get top K candidates for a job description (Phase 3).
  * Query is embedded by Pinecone; returns matching candidate IDs.
+ * Caller should filter by minScore (e.g. 0.7) to get only qualified candidates.
  *
  * @param {string} jobDescription - Full job description text
- * @param {number|string} topK - Number of candidates to return (default 5). Use "all" or 0 to get all candidates.
+ * @param {number} topK - Number of candidates to request from Pinecone (default 100, max 100)
  * @returns {Promise<Array<{ id: string, score: number, metadata?: object }>>}
  */
-async function getTopCandidatesForJob(jobDescription, topK = 5) {
+async function getTopCandidatesForJob(jobDescription, topK = 100) {
   const text = (jobDescription || "").trim();
   if (!text) return [];
 
   const index = getIndex();
   const ns = index.namespace(NAMESPACE);
-
-  // Handle "all" candidates: get total count from index stats
-  let actualTopK = topK;
-  if (topK === "all" || topK === 0 || topK === "0") {
-    const stats = await index.describeIndexStats();
-    const namespaceStats = stats.namespaces?.[NAMESPACE];
-    const totalCount = parseInt(namespaceStats?.recordCount || "0", 10);
-    actualTopK = Math.max(1, totalCount); // Use total count, or 1 if no records
-  } else {
-    actualTopK = Math.max(1, Math.min(parseInt(topK, 10) || 10, 10000)); // Max 10k for safety
-  }
+  const actualTopK = Math.max(1, Math.min(parseInt(topK, 10) || 100, 100));
 
   const response = await ns.searchRecords({
     query: {

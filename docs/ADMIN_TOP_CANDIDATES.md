@@ -4,13 +4,14 @@ Use this in the admin app (e.g. samushao-admin) so that when you click **"Reques
 
 ## API
 
-**GET** `/jobs/:id/top-candidates?topK=N`
+**GET** `/jobs/:id/top-candidates?topK=100&minScore=0.7`
 
 - **`:id`** — Job ID (integer).
-- **`topK`** (optional) — Number of candidates to return.
-  - Default: `10` if omitted.
-  - Use `topK=all` or `topK=0` to get **all matching candidates** (fetches total count from Pinecone).
-  - Max: `10000` if a number is provided.
+- **`topK`** (optional) — Number of candidates to request from Pinecone (default `100`, max `100`).
+  - We request this many from Pinecone, then filter by minScore. You get back only those that pass (0 to topK).
+- **`minScore`** (optional) — Minimum relevance score threshold (default `0.7`).
+  - Only candidates with `score >= minScore` are returned.
+  - Use `minScore=0` to include all requested candidates regardless of score.
 
 **Response:**
 
@@ -29,8 +30,30 @@ Use this in the admin app (e.g. samushao-admin) so that when you click **"Reques
 }
 ```
 
-- **`score`** — Match score (0–1, higher = better fit).
+- **`score`** — Match score (0–1, higher = better fit). Only candidates with `score >= minScore` (default 0.7) are returned.
 - **`cv_url`** — Direct link to download the CV (Cloudinary).
+
+**Examples:**
+
+```bash
+# Get up to 100 qualified candidates (score >= 0.7) — default
+GET /jobs/123/top-candidates
+
+# Request 50, get back only those with score >= 0.7
+GET /jobs/123/top-candidates?topK=50
+
+# Lower threshold (score >= 0.5)
+GET /jobs/123/top-candidates?topK=100&minScore=0.5
+
+# No score filter (all 100 returned)
+GET /jobs/123/top-candidates?topK=100&minScore=0
+```
+
+## How It Works
+
+1. **Pinecone query**: We request up to `topK` candidates (default 100, max 100), sorted by score (highest first).
+2. **Filter**: We keep only candidates with `score >= minScore` (default 0.7).
+3. **Response**: You get back only those that pass the threshold (0 to 100). No large payloads.
 
 ## CORS
 
@@ -43,15 +66,12 @@ Add a **"Request candidates"** (or "Matching candidates") control next to each j
 **Minimal fetch example:**
 
 ```javascript
-async function loadMatchingCandidates(jobId, topK = "all") {
+async function loadMatchingCandidates(jobId, topK = 100, minScore = 0.7) {
   const base = "https://your-api.samushao.ge"; // or process.env.REACT_APP_API_URL
-  const url = topK === "all" 
-    ? `${base}/jobs/${jobId}/top-candidates?topK=all` // use topK=all to get all
-    : `${base}/jobs/${jobId}/top-candidates?topK=${topK}`;
-  const res = await fetch(url);
+  const res = await fetch(`${base}/jobs/${jobId}/top-candidates?topK=${topK}&minScore=${minScore}`);
   if (!res.ok) throw new Error("Failed to load candidates");
   const data = await res.json();
-  return data.candidates; // array of { user_id, score, user_name, user_email, cv_url }
+  return data.candidates; // array of { user_id, score, user_name, user_email, cv_url } (only those with score >= minScore)
 }
 ```
 
@@ -62,15 +82,12 @@ async function loadMatchingCandidates(jobId, topK = "all") {
 const [candidates, setCandidates] = useState([]);
 const [loading, setLoading] = useState(false);
 
-async function handleRequestCandidates(jobId, getAll = false) {
+async function handleRequestCandidates(jobId, topK = 100, minScore = 0.7) {
   setLoading(true);
   try {
-    const url = getAll 
-      ? `${API_BASE}/jobs/${jobId}/top-candidates?topK=all` // use topK=all to get all
-      : `${API_BASE}/jobs/${jobId}/top-candidates?topK=20`;
-    const res = await fetch(url);
+    const res = await fetch(`${API_BASE}/jobs/${jobId}/top-candidates?topK=${topK}&minScore=${minScore}`);
     const data = await res.json();
-    setCandidates(data.candidates || []);
+    setCandidates(data.candidates || []); // Only candidates with score >= minScore
   } catch (e) {
     console.error(e);
   } finally {

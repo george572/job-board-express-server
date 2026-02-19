@@ -678,9 +678,8 @@ router.get("/searchterms", (req, res) => {
 router.get("/:id/top-candidates", async (req, res) => {
   try {
     const jobId = parseInt(req.params.id, 10);
-    const topKParam = req.query.topK;
-    // Support "all" or 0 to get all candidates; otherwise use number (default 10)
-    const topK = topKParam === "all" || topKParam === "0" ? "all" : parseInt(topKParam, 10) || 10;
+    const topK = Math.min(100, Math.max(1, parseInt(req.query.topK, 10) || 100)); // Default 100, max 100
+    const minScore = parseFloat(req.query.minScore) || 0.7; // Only return candidates with score >= minScore
     if (isNaN(jobId)) {
       return res.status(400).json({ error: "Invalid job ID" });
     }
@@ -702,7 +701,9 @@ router.get("/:id/top-candidates", async (req, res) => {
       return res.json({ job_id: jobId, candidates: [] });
     }
     const matches = await getTopCandidatesForJob(description, topK);
-    const userIds = matches.map((m) => m.id).filter(Boolean);
+    // Only return candidates that pass the score threshold
+    const qualifiedMatches = matches.filter((m) => (m.score || 0) >= minScore);
+    const userIds = qualifiedMatches.map((m) => m.id).filter(Boolean);
     if (userIds.length === 0) {
       return res.json({ job_id: jobId, candidates: [] });
     }
@@ -718,7 +719,7 @@ router.get("/:id/top-candidates", async (req, res) => {
     resumeRows.forEach((r) => {
       if (!resumeMap[r.user_id]) resumeMap[r.user_id] = r;
     });
-    const candidates = matches.map((m) => {
+    const candidates = qualifiedMatches.map((m) => {
       const u = userMap[m.id];
       const r = resumeMap[m.id];
       return {
