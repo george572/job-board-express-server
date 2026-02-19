@@ -2,11 +2,11 @@
 
 ## Overview
 
-This system uses **Pinecone multilingual-e5-large** for embeddings, **metadata-enriched queries** (job_role, job_experience, etc.), and **reranking** (bge-reranker-v2-m3) for better candidate matching. CV text is sent to Pinecone, which embeds and indexes it. Searches use structured metadata and two-stage retrieval (search → rerank).
+This system uses **Jina `jina-embeddings-v3`** for embeddings and a **Pinecone vector index (1024-dim, cosine)** for candidate–job matching. CV text is embedded via Jina, stored as vectors in Pinecone, and searches use metadata-enriched queries (job_role, job_experience, etc.) embedded via Jina as well.
 
 ## 1. Create Pinecone Index
 
-Create an index with **multilingual-e5-large** (recommended for multilingual/Georgian content):
+Create a **vector index** (dim 1024, cosine) for Jina embeddings:
 
 ```bash
 npm run create-pinecone-index
@@ -23,10 +23,9 @@ node scripts/create-pinecone-index-e5.js
 - Create the new index with a different name and set `PINECONE_INDEX` in `.env`
 
 The script creates an index with:
-- Model: `multilingual-e5-large`
-- Field map: `text` → `text`
-- Write: `input_type: passage`, `truncate: END`
-- Read: `input_type: query`, `truncate: END`
+- Dimension: `1024`
+- Metric: `cosine`
+- Serverless: `aws`, region `us-east-1`
 
 ## 2. Environment Variables
 
@@ -35,6 +34,7 @@ Add to `.env`:
 ```
 PINECONE_API_KEY=your-pinecone-api-key
 PINECONE_INDEX=samushao-candidates
+JINA_API_KEY=your-jina-api-key
 ```
 
 No OpenAI (or other embedding) API key is required.
@@ -52,7 +52,8 @@ This will:
 - Fetch all candidates with resumes from the DB
 - Extract text from each CV (PDF/DOC/DOCX)
 - Structure text to emphasize profession and experience
-- Upsert to Pinecone (Pinecone generates embeddings; id = user_uid)
+- Call Jina to embed the CV text (`task: retrieval.passage`)
+- Upsert embeddings to Pinecone as vectors (`values`) with metadata (including the CV text); id = user_uid
 
 ## 4. Phase 2 & 4 — New CV Upload / Update
 
@@ -64,7 +65,7 @@ Already wired: when a user uploads or updates their CV via `POST /resumes`, the 
 
 Returns the top matching candidates using:
 - **Metadata-enriched query**: job_role, job_experience, job_type, job_city in the search text
-- **Reranking**: bge-reranker-v2-m3 for two-stage retrieval (higher accuracy)
+- **Jina embeddings for queries** (`task: retrieval.query`) and **Pinecone vector search**
 
 **Admin UI:** See [ADMIN_TOP_CANDIDATES.md](./ADMIN_TOP_CANDIDATES.md).
 

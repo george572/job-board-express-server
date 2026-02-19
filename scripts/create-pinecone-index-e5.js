@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Create Pinecone index with multilingual-e5-large for candidate–job matching.
+ * Create Pinecone vector index for candidate–job matching using Jina embeddings.
  * Run once to create the index, then set PINECONE_INDEX in .env and run backfill.
  *
  * Usage: node scripts/create-pinecone-index-e5.js
@@ -23,18 +23,18 @@ async function main() {
 
   const pc = new Pinecone({ apiKey });
 
-  console.log(`Creating index "${INDEX_NAME}" with multilingual-e5-large...`);
+  console.log(`Creating vector index "${INDEX_NAME}" for Jina embeddings (dim=1024, metric=cosine)...`);
 
   try {
-    await pc.createIndexForModel({
+    await pc.createIndex({
       name: INDEX_NAME,
-      cloud: "aws",
-      region: "us-east-1",
-      embed: {
-        model: "multilingual-e5-large",
-        fieldMap: { text: "text" },
-        writeParameters: { input_type: "passage", truncate: "END" },
-        readParameters: { input_type: "query", truncate: "END" },
+      dimension: 1024,
+      metric: "cosine",
+      spec: {
+        serverless: {
+          cloud: "aws",
+          region: "us-east-1",
+        },
       },
       waitUntilReady: true,
       suppressConflicts: true,

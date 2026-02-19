@@ -84,21 +84,21 @@ async function main() {
 
   for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
     const batch = candidates.slice(i, i + BATCH_SIZE);
-    const results = await Promise.allSettled(
-      batch.map((c) => indexCandidateFromCvUrl(c.user_id, c.file_url, c.file_name))
-    );
-
-    for (let j = 0; j < results.length; j++) {
-      const r = results[j];
-      const c = batch[j];
+    for (const c of batch) {
       const user_id = c.user_id;
       const file_url = c.file_url || "";
       const file_name = c.file_name || "";
-
-      if (r.status === "fulfilled" && r.value) {
-        console.log(`  ✓ ${user_id}`);
-      } else {
-        const err = getErrorReason(r);
+      try {
+        const ok = await indexCandidateFromCvUrl(user_id, file_url, file_name);
+        if (ok) {
+          console.log(`  ✓ ${user_id}`);
+        } else {
+          const err = "no text extracted";
+          failedList.push({ user_id, file_url, file_name, error: err });
+          console.log(`  ✗ ${user_id} — ${err}`);
+        }
+      } catch (e) {
+        const err = e?.message || String(e);
         failedList.push({ user_id, file_url, file_name, error: err });
         console.log(`  ✗ ${user_id} — ${err}`);
       }

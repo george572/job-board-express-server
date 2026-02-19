@@ -15,8 +15,32 @@ const { Pinecone } = require("@pinecone-database/pinecone");
 const { extractTextFromCv } = require("./cvTextExtractor");
 
 const NAMESPACE = "candidates";
+const JINA_API_KEY = (process.env.JINA_API_KEY || "").trim();
 
 let _pinecone = null;
+
+async function embedWithJina(texts, task) {
+  if (!JINA_API_KEY) throw new Error("JINA_API_KEY is required for Jina embeddings");
+  const res = await fetch("https://api.jina.ai/v1/embeddings", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${JINA_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      input: texts,
+      model: "jina-embeddings-v3",
+      task, // "retrieval.passage" or "retrieval.query"
+      dimensions: 1024,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Jina embed failed (${res.status}): ${body}`);
+  }
+  const json = await res.json();
+  return (json.data || []).map((d) => d.embedding);
+}
 
 function normalizeForMatch(s) {
   return String(s || "")
@@ -95,7 +119,7 @@ function buildCandidateTextForEmbedding(cvText) {
 }
 
 /**
- * Upsert a single candidate's CV to Pinecone (text is embedded by Pinecone).
+ * Upsert a single candidate's CV to Pinecone (embedding computed via Jina).
  * ID = user_id; overwrites if already exists (Phase 2 & 4).
  * Text is structured so job title and past experience are emphasized for matching.
  *
@@ -109,15 +133,20 @@ async function upsertCandidate(userId, cvText) {
   if (!text) return false;
 
   const index = getIndex();
-  const ns = index.namespace(NAMESPACE);
-  await ns.upsertRecords({
+  const [embedding] = await embedWithJina([text], "retrieval.passage");
+
+  await index.upsert({
     records: [
       {
-        _id: String(userId),
-        text: text, // field_map text=content means we send 'text', Pinecone maps to 'content'
-        user_id: String(userId),
+        id: String(userId),
+        values: embedding,
+        metadata: {
+          text,
+          user_id: String(userId),
+        },
       },
     ],
+    namespace: NAMESPACE,
   });
   return true;
 }
@@ -149,10 +178,10 @@ function buildJobSearchText(opts) {
 
 /**
  * Get top K candidates for a job (Phase 3).
- * Uses metadata-enriched query, hybrid-ready (multilingual-e5-large), and reranking.
+ * Uses metadata-enriched query, Jina embeddings, and Pinecone vector search.
  *
  * @param {string|object} jobInput - Job description string, or { jobDescription, job_role, job_experience, job_type, job_city, requireRoleMatch }
- * @param {number} topK - Number of candidates to return after reranking (default 100, max 100)
+ * @param {number} topK - Number of candidates to return after filtering (default 100, max 100)
  * @returns {Promise<Array<{ id: string, score: number, metadata?: object }>>}
  */
 async function getTopCandidatesForJob(jobInput, topK = 100) {
@@ -161,35 +190,30 @@ async function getTopCandidatesForJob(jobInput, topK = 100) {
   if (!text.trim()) return [];
 
   const index = getIndex();
-  const ns = index.namespace(NAMESPACE);
   const actualTopK = Math.max(1, Math.min(parseInt(topK, 10) || 100, 100));
 
-  // bge-reranker-v2-m3 max 100 docs; fetch up to that for reranking pool
+  // Fetch more candidates for a better pool, then apply strict filters and trim to actualTopK.
   const fetchK = Math.min(actualTopK * 2, 100);
 
-  const response = await ns.searchRecords({
-    query: {
-      topK: fetchK,
-      inputs: { text },
-    },
-    fields: ["text"],
-    rerank: {
-      model: "bge-reranker-v2-m3",
-      rankFields: ["text"],
-      topN: actualTopK,
-      parameters: { truncate: "END" },
-    },
+  const [queryEmbedding] = await embedWithJina([text], "retrieval.query");
+
+  const response = await index.query({
+    vector: queryEmbedding,
+    topK: fetchK,
+    includeMetadata: true,
+    namespace: NAMESPACE,
   });
 
-  let hits = response?.result?.hits || [];
+  let matches = response?.matches || [];
   if (opts?.requireRoleMatch && opts?.job_role) {
-    hits = hits.filter((hit) => candidateHasRoleExperience(hit?.fields?.text, opts.job_role));
+    matches = matches.filter((hit) => candidateHasRoleExperience(hit?.metadata?.text, opts.job_role));
   }
 
-  return hits.map((hit) => ({
-    id: hit._id,
-    score: hit._score ?? 0,
-    metadata: hit.fields || {},
+  const limited = matches.slice(0, actualTopK);
+  return limited.map((hit) => ({
+    id: hit.id,
+    score: hit.score ?? 0,
+    metadata: hit.metadata || {},
   }));
 }
 
