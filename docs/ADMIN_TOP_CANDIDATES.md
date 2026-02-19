@@ -4,7 +4,7 @@ Use this in the admin app (e.g. samushao-admin) so that when you click **"Reques
 
 ## API
 
-**GET** `/jobs/:id/top-candidates?topK=100&minScore=0.5`
+**GET** `/jobs/:id/top-candidates?topK=100&minScore=0.5&requireRoleMatch=0`
 
 - **`:id`** — Job ID (integer).
 - **`topK`** (optional) — Number of candidates to request from Pinecone (default `100`, max `100`).
@@ -12,6 +12,9 @@ Use this in the admin app (e.g. samushao-admin) so that when you click **"Reques
 - **`minScore`** (optional) — Minimum relevance score threshold (default `0.5`).
   - Only candidates with `score >= minScore` are returned.
   - **Score calibration for CV–job matching:** Reranker scores rarely reach 0.9; 0.5–0.7 = decent match, 0.7+ = strong. Use `minScore=0` to include all requested candidates.
+- **`requireRoleMatch`** (optional) — If `1` / `true`, filters out candidates whose CV text does **not** explicitly mention the job title (or at least one meaningful word from it).
+  - Use this to remove “semantically kinda related” but clearly irrelevant CVs.
+  - Example: for `jobName = "Sales Manager"`, CV must contain “sales manager” or at least “sales” / “manager”.
 
 **Response:**
 
@@ -45,6 +48,9 @@ GET /jobs/123/top-candidates?topK=50
 # Stricter threshold (score >= 0.7)
 GET /jobs/123/top-candidates?topK=100&minScore=0.7
 
+# Enforce title/role mention in CV text (stricter, fewer but cleaner results)
+GET /jobs/123/top-candidates?topK=100&minScore=0.5&requireRoleMatch=1
+
 # No score filter (all 100 returned)
 GET /jobs/123/top-candidates?topK=100&minScore=0
 ```
@@ -58,6 +64,8 @@ GET /jobs/123/top-candidates?topK=100&minScore=0
 ## How the request is sent to Pinecone
 
 **Model:** multilingual-e5-large (multilingual, good for Georgian + English CVs)
+
+**Search type:** This is **semantic search over text records** (Pinecone generates dense embeddings for CVs + query using `multilingual-e5-large`), with **integrated reranking** (`bge-reranker-v2-m3`). It is not hybrid (dense+sparse) search.
 
 **Metadata-enriched query:**
 

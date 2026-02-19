@@ -690,6 +690,13 @@ router.get("/:id/top-candidates", async (req, res) => {
       return res.status(404).json({ error: "Job not found" });
     }
     const { getTopCandidatesForJob } = require("../services/pineconeCandidates");
+    const requireRoleMatch =
+      String(req.query.requireRoleMatch || "")
+        .trim()
+        .toLowerCase() === "1" ||
+      String(req.query.requireRoleMatch || "")
+        .trim()
+        .toLowerCase() === "true";
     // Pass job metadata (job_role, job_experience, etc.) for metadata-enriched search + reranking
     const matches = await getTopCandidatesForJob(
       {
@@ -698,6 +705,7 @@ router.get("/:id/top-candidates", async (req, res) => {
         job_type: job.job_type || "",
         job_city: job.job_city || "",
         jobDescription: job.jobDescription || job.job_description || "",
+        requireRoleMatch,
       },
       topK
     );

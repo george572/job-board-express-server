@@ -18,6 +18,44 @@ const NAMESPACE = "candidates";
 
 let _pinecone = null;
 
+function normalizeForMatch(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/[\u2010-\u2015]/g, "-")
+    .replace(/[^a-z0-9\u10A0-\u10FF\s-]/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildRoleTokens(role) {
+  const norm = normalizeForMatch(role);
+  if (!norm) return { phrase: "", tokens: [] };
+  const tokens = Array.from(
+    new Set(
+      norm
+        .split(" ")
+        .map((t) => t.trim())
+        .filter((t) => t.length >= 3 && !/^\d+$/.test(t))
+    )
+  );
+  return { phrase: norm, tokens };
+}
+
+function candidateHasRoleExperience(candidateText, role) {
+  const cand = normalizeForMatch(candidateText);
+  if (!cand) return false;
+
+  const { phrase, tokens } = buildRoleTokens(role);
+  if (!phrase) return true; // no role to enforce
+
+  // Strong signal: full phrase appears.
+  if (phrase.length >= 6 && cand.includes(phrase)) return true;
+
+  // Fallback: require at least one meaningful token to appear.
+  // (This is intentionally strict-ish; you can tune later.)
+  return tokens.some((t) => cand.includes(t));
+}
+
 function getPinecone() {
   if (!_pinecone) {
     const apiKey = process.env.PINECONE_API_KEY;
@@ -113,7 +151,7 @@ function buildJobSearchText(opts) {
  * Get top K candidates for a job (Phase 3).
  * Uses metadata-enriched query, hybrid-ready (multilingual-e5-large), and reranking.
  *
- * @param {string|object} jobInput - Job description string, or { jobDescription, job_role, job_experience, job_type, job_city }
+ * @param {string|object} jobInput - Job description string, or { jobDescription, job_role, job_experience, job_type, job_city, requireRoleMatch }
  * @param {number} topK - Number of candidates to return after reranking (default 100, max 100)
  * @returns {Promise<Array<{ id: string, score: number, metadata?: object }>>}
  */
@@ -143,7 +181,11 @@ async function getTopCandidatesForJob(jobInput, topK = 100) {
     },
   });
 
-  const hits = response?.result?.hits || [];
+  let hits = response?.result?.hits || [];
+  if (opts?.requireRoleMatch && opts?.job_role) {
+    hits = hits.filter((hit) => candidateHasRoleExperience(hit?.fields?.text, opts.job_role));
+  }
+
   return hits.map((hit) => ({
     id: hit._id,
     score: hit._score ?? 0,
