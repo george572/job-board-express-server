@@ -50,14 +50,14 @@
           ვაკანსიები სადაც შენი CV ერგება
         </h2>
         <% if (typeof topCvFitTotalCount !== 'undefined' && topCvFitTotalCount > 0) { %>
-        <a href="/vakansiebi-shentvis" class="text-sm text-[#315EFF] hover:underline hidden sm:inline-block">
+        <a id="top-cv-fit-see-all-link" href="/vakansiebi-shentvis" class="text-sm text-[#315EFF] hover:underline hidden sm:inline-block">
           ყველას ნახვა (<%= topCvFitTotalCount %>)
         </a>
         <% } %>
       </div>
       <div class="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0">
         <% if (typeof topCvFitTotalCount !== 'undefined' && topCvFitTotalCount > 0) { %>
-        <a href="/vakansiebi-shentvis" class="text-sm text-[#315EFF] hover:underline sm:hidden">
+        <a id="top-cv-fit-see-all-link-mobile" href="/vakansiebi-shentvis" class="text-sm text-[#315EFF] hover:underline sm:hidden">
           ყველას ნახვა (<%= topCvFitTotalCount %>)
         </a>
         <% } %>
@@ -641,6 +641,7 @@
         });
       }
 
+      // Top CV fit: job click tracking
       const topCvFitCards = document.querySelectorAll('.top-cv-fit-card a[data-job-id]');
       topCvFitCards.forEach(function (card) {
         card.addEventListener('click', function () {
@@ -660,6 +661,38 @@
             }
           } catch (e) {}
         });
+      });
+
+      // Top CV fit: swipe/scroll tracking
+      if (topCvFitScroll) {
+        var lastTopCvFitScrollLeft = topCvFitScroll.scrollLeft;
+        var topCvFitScrollTimeout;
+        topCvFitScroll.addEventListener('scroll', function () {
+          clearTimeout(topCvFitScrollTimeout);
+          topCvFitScrollTimeout = setTimeout(function () {
+            var now = topCvFitScroll.scrollLeft;
+            if (now !== lastTopCvFitScrollLeft && window.amplitude) {
+              try {
+                window.amplitude.track('Top CV Fit Slider Swiped', {
+                  direction: now > lastTopCvFitScrollLeft ? 'left' : 'right'
+                });
+              } catch (e) {}
+              lastTopCvFitScrollLeft = now;
+            }
+          }, 150);
+        });
+      }
+
+      // Top CV fit: "See all" click tracking
+      ['top-cv-fit-see-all-link', 'top-cv-fit-see-all-link-mobile'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('click', function () {
+            try {
+              if (window.amplitude) window.amplitude.track('Top CV Fit See All Clicked');
+            } catch (e) {}
+          });
+        }
       });
 
       const cards = document.querySelectorAll('.top-salary-card a[data-job-id]');
