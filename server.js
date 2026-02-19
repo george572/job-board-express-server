@@ -366,6 +366,29 @@ app.use((req, res, next) => {
 const { visitorMiddleware } = require("./middleware/visitor");
 app.use(visitorMiddleware(db, extractIdFromSlug));
 
+// After visitor: upgrade enlistedInFb from DB if user/visitor has interacted
+app.use(async (req, res, next) => {
+  if (res.locals.enlistedInFb) return next();
+  const userId = req.session?.user?.uid;
+  const visitorId = req.visitorId;
+  if (!userId && !visitorId) return next();
+  try {
+    let q = db("enlisted_in_fb");
+    if (userId && visitorId) {
+      q = q.whereRaw("(user_id = ? OR visitor_id = ?)", [userId, visitorId]);
+    } else if (userId) {
+      q = q.where("user_id", userId);
+    } else {
+      q = q.where("visitor_id", visitorId);
+    }
+    const found = await q.first();
+    if (found) res.locals.enlistedInFb = true;
+  } catch (e) {
+    /* ignore */
+  }
+  next();
+});
+
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 
@@ -1290,9 +1313,13 @@ const FB_GROUP_URL = "https://www.facebook.com/groups/964592739202329";
 app.get("/api/enlist-fb", async (req, res) => {
   try {
     if (!hasEnlistedFbCookie(req)) {
-      await db("enlisted_in_fb").insert({});
+      await db("enlisted_in_fb").insert({
+        visitor_id: req.visitorId || null,
+        user_id: req.session?.user?.uid || null,
+        action: "enlist",
+      });
       res.cookie(ENLISTED_FB_COOKIE, "1", {
-        maxAge: 365 * 24 * 60 * 60,
+        maxAge: 10 * 365 * 24 * 60 * 60,
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
@@ -1304,9 +1331,32 @@ app.get("/api/enlist-fb", async (req, res) => {
   }
   res.redirect(302, FB_GROUP_URL);
 });
+app.get("/api/dismiss-fb-promo", async (req, res) => {
+  try {
+    if (!hasEnlistedFbCookie(req)) {
+      await db("enlisted_in_fb").insert({
+        visitor_id: req.visitorId || null,
+        user_id: req.session?.user?.uid || null,
+        action: "dismiss",
+      });
+      res.cookie(ENLISTED_FB_COOKIE, "1", {
+        maxAge: 10 * 365 * 24 * 60 * 60,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+      });
+    }
+  } catch (err) {
+    console.error("dismiss-fb-promo error:", err);
+  }
+  res.status(204).end();
+});
 app.get("/api/enlist-fb/count", async (req, res) => {
   try {
-    const [{ count }] = await db("enlisted_in_fb").count("id as count");
+    const [{ count }] = await db("enlisted_in_fb")
+      .whereRaw("(action IS NULL OR action = ?)", ["enlist"])
+      .count("id as count");
     res.json({ count: parseInt(count, 10) || 0 });
   } catch (err) {
     console.error("enlist-fb count error:", err);

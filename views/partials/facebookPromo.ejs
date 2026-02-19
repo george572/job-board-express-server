@@ -1,7 +1,8 @@
 <% if (!enlistedInFb) { %>
 <!-- Facebook groups promo – styled like job item; overflow-anchor:none prevents scroll jump when it enters viewport -->
 <div class="fb-promo-block w-full mx-auto px-4 mt-6 mb-4" style="overflow-anchor: none" data-fb-promo>
-  <article class=" flex items-center justify-center flex-col mx-auto my-4 mt-0 rounded-lg p-6 bg-primary text-white text-sm w-full">
+  <article class="relative flex items-center justify-center flex-col mx-auto my-4 mt-0 rounded-lg p-6 bg-primary text-white text-sm w-full">
+    <button type="button" class="fb-promo-dismiss absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors cursor-pointer text-[30px] leading-none z-10" aria-label="დახურვა">×</button>
     <p class="text-[14px] text-white font-[400] mb-4">გაწევრიანდით ჩვენს Facebook ჯგუფში და გაიგეთ ყველაზე მაგარი ვაკანსიების შესახებ პირველმა!</p>
     <div class="flex flex-col sm:flex-row flex-wrap gap-3">
       <a href="/api/enlist-fb" target="_blank" rel="noopener noreferrer" class="fb-promo-enlist-link flex items-center justify-center gap-2 text-white hover:opacity-90 text-[14px]">
@@ -18,6 +19,10 @@
   function hidePromos() {
     try { document.querySelectorAll('[data-fb-promo]').forEach(function(el) { el.style.display = 'none'; }); } catch (e) {}
   }
+  function saveAndHide() {
+    try { localStorage.setItem(key, '1'); } catch (e) {}
+    hidePromos();
+  }
   if (typeof localStorage !== 'undefined' && localStorage.getItem(key)) {
     hidePromos();
     return;
@@ -26,8 +31,12 @@
     if (localStorage.getItem(key)) { hidePromos(); return; }
     document.querySelectorAll('.fb-promo-enlist-link').forEach(function(link) {
       link.addEventListener('click', function() {
-        try { localStorage.setItem(key, '1'); } catch (e) {}
-        hidePromos();
+        saveAndHide();
+      });
+    });
+    document.querySelectorAll('.fb-promo-dismiss').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        fetch('/api/dismiss-fb-promo', { method: 'GET', credentials: 'same-origin' }).then(function() { saveAndHide(); }).catch(function() { saveAndHide(); });
       });
     });
   });
