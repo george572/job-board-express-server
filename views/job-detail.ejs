@@ -143,6 +143,7 @@
 </head>
 
 <body data-user-uid="<%= user && user.uid ? user.uid : '' %>" data-job-id="<%= job.id %>">
+  <%- include('partials/gtm-noscript') %>
   <script>
     (function(){
       var jobId = document.body.getAttribute('data-job-id');
