@@ -158,56 +158,6 @@ router.post("/", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Assess CV–job fit: vector search + final Gemini verdict (skip if job.disable_cv_filter)
-    // 1. Vector search: get candidate match (score + cvText from Pinecone metadata)
-    // 2. Gemini call: outputs verdict (STRONG_MATCH, GOOD_MATCH, PARTIAL_MATCH, WEAK_MATCH)
-    // 3. Send only if verdict is at least PARTIAL_MATCH; block WEAK_MATCH
-    let isFit = true;
-    let geminiVerdict = null;
-    let geminiSummary = null;
-    if (!job.disable_cv_filter) {
-      try {
-        const {
-          getCandidateMatchForJob,
-        } = require("../services/pineconeCandidates");
-        const {
-          assessCandidateAlignment,
-        } = require("../services/geminiCandidateAssessment");
-        const match = await getCandidateMatchForJob(job, user_id);
-        if (!match || !match.cvText) {
-          isFit = false;
-        } else {
-          const assessment = await assessCandidateAlignment(job, match.cvText);
-          geminiVerdict = assessment.verdict;
-          geminiSummary = assessment.summary;
-          isFit = geminiVerdict !== "WEAK_MATCH"; // Allow STRONG_MATCH, GOOD_MATCH, PARTIAL_MATCH
-        }
-      } catch (err) {
-        console.error("CV–job fit assessment error:", err?.message);
-        isFit = false;
-      }
-    }
-    if (!isFit) {
-      try {
-        await db("cv_refusals").insert({ user_id, job_id: job.id });
-        await db("users").where("user_uid", user_id).increment("failed_cvs", 1);
-      } catch (e) {
-        if (e.code === "23505") {
-          // Already in cv_refusals (user retried); keep record for admin
-        } else throw e;
-      }
-      // Discard: don't send email, don't add to job_applications; show success to user
-      return res.json({
-        message: "CV is sent successfully",
-        job,
-        resume,
-        user,
-        cv_submitted: false,
-        gemini_verdict: geminiVerdict,
-        gemini_summary: geminiSummary,
-      });
-    }
-
     const cvsSentBefore = job.cvs_sent || 0;
     const isThirdCv = cvsSentBefore === 2;
 
@@ -256,8 +206,6 @@ router.post("/", async (req, res) => {
       resume,
       user,
       cv_submitted: true,
-      gemini_verdict: geminiVerdict,
-      gemini_summary: geminiSummary,
     });
   } catch (err) {
     if (res.headersSent) return;
