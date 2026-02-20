@@ -82,7 +82,16 @@ router.post("/", async (req, res) => {
     if (req.session?.user?.uid) insertPayload.user_id = req.session.user.uid;
     if (req.visitorId) insertPayload.visitor_id = req.visitorId;
 
-    await db("job_form_submissions").insert(insertPayload);
+    try {
+      await db("job_form_submissions").insert(insertPayload);
+    } catch (insertErr) {
+      // Unique constraint violation = race / double-submit (same user/visitor already applied)
+      if (insertErr.code === "23505") {
+        setFormSubmittedCookie(res, cookieIds, jobId);
+        return res.status(400).json({ error: "თქვენ უკვე გააგზავნეთ განაცხადი ამ ვაკანსიაზე" });
+      }
+      throw insertErr;
+    }
 
     try {
       await db.raw(

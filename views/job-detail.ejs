@@ -1010,7 +1010,16 @@
           document.body.classList.remove('dialog-open');
         }
       }
+      var formSubmitting = false;
       function submitForm(form, successEl) {
+        if (formSubmitting) return;
+        formSubmitting = true;
+        var submitBtn = form.querySelector('button[type="submit"]');
+        var originalText = submitBtn ? submitBtn.textContent : '';
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'იგზავნება...';
+        }
         const fd = new FormData(form);
         const body = {
           job_id: jobId,
@@ -1043,9 +1052,15 @@
             formFields.forEach(function(el) { el.style.display = ''; });
             if (successEl) successEl.classList.add('hidden');
             setAppliedState();
+            formSubmitting = false;
           }, 2500);
         })
         .catch(function(err) {
+          formSubmitting = false;
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+          }
           alert(err.message || 'გაგზავნა ვერ მოხერხდა');
         });
       }
