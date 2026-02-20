@@ -4,14 +4,14 @@ Use this in the admin app (e.g. samushao-admin) so that when you click **"Reques
 
 ## API
 
-**GET** `/jobs/:id/top-candidates?topK=100&minScore=0.5&requireRoleMatch=0`
+**GET** `/jobs/:id/top-candidates?topK=100&minScore=0.4&requireRoleMatch=0`
 
 - **`:id`** — Job ID (integer).
 - **`topK`** (optional) — Number of candidates to request from Pinecone (default `100`, max `100`).
   - We request this many from Pinecone, then filter by minScore. You get back only those that pass (0 to topK).
-- **`minScore`** (optional) — Minimum relevance score threshold (default `0.5`).
+- **`minScore`** (optional) — Minimum relevance score threshold (default `0.4`).
   - Only candidates with `score >= minScore` are returned.
-  - **Score calibration for CV–job matching:** Reranker scores rarely reach 0.9; 0.5–0.7 = decent match, 0.7+ = strong. Use `minScore=0` to include all requested candidates.
+  - **Score calibration for CV–job matching:** Reranker scores rarely reach 0.9; 0.4–0.7 = decent match, 0.7+ = strong. Use `minScore=0` to include all requested candidates.
 - **`requireRoleMatch`** (optional) — If `1` / `true`, filters out candidates whose CV text does **not** explicitly mention the job title (or at least one meaningful word from it).
   - Use this to remove “semantically kinda related” but clearly irrelevant CVs.
   - Example: for `jobName = "Sales Manager"`, CV must contain “sales manager” or at least “sales” / “manager”.
@@ -33,23 +33,24 @@ Use this in the admin app (e.g. samushao-admin) so that when you click **"Reques
 }
 ```
 
-- **`score`** — Match score (0–1, higher = better fit). Only candidates with `score >= minScore` (default 0.5) are returned.
+- **`score`** — Match score (0–1, higher = better fit). Only candidates with `score >= minScore` (default 0.4) are returned.
 - **`cv_url`** — Direct link to download the CV (Cloudinary).
+- **`gemini_assessment`** (when `assessWithGemini=1`) — `{ fit_score: 0-100, summary: string, verdict: "STRONG_MATCH"|"GOOD_MATCH"|"PARTIAL_MATCH"|"WEAK_MATCH" }` or `{ error: string }` on failure.
 
 **Examples:**
 
 ```bash
-# Get up to 100 qualified candidates (score >= 0.5) — default
+# Get up to 100 qualified candidates (score >= 0.4) — default
 GET /jobs/123/top-candidates
 
-# Request 50, get back only those with score >= 0.5
+# Request 50, get back only those with score >= 0.4
 GET /jobs/123/top-candidates?topK=50
 
 # Stricter threshold (score >= 0.7)
 GET /jobs/123/top-candidates?topK=100&minScore=0.7
 
 # Enforce title/role mention in CV text (stricter, fewer but cleaner results)
-GET /jobs/123/top-candidates?topK=100&minScore=0.5&requireRoleMatch=1
+GET /jobs/123/top-candidates?topK=100&minScore=0.4&requireRoleMatch=1
 
 # No score filter (all 100 returned)
 GET /jobs/123/top-candidates?topK=100&minScore=0
@@ -58,7 +59,7 @@ GET /jobs/123/top-candidates?topK=100&minScore=0
 ## How It Works
 
 1. **Pinecone query**: We request up to `topK` candidates (default 100, max 100), sorted by score (highest first).
-2. **Filter**: We keep only candidates with `score >= minScore` (default 0.5).
+2. **Filter**: We keep only candidates with `score >= minScore` (default 0.4).
 3. **Response**: You get back only those that pass the threshold (0 to 100). No large payloads.
 
 ## How the request is sent to Pinecone
@@ -100,7 +101,7 @@ Add a **"Request candidates"** (or "Matching candidates") control next to each j
 **Minimal fetch example:**
 
 ```javascript
-async function loadMatchingCandidates(jobId, topK = 100, minScore = 0.5) {
+async function loadMatchingCandidates(jobId, topK = 100, minScore = 0.4) {
   const base = "https://your-api.samushao.ge"; // or process.env.REACT_APP_API_URL
   const res = await fetch(`${base}/jobs/${jobId}/top-candidates?topK=${topK}&minScore=${minScore}`);
   if (!res.ok) throw new Error("Failed to load candidates");
@@ -116,7 +117,7 @@ async function loadMatchingCandidates(jobId, topK = 100, minScore = 0.5) {
 const [candidates, setCandidates] = useState([]);
 const [loading, setLoading] = useState(false);
 
-async function handleRequestCandidates(jobId, topK = 100, minScore = 0.5) {
+async function handleRequestCandidates(jobId, topK = 100, minScore = 0.4) {
   setLoading(true);
   try {
     const res = await fetch(`${API_BASE}/jobs/${jobId}/top-candidates?topK=${topK}&minScore=${minScore}`);

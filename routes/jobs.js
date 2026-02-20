@@ -751,9 +751,50 @@ router.get("/:id/top-candidates", async (req, res) => {
         user_name: u?.user_name || null,
         user_email: u?.user_email || null,
         cv_url: r?.file_url || null,
+        cv_file_name: r?.file_name || null,
         last_seen_at: lastSeenMap[m.id] || null,
       };
     });
+
+    // Optional: Gemini alignment assessment (assessWithGemini=1&assessLimit=10)
+    const assessWithGemini =
+      String(req.query.assessWithGemini || "").trim().toLowerCase() === "1" ||
+      String(req.query.assessWithGemini || "").trim().toLowerCase() === "true";
+    const assessLimit = Math.min(
+      20,
+      Math.max(1, parseInt(req.query.assessLimit, 10) || 10)
+    );
+
+    if (assessWithGemini && candidates.length > 0) {
+      const { assessCandidateAlignment } = require("../services/geminiCandidateAssessment");
+      const { extractTextFromCv } = require("../services/cvTextExtractor");
+
+      const toAssess = candidates
+        .filter((c) => c.cv_url)
+        .slice(0, assessLimit);
+
+      const assessOne = async (c) => {
+        try {
+          const cvText = await extractTextFromCv(c.cv_url, c.cv_file_name);
+          if (!cvText || cvText.length < 50) {
+            return { ...c, gemini_assessment: { error: "Could not extract CV text" } };
+          }
+          const assessment = await assessCandidateAlignment(job, cvText);
+          return { ...c, gemini_assessment: assessment };
+        } catch (err) {
+          return {
+            ...c,
+            gemini_assessment: { error: err.message || "Assessment failed" },
+          };
+        }
+      };
+
+      const assessed = await Promise.all(toAssess.map(assessOne));
+      const assessedMap = Object.fromEntries(assessed.map((a) => [a.user_id, a]));
+      const result = candidates.map((c) => assessedMap[c.user_id] || c);
+      return res.json({ job_id: jobId, candidates: result });
+    }
+
     res.json({ job_id: jobId, candidates });
   } catch (err) {
     console.error("jobs top-candidates error:", err);
