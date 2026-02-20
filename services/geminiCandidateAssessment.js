@@ -37,7 +37,8 @@ async function assessCandidateAlignment(job, cvText) {
     (job.jobDescription || job.job_description || "").trim() || "N/A",
   ].join("\n");
 
-  const prompt = `You are an elite recruiter. Analyze how well the candidate's CV aligns with the job below.
+  const prompt = `You are an elite recruiter. Analyze how well the candidate's CV aligns with the job below. when assesing the candidate, ignore their personal soft skill claims like being able to work under stress and etc.
+Summary output must be in Georgian (ქართული ენა).
 
 Job details:
 ${jobDetails}
@@ -57,8 +58,8 @@ SCORING (0-100):
 
 If a mandatory requirement is clearly missing (e.g. JD asks for Java, candidate has none), fit_score cannot exceed 30.
 
-Respond in this exact JSON format (no other text):
-{"fit_score": <0-100>, "summary": "<2-3 sentence explanation>", "verdict": "STRONG_MATCH"|"GOOD_MATCH"|"PARTIAL_MATCH"|"WEAK_MATCH"}
+Write the summary in Georgian (ქართული ენა). Respond in this exact JSON format (no other text):
+{"fit_score": <0-100>, "summary": "<2-3 sentence explanation in Georgian>", "verdict": "STRONG_MATCH"|"GOOD_MATCH"|"PARTIAL_MATCH"|"WEAK_MATCH"}
 
 Verdict mapping: 80-100=STRONG_MATCH, 60-79=GOOD_MATCH, 40-59=PARTIAL_MATCH, 0-39=WEAK_MATCH`;
 

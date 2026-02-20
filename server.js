@@ -379,7 +379,6 @@ app.use(session(sessionOptions));
 // Then your res.locals middleware
 const ENLISTED_FB_COOKIE = "enlisted_fb";
 const CONSENT_COOKIE = "samushao_consent_v2";
-const CV_CONSENT_COOKIE = "samushao_cv_consent";
 function hasCookie(req, name) {
   const raw = req?.headers?.cookie || "";
   return new RegExp(`\\b${name}=([^;]+)`).test(raw);
@@ -414,18 +413,6 @@ app.use(async (req, res, next) => {
   } catch (e) {
     // On error, don't block the request; just hide banner
     res.locals.showConsentBanner = false;
-  }
-  next();
-});
-
-// CV auto-send consent banner: show only for logged-in users (type 'user') who haven't chosen yet
-app.use((req, res, next) => {
-  res.locals.showCvConsentBanner = false;
-  if (
-    req.session?.user?.user_type === "user" &&
-    !hasCookie(req, CV_CONSENT_COOKIE)
-  ) {
-    res.locals.showCvConsentBanner = true;
   }
   next();
 });
@@ -1426,36 +1413,6 @@ app.post("/consent/accept", async (req, res) => {
     console.error("consent/accept error:", err);
   }
   return res.redirect(303, redirectTo);
-});
-
-// CV auto-send consent: set wants_cv_to_be_sent and cookie (authorized users only)
-app.post("/api/cv-consent", async (req, res) => {
-  if (!req.session?.user || req.session.user.user_type !== "user") {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-  const accept = req.body?.accept;
-  if (typeof accept !== "boolean") {
-    return res.status(400).json({ error: "accept (boolean) required" });
-  }
-  try {
-    await db("users")
-      .where("user_uid", req.session.user.uid)
-      .update({
-        wants_cv_to_be_sent: accept,
-        consent_updated_at: db.fn.now(),
-      });
-    res.cookie(CV_CONSENT_COOKIE, "1", {
-      maxAge: 365 * 24 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-    });
-    return res.json({ success: true, wants_cv_to_be_sent: accept });
-  } catch (err) {
-    console.error("cv-consent error:", err);
-    return res.status(500).json({ error: err.message });
-  }
 });
 
 // Toggle automatic CV sending preference for current user
