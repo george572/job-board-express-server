@@ -404,6 +404,16 @@ ${candidatesBlock}
       });
     });
 
+    // Increment job's cvs_sent by number of user data entries sent to HR
+    const jobId = job_id ? parseInt(job_id, 10) : NaN;
+    if (list.length > 0 && !isNaN(jobId)) {
+      try {
+        await db("jobs").where("id", jobId).increment("cvs_sent", list.length);
+      } catch (incErr) {
+        console.error("[hr-email] cvs_sent increment error:", incErr?.message);
+      }
+    }
+
     // Also send emails to all candidates informing them they've been recommended
     if (list.length > 0 && applicantsTransporter) {
       const company = (company_name || "").trim() || "კომპანია";
