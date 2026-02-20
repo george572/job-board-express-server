@@ -48,6 +48,10 @@ router.post("/", upload.single("resume"), async (req, res) => {
     return res.status(400).json({ error: "No file uploaded" });
   }
 
+  // Multer/busboy receives filenames as Latin1; convert to UTF-8 for Georgian/non-ASCII names
+  const rawName = req.file.originalname;
+  const file_name = Buffer.from(rawName, "latin1").toString("utf8");
+
   const user_id = String(req.body.user_uid);
 
   // cloudinary upload
@@ -75,14 +79,14 @@ router.post("/", upload.single("resume"), async (req, res) => {
           .insert({
             file_url: downloadUrl,
             user_id: user_id,
-            file_name: req.file.originalname
+            file_name
           })
           .then(() => {
             res.json({ message: "File uploaded successfully" });
             // Phase 2 & 4: Index CV in Pinecone and invalidate CV-fit cache for fresh job recommendations
             const { indexCandidateFromCvUrl } = require("../services/pineconeCandidates");
             const { invalidate } = require("../services/cvFitCache");
-            indexCandidateFromCvUrl(user_id, downloadUrl, req.file.originalname)
+            indexCandidateFromCvUrl(user_id, downloadUrl, file_name)
               .then(() => invalidate(user_id))
               .catch((err) => console.warn("[Pinecone] Failed to index CV for user", user_id, err.message));
           })
