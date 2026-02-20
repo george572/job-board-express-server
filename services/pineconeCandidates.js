@@ -218,6 +218,45 @@ async function getTopCandidatesForJob(jobInput, topK = 100) {
 }
 
 /**
+ * Get a specific candidate's match score for a job using vector search.
+ * Uses the job description to query the candidates index; returns the user's score if found.
+ *
+ * @param {object} job - Job record: jobName, jobDescription, job_experience, job_type, job_city
+ * @param {string} userId - user_uid (candidate id)
+ * @returns {Promise<number|null>} Similarity score (0-1) or null if user not in index / not in results
+ */
+async function getCandidateScoreForJob(job, userId) {
+  const match = await getCandidateMatchForJob(job, userId);
+  return match ? match.score : null;
+}
+
+/**
+ * Get candidate's match score and CV text for a job (for Gemini assessment).
+ * Returns score + cvText from Pinecone metadata; cvText is needed for final Gemini verdict.
+ *
+ * @param {object} job - Job record: jobName, jobDescription, job_experience, job_type, job_city
+ * @param {string} userId - user_uid (candidate id)
+ * @returns {Promise<{ score: number, cvText: string }|null>} Match with cvText, or null if user not found
+ */
+async function getCandidateMatchForJob(job, userId) {
+  const opts = {
+    job_role: job.jobName || job.job_role,
+    job_experience: job.job_experience,
+    job_type: job.job_type,
+    job_city: job.job_city,
+    jobDescription: job.jobDescription || job.job_description,
+  };
+  const matches = await getTopCandidatesForJob(opts, 100);
+  const hit = matches.find((m) => m.id === String(userId));
+  if (!hit) return null;
+  const cvText = (hit.metadata?.text || "").trim();
+  return {
+    score: hit.score ?? 0,
+    cvText: cvText || "",
+  };
+}
+
+/**
  * Full flow: extract CV text from URL, upsert to Pinecone.
  * Use for Phase 2 (new signup) and Phase 4 (CV update).
  *
@@ -237,6 +276,8 @@ module.exports = {
   getIndexName,
   upsertCandidate,
   getTopCandidatesForJob,
+  getCandidateScoreForJob,
+  getCandidateMatchForJob,
   indexCandidateFromCvUrl,
   NAMESPACE,
 };

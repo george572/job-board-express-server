@@ -3,7 +3,6 @@ const knex = require("knex");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
 const path = require("path");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { slugify } = require("../utils/slugify");
 
 const SITE_BASE_URL = process.env.SITE_BASE_URL || "https://samushao.ge";
@@ -118,71 +117,6 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-/**
- * Fetches PDF from URL, converts to base64, and asks Gemini if the candidate is a fit for the job.
- * @returns {Promise<boolean>} true if fit, false if not fit
- */
-async function assessCandidateFit(job, pdfBase64) {
-  const apiKey =
-    process.env.GEMINI_CV_READER_API_KEY || process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "GEMINI_CV_READER_API_KEY or GEMINI_API_KEY is missing in .env",
-    );
-  }
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-
-  const jobDetails = [
-    `Job title: ${job.jobName || "N/A"}`,
-    `Company: ${job.companyName || "N/A"}`,
-    `City: ${job.job_city || "N/A"}`,
-    `Experience required: ${job.job_experience || "N/A"}`,
-    `Job type: ${job.job_type || "N/A"}`,
-    `Address: ${job.job_address || "N/A"}`,
-    `Salary: ${job.jobSalary || "N/A"}`,
-    "",
-    "Job description:",
-    job.jobDescription || "",
-  ].join("\n");
-
-  const prompt = `You are an elite Technical Recruiter. Your task is to analyze a candidate's CV (PDF attached) against the Job Description below and provide a Fit Score.
-
-Job details:
-${jobDetails}
-
-SCORING LOGIC (Total 100%):
-1. Core Technical Skills (50%): Direct experience with the primary tools/languages requested in the JD.
-2. Years of Experience (25%): Does the candidate meet or exceed the seniority level?
-3. Industry Relevance (15%): Has the candidate worked in a similar sector?
-4. Education/Soft Skills (10%): Degree requirements and communication indicators.
-
-CRITICAL RULE: If a "Mandatory" or "Hard Requirement" is missing (e.g. JD asks for Java and candidate has none), the fit_percentage cannot exceed 30%, regardless of other factors.
-
-FINAL DECISION:
-- If fit_percentage < 70% → reply NOT_FIT
-- If fit_percentage >= 70% → reply FIT
-
-First analyze the CV against the JD using the scoring logic above, then output your final decision. Reply with ONLY one of these two words at the end of your response: FIT or NOT_FIT`;
-
-  const result = await model.generateContent([
-    { text: prompt },
-    {
-      inlineData: {
-        mimeType: "application/pdf",
-        data: pdfBase64,
-      },
-    },
-  ]);
-  const response = result.response;
-  if (!response || !response.text) {
-    throw new Error("Empty response from Gemini");
-  }
-  const text = response.text().trim().toUpperCase();
-  if (text.includes("NOT_FIT")) return false;
-  return text.includes("FIT");
-}
-
 router.post("/", async (req, res) => {
   const { job_id, user_id } = req.body;
 
@@ -211,20 +145,30 @@ router.post("/", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Step A: Fetch PDF from Cloudinary URL
-    const pdfResponse = await fetch(resume.file_url);
-    if (!pdfResponse.ok) {
-      return res
-        .status(502)
-        .json({ error: "Failed to fetch resume PDF from storage" });
-    }
-    const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
-    const pdfBase64 = pdfBuffer.toString("base64");
-
-    // Step B & C: Pass to Gemini and assess fit (skip if job.disable_cv_filter)
+    // Assess CV–job fit: vector search + final Gemini verdict (skip if job.disable_cv_filter)
+    // 1. Vector search: get candidate match (score + cvText from Pinecone metadata)
+    // 2. Gemini call: outputs verdict (STRONG_MATCH, GOOD_MATCH, PARTIAL_MATCH, WEAK_MATCH)
+    // 3. Send only if verdict is at least PARTIAL_MATCH; block WEAK_MATCH
     let isFit = true;
+    let geminiVerdict = null;
+    let geminiSummary = null;
     if (!job.disable_cv_filter) {
-      isFit = await assessCandidateFit(job, pdfBase64);
+      try {
+        const { getCandidateMatchForJob } = require("../services/pineconeCandidates");
+        const { assessCandidateAlignment } = require("../services/geminiCandidateAssessment");
+        const match = await getCandidateMatchForJob(job, user_id);
+        if (!match || !match.cvText) {
+          isFit = false;
+        } else {
+          const assessment = await assessCandidateAlignment(job, match.cvText);
+          geminiVerdict = assessment.verdict;
+          geminiSummary = assessment.summary;
+          isFit = geminiVerdict !== "WEAK_MATCH"; // Allow STRONG_MATCH, GOOD_MATCH, PARTIAL_MATCH
+        }
+      } catch (err) {
+        console.error("CV–job fit assessment error:", err?.message);
+        isFit = false;
+      }
     }
     if (!isFit) {
       try {
@@ -241,6 +185,9 @@ router.post("/", async (req, res) => {
         job,
         resume,
         user,
+        cv_submitted: false,
+        gemini_verdict: geminiVerdict,
+        gemini_summary: geminiSummary,
       });
     }
 
@@ -291,6 +238,9 @@ router.post("/", async (req, res) => {
       job,
       resume,
       user,
+      cv_submitted: true,
+      gemini_verdict: geminiVerdict,
+      gemini_summary: geminiSummary,
     });
   } catch (err) {
     if (res.headersSent) return;
