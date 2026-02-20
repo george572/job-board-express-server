@@ -20,6 +20,11 @@ const MAIL_USER = "info@samushao.ge";
 const MAIL_PASS = (process.env.MAIL_PSW || "").trim();
 
 // Marketing email on 3rd CV – from giorgi@samushao.ge
+const APPLICANTS_MAIL_USER = (process.env.APPLICANTS_MAIL_USER || "").trim();
+const APPLICANTS_MAIL_PASS = (process.env.APPLICANTS_MAIL_PASS || "")
+  .trim()
+  .replace(/\s/g, "");
+
 const MARKETING_MAIL_USER = (
   process.env.APPLICANTS_MAIL_USER ||
   process.env.MARKETING_MAIL_USER ||
@@ -32,6 +37,16 @@ const MARKETING_MAIL_PASS = (
 )
   .trim()
   .replace(/\s/g, "");
+
+const applicantsTransporter =
+  APPLICANTS_MAIL_USER && APPLICANTS_MAIL_PASS
+    ? nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false,
+        auth: { user: APPLICANTS_MAIL_USER, pass: APPLICANTS_MAIL_PASS },
+      })
+    : null;
 
 const marketingTransporter =
   MARKETING_MAIL_USER && MARKETING_MAIL_PASS
@@ -305,8 +320,9 @@ router.post("/user-vacancy-email", async (req, res) => {
 });
 
 // Endpoint to notify HRs about AI-selected candidates for a specific vacancy
+// Also sends emails to all candidates informing them they've been recommended
 router.post("/hr-email", async (req, res) => {
-  const { hr_email, company_name, job_name, last_seen_at, users_list } =
+  const { hr_email, company_name, job_name, job_id, job_link, last_seen_at, users_list } =
     req.body || {};
 
   if (!hr_email || !job_name) {
@@ -320,6 +336,12 @@ router.post("/hr-email", async (req, res) => {
       .status(500)
       .json({ error: "HR email service is not configured" });
   }
+
+  const jobLink =
+    (job_link && job_link.trim()) ||
+    (job_id && job_name
+      ? `${SITE_BASE_URL}/vakansia/${slugify(job_name)}-${job_id}`
+      : SITE_BASE_URL);
 
   const subject = `კანდიდატები ვაკანსია ${job_name}-სთვის.`;
 
@@ -360,7 +382,7 @@ ${candidatesBlock}კანდიდატებმა იციან რომ
 
   const fromAddr = MARKETING_MAIL_USER || "giorgi@samushao.ge";
   const mailOptions = {
-    from: `"გიორგი Samushao.ge" <${fromAddr}>`,
+    from: `"Giorgi Khutiashvili - Samushao.ge" <${fromAddr}>`,
     to: hr_email.trim(),
     subject,
     text,
@@ -377,6 +399,40 @@ ${candidatesBlock}კანდიდატებმა იციან რომ
         }
       });
     });
+
+    // Also send emails to all candidates informing them they've been recommended
+    if (list.length > 0 && applicantsTransporter) {
+      const company = (company_name || "").trim() || "კომპანია";
+      const candidateSubject = `ჩვენ გავაზიარეთ თქვენი რეზიუმე ვაკანსიისთვის - ${job_name}`;
+      const candidateText = `სალამი!
+
+ჩვენ გავუზიარეთ თქვენი CV ვაკანსიისთვის "${job_name}".
+დამსაქმებელი შეიძლება დაგიკავშირდეთ პირობებზე და დეტალებზე საუბრისთვის.
+
+პატივისცემით,
+Samushao.ge`;
+
+      for (const u of list) {
+        const email = (u.user_email ?? u.userEmail ?? u.email ?? "").trim();
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) continue;
+        try {
+          await new Promise((resolve, reject) => {
+            applicantsTransporter.sendMail(
+              {
+                from: `"Samushao.ge" <${APPLICANTS_MAIL_USER}>`,
+                to: email,
+                subject: candidateSubject,
+                text: candidateText,
+              },
+              (err) => (err ? reject(err) : resolve())
+            );
+          });
+          console.log(`[hr-email] Sent candidate notification to ${email}`);
+        } catch (candErr) {
+          console.error(`[hr-email] Candidate email failed for ${email}:`, candErr?.message);
+        }
+      }
+    }
 
     res.json({ ok: true });
   } catch (err) {
