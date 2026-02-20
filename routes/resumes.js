@@ -25,6 +25,7 @@ router.get("/:id", (req, res) => {
 
   db("resumes")
     .where("user_id", id)
+    .orderBy("updated_at", "desc")
     .first()
     .then((row) => {
       if (!row) {

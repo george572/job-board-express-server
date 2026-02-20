@@ -598,33 +598,35 @@
         }
       } catch (e) {}
 
-      // When dialog opens, if user is logged in, try to load an already uploaded CV
-      if (userUid && !hasExistingResume) {
+      // When dialog opens, always fetch latest CV from server (user may have updated it on my-cv page)
+      if (userUid) {
         fetch('/resumes/' + userUid)
           .then(function (r) {
-            if (r.status === 404) return null;
+            if (!r.ok) return null;
             return r.json();
           })
           .then(function (data) {
-            if (!data) return;
+            // Don't overwrite if user already picked a new file in this session
+            if (fileInput.files && fileInput.files[0]) return;
+            if (!data || !data.file_url) {
+              hasExistingResume = false;
+              useExistingResume = false;
+              selectedFileBox.classList.add('hidden');
+              uploadArea.classList.remove('hidden');
+              return;
+            }
             hasExistingResume = true;
             useExistingResume = true;
             selectedFileName.textContent = data.file_name || 'ჩემი CV';
             selectedFileBox.classList.remove('hidden');
             uploadArea.classList.add('hidden');
             uploadProgressBox.classList.add('hidden');
-            if (uploadFormatText) {
-              uploadFormatText.classList.add('hidden');
-            }
-            if (dialogHeaderText) {
-              dialogHeaderText.classList.add('hidden');
-            }
+            if (uploadFormatText) uploadFormatText.classList.add('hidden');
+            if (dialogHeaderText) dialogHeaderText.classList.add('hidden');
             submitBtn.disabled = false;
             submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             submitBtn.classList.add('cursor-pointer');
-            if (uploadNewCvBtn) {
-              uploadNewCvBtn.classList.remove('hidden');
-            }
+            if (uploadNewCvBtn) uploadNewCvBtn.classList.remove('hidden');
           })
           .catch(function (err) {
             console.log('Failed to load existing CV', err);
@@ -648,6 +650,31 @@
     uploadArea.addEventListener('click', () => fileInput.click());
 
     function clearFile() {
+      if (userUid && hasExistingResume && useExistingResume) {
+        clearFileBtn.disabled = true;
+        fetch('/resumes/' + userUid, { method: 'DELETE' })
+          .then(function (r) {
+            if (!r.ok) throw new Error('Delete failed');
+            return r.json();
+          })
+          .then(function () {
+            hasExistingResume = false;
+            useExistingResume = false;
+            resetCvUiState();
+          })
+          .catch(function (err) {
+            console.log('CV delete error:', err);
+            resetCvUiState();
+          })
+          .finally(function () {
+            clearFileBtn.disabled = false;
+          });
+        return;
+      }
+      resetCvUiState();
+    }
+
+    function resetCvUiState() {
       fileInput.value = '';
       selectedFileName.textContent = 'ჩემი CV';
       selectedFileBox.classList.add('hidden');
@@ -663,6 +690,9 @@
       submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
       submitBtn.classList.remove('cursor-pointer');
       submitBtnText.textContent = 'გააგზავნე რეზიუმე';
+      hasExistingResume = false;
+      useExistingResume = false;
+      if (uploadNewCvBtn) uploadNewCvBtn.classList.add('hidden');
     }
 
     // File selection: only store locally; nothing is sent until user clicks "გააგზავნე რეზიუმე"
