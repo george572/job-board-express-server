@@ -1293,7 +1293,7 @@ app.get("/vakansiebi-shentvis", async (req, res) => {
       paginationBase: "/vakansiebi-shentvis",
       slugify,
       seo: {
-        title: "ვაკანსიები სადაც შენი CV ზუსტად ერგება | Samushao.ge",
+        title: "ვაკანსიები სადაც შენი CV კარგად ერგება | Samushao.ge",
         description: "ვაკანსიები რომლებიც ზუსტად შეესაბამება შენი CV-ს.",
         canonical: "https://samushao.ge/vakansiebi-shentvis",
         ogImage:
