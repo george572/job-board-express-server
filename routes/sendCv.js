@@ -362,7 +362,7 @@ router.post("/hr-email", async (req, res) => {
             const url =
               u.cv_url ?? u.cvUrl ?? u.resume_url ?? u.file_url ?? "—";
             const summary = u.user_summary ?? u.userSummary ?? u.summary ?? "—";
-            return `სახელი : ${name}\nიმეილი : ${email}\nCV ლინკი : ${url}\nშეფასება : ${summary}`;
+            return `სახელი : ${name}\nიმეილი : ${email}\nCV ლინკი : ${url}\n AI შეფასება : ${summary}`;
           })
           .join("\n\n")
       : "";
@@ -381,6 +381,10 @@ ${countLine}
 
 ${candidatesBlock}
 
+
+გაითვალისწინეთ, საუკეთესო კანდიდატები გამოიგზავნა ავტომატურად,
+ჩვენ არ ვიცით ეს კანდიდატები დათანხმდებიან თუ არა თქვენთან მუშაობას.
+თქვენ თავად უნდა შეეხმიანოთ კანდიდატებს.
 პატივისცემით,
 გიორგი Samushao.ge`;
 
