@@ -1307,7 +1307,7 @@ const patchOrPutJob = async (req, res) => {
       const pineconeFields = ["jobName", "jobDescription", "job_experience", "job_type", "job_city", "expires_at"];
       const touchedPinecone = Object.keys(updateData).some((k) => pineconeFields.includes(k));
       if (touchedPinecone) {
-        const job = await db("jobs").where("id", jobId).select("jobName", "jobDescription", "job_description", "job_experience", "job_type", "job_city", "expires_at").first();
+        const job = await db("jobs").where("id", jobId).select("jobName", "jobDescription", "job_experience", "job_type", "job_city", "expires_at").first();
         if (job) {
           if (job.expires_at && new Date(job.expires_at) <= new Date()) {
             deleteJob(jobId).catch((err) => console.error("[pinecone] Failed to delete job:", err.message));
