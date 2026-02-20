@@ -91,8 +91,8 @@ function isAfter1830() {
   const pts = new Intl.DateTimeFormat("en-US", { timeZone: TZ_GEORGIA, hour: "numeric", minute: "numeric", hour12: false }).formatToParts(new Date());
   const hour = parseInt(pts.find((p) => p.type === "hour").value, 10);
   const minute = parseInt(pts.find((p) => p.type === "minute").value, 10);
-  // Treat everything from 18:00 onwards as "end of day" – defer to next morning
-  return hour > 18 || (hour === 18 && minute >= 0);
+  // Defer to next morning only when between 18:30 and 00:00 Georgia time
+  return hour > 18 || (hour === 18 && minute >= 30);
 }
 /** Returns Date for next calendar day 10:00 Tbilisi, stored as UTC (10:00 Tbilisi = 06:00 UTC) */
 function getNextDay1020Georgia() {
@@ -423,8 +423,9 @@ async function sendNewJobEmail(job, opts = {}) {
     const slotSize = totalWindow / opts.batchTotal;
     const base = opts.batchIndex * slotSize;
     const jitter = (Math.random() - 0.5) * slotSize * 0.4;
-    // Bulk uploads: always send next morning between 10:00–12:00 Tbilisi
-    const baseTime = getNextDay1020Georgia().getTime();
+    // Bulk uploads: only defer to next morning when between 18:30 and 00:00 Georgia; otherwise spread over next 2h from now
+    const deferToNextDay = isAfter1830();
+    const baseTime = deferToNextDay ? getNextDay1020Georgia().getTime() : now;
     sendAfterMs = baseTime + Math.max(0, base + jitter);
   } else {
     const deferToNextDay = isAfter1830();
