@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ka">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <%- include('partials/head-meta', { seo }) %>
+  <link rel="stylesheet" href="/css/style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/docx-preview/0.3.0/docx-preview.min.js"></script>
+</head>
+
+<body class="font-markgeo text-secondary bg-[#F8F9FA]">
+  <%- include('partials/header') %>
+
+  <main class="w-full max-w-4xl mx-auto px-4 py-8">
+    <h1 class="text-2xl font-medium text-[#151515] mb-6 flex items-center gap-2">
+      <%- include('partials/icons/document-check.ejs') %>
+      ჩემი CV
+    </h1>
+
+    <div class="flex flex-col md:flex-row gap-4 mb-6">
+      <form action="/my-cv/delete" method="POST" class="inline" onsubmit="return confirm('ნამდვილად გსურთ CV-ის წაშლა?');">
+        <button type="submit" class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 cursor-pointer" <%= !resume ? 'disabled' : '' %>>
+          წაშლა
+        </button>
+      </form>
+      <label class="inline-flex px-4 py-2 rounded-lg bg-[#315EFF] text-white hover:bg-[#2a4fd9] cursor-pointer">
+        <input type="file" id="cvUpload" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" class="hidden" />
+        ატვირთვა
+      </label>
+    </div>
+
+    <div class="bg-white rounded-lg border border-[#EBEBEB] shadow-sm overflow-hidden min-h-[400px]">
+      <% if (resume) {
+        const fileName = (resume.file_name || resume.file_url || '').toLowerCase();
+        const isPdf = /\.pdf$/i.test(fileName) || /\.pdf(\?|$)/.test(resume.file_url || '');
+        const isDocx = /\.(doc|docx)$/i.test(fileName) || /\.(doc|docx)(\?|$)/.test(resume.file_url || '');
+        const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName) || /\.(jpg|jpeg|png|gif|webp)(\?|$)/.test(resume.file_url || '');
+      %>
+        <div class="p-4 border-b border-[#EBEBEB] bg-[#FAFAFA] text-sm text-gray-600">
+          <%= resume.file_name || 'CV' %>
+        </div>
+        <div class="p-4 w-full overflow-auto" style="min-height: 60vh; max-height: 70vh;" id="cvViewerContainer">
+          <% if (isPdf) { %>
+            <div id="pdfCanvasContainer" class="flex flex-col items-center gap-4 py-4"></div>
+            <div id="pdfLoading" class="text-center py-8 text-gray-500">იტვირთება...</div>
+          <% } else if (isDocx) { %>
+            <div id="docxContainer" class="docx-wrapper p-4"></div>
+            <div id="docxLoading" class="text-center py-8 text-gray-500">იტვირთება...</div>
+          <% } else if (isImage) { %>
+            <img src="/my-cv/preview" alt="CV" class="max-w-full max-h-[70vh] object-contain mx-auto" />
+          <% } else { %>
+            <div class="flex flex-col items-center justify-center py-12 text-gray-500">
+              <p class="mb-4">პრევიუ ამ ფორმატისთვის ხელმისაწვდომი არ არის.</p>
+              <a href="<%= resume.file_url %>" target="_blank" rel="noopener" class="text-[#315EFF] hover:underline">ჩამოტვირთვა</a>
+            </div>
+          <% } %>
+        </div>
+      <% } else { %>
+        <div class="flex flex-col items-center justify-center py-16 text-gray-500">
+          <p class="mb-4">ჯერ არ გაქვთ ატვირთული CV.</p>
+          <p class="text-sm">აირჩიეთ ფაილი ზემოთ მოცემული ღილაკიდან ან გამოიყენეთ ვაკანსიის გვერდზე CV-ის ატვირთვა.</p>
+        </div>
+      <% } %>
+    </div>
+
+    <p class="mt-4 text-sm text-gray-500">მხარდაჭერილი ფორმატები: PDF, DOC, DOCX, JPG, PNG</p>
+  </main>
+
+  <script>
+    (function() {
+      const fileInput = document.getElementById('cvUpload');
+      const userUid = <%- JSON.stringify(typeof user !== 'undefined' ? user?.uid : null) %>;
+      if (!fileInput || !userUid) return;
+
+      fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('resume', file);
+        formData.append('user_uid', userUid);
+        fetch('/resumes/', {
+          method: 'POST',
+          body: formData
+        })
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data.error) throw new Error(data.error);
+            window.location.reload();
+          })
+          .catch(function(err) {
+            alert('ატვირთვა ვერ მოხერხდა: ' + (err.message || 'შეცდომა'));
+          });
+      });
+    })();
+  </script>
+  <% if (resume) {
+    const fileName = (resume.file_name || resume.file_url || '').toLowerCase();
+    const isPdf = /\.pdf$/i.test(fileName) || /\.pdf(\?|$)/.test(resume.file_url || '');
+    const isDocx = /\.(doc|docx)$/i.test(fileName) || /\.(doc|docx)(\?|$)/.test(resume.file_url || '');
+  %>
+  <script>
+    (function() {
+      const previewUrl = '/my-cv/preview';
+      <% if (isPdf) { %>
+      if (typeof pdfjsLib !== 'undefined') {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        const container = document.getElementById('pdfCanvasContainer');
+        const loadingEl = document.getElementById('pdfLoading');
+        if (container && loadingEl) {
+          fetch(previewUrl, { credentials: 'same-origin' }).then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.arrayBuffer();
+          })
+            .then(function(buf) { return pdfjsLib.getDocument(buf).promise; })
+            .then(function(pdf) {
+            loadingEl.style.display = 'none';
+            const numPages = pdf.numPages;
+            for (let i = 1; i <= numPages; i++) {
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              pdf.getPage(i).then(function(page) {
+                const scale = 1.5;
+                const viewport = page.getViewport({ scale });
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                page.render({ canvasContext: ctx, viewport }).promise.then(function() {});
+              });
+              container.appendChild(canvas);
+            }
+          })
+            .catch(function(err) {
+            loadingEl.textContent = 'PDF ვერ ჩაიტვირთა. ' + (err.message || '');
+          });
+        }
+      }
+      <% } else if (isDocx) { %>
+      if (typeof docx !== 'undefined') {
+        const container = document.getElementById('docxContainer');
+        const loadingEl = document.getElementById('docxLoading');
+        if (container && loadingEl) {
+          fetch(previewUrl, { credentials: 'same-origin' }).then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.blob();
+          }).then(function(blob) {
+            return docx.renderAsync(blob, container);
+          }).then(function() {
+            loadingEl.style.display = 'none';
+          }).catch(function(err) {
+            loadingEl.textContent = 'DOCX ვერ ჩაიტვირთა. ' + (err.message || '');
+          });
+        }
+      }
+      <% } %>
+    })();
+  </script>
+  <% } %>
+</body>
+
+</html>

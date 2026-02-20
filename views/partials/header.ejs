@@ -60,6 +60,10 @@
     <div id="logoutPopup" class="hidden fixed right-5 top-12 md:top-20 z-50 items-center justify-center">
       <div class="bg-white rounded-lg p-4 max-w-sm w-full mx-4 relative shadow-lg border border-gray-100">
         <% if (user && user.user_type === 'user') { %>
+        <a href="/my-cv" class="flex items-center gap-2 px-4 py-3 rounded-lg hover:bg-[#F5F8FF] text-[#151515] no-underline w-full mb-2">
+          <%- include('./icons/document-check.ejs') %>
+          <span>ჩემი CV</span>
+        </a>
         <a href="/my-applications" class="flex items-center gap-2 px-4 py-3 rounded-lg hover:bg-[#F5F8FF] text-[#151515] no-underline w-full mb-2">
           <%- include('./icons/document-check.ejs') %>
           <span>გაგზავნილი CV-ები</span>

@@ -78,11 +78,12 @@ router.post("/", upload.single("resume"), async (req, res) => {
           })
           .then(() => {
             res.json({ message: "File uploaded successfully" });
-            // Phase 2 & 4: Index CV in Pinecone for job-candidate matching (fire-and-forget)
+            // Phase 2 & 4: Index CV in Pinecone and invalidate CV-fit cache for fresh job recommendations
             const { indexCandidateFromCvUrl } = require("../services/pineconeCandidates");
-            indexCandidateFromCvUrl(user_id, downloadUrl, req.file.originalname).catch((err) => {
-              console.warn("[Pinecone] Failed to index CV for user", user_id, err.message);
-            });
+            const { invalidate } = require("../services/cvFitCache");
+            indexCandidateFromCvUrl(user_id, downloadUrl, req.file.originalname)
+              .then(() => invalidate(user_id))
+              .catch((err) => console.warn("[Pinecone] Failed to index CV for user", user_id, err.message));
           })
           .catch((err) => res.status(500).json({ error: err.message }));
       }
@@ -91,19 +92,21 @@ router.post("/", upload.single("resume"), async (req, res) => {
 });
 
 // DELETE CV file
-router.delete("/:id", (req, res) => {
+router.delete("/:id", async (req, res) => {
   const userId = req.params.id;
-
-  db("resumes")
-    .where("user_id", userId)
-    .del()
-    .then((count) => {
-      if (count === 0) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-      res.status(200).json({ message: "CV deleted successfully" });
-    })
-    .catch((err) => res.status(500).json({ error: err.message }));
+  try {
+    const count = await db("resumes").where("user_id", userId).del();
+    if (count === 0) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+    const { deleteCandidate } = require("../services/pineconeCandidates");
+    const { invalidate } = require("../services/cvFitCache");
+    await deleteCandidate(userId).catch((err) => console.warn("[Pinecone] Failed to delete candidate", userId, err.message));
+    invalidate(userId);
+    res.status(200).json({ message: "CV deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

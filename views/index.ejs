@@ -47,7 +47,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
       <div class="flex flex-col gap-1 flex-1">
         <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515]">
-          ვაკანსიები სადაც შენი CV კარგად ერგება
+          ვაკანსიები სადაც შენი CV შეიძლება კარგად ერგებოდეს
         </h2>
         <% if (typeof topCvFitTotalCount !== 'undefined' && topCvFitTotalCount > 0) { %>
         <a id="top-cv-fit-see-all-link" href="/vakansiebi-shentvis" class="text-sm text-[#315EFF] hover:underline hidden sm:inline-block">
@@ -209,7 +209,7 @@
   <div id="jobs-area" data-current-page="<%= currentPage || 1 %>" data-total-pages="<%= totalPages || 1 %>">
   <% if (filtersActive) { %><%- include('partials/facebookPromo') %><% } %>
   <h1 id="all-vacancies-heading" class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1 pb-4 w-full mx-auto px-4" style="<%= filtersActive ? 'display:none' : '' %>">
-    <%= typeof pageType === 'string' && pageType === 'top-salary' ? 'ყველაზე მაღალანაზღაურებადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'top-views' ? 'ყველაზე ნახვადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'today' ? 'დღევანდელი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'recommended' ? 'შენთვის რეკომენდებული ვაკანსიები' : (typeof pageType === 'string' && pageType === 'top-cv-fit' ? 'ვაკანსიები სადაც შენი CV კარგად ერგება' : 'ყველა ვაკანსია')))) %>
+    <%= typeof pageType === 'string' && pageType === 'top-salary' ? 'ყველაზე მაღალანაზღაურებადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'top-views' ? 'ყველაზე ნახვადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'today' ? 'დღევანდელი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'recommended' ? 'შენთვის რეკომენდებული ვაკანსიები' : (typeof pageType === 'string' && pageType === 'top-cv-fit' ? 'ვაკანსიები სადაც შენი CV შეიძლება კარგად ერგებოდეს' : 'ყველა ვაკანსია')))) %>
   </h1>
   <div class="w-full relative mx-auto px-4" id="jobs-container">
     <% if (jobs && jobs.length > 0) { %>

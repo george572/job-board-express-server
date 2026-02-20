@@ -257,6 +257,18 @@ async function getCandidateMatchForJob(job, userId) {
 }
 
 /**
+ * Delete a candidate's vector from Pinecone. Call when CV is deleted.
+ *
+ * @param {string} userId - user_uid
+ * @returns {Promise<void>}
+ */
+async function deleteCandidate(userId) {
+  if (!userId) return;
+  const index = getIndex();
+  await index.deleteOne({ id: String(userId), namespace: NAMESPACE });
+}
+
+/**
  * Full flow: extract CV text from URL, upsert to Pinecone.
  * Use for Phase 2 (new signup) and Phase 4 (CV update).
  *
@@ -275,6 +287,7 @@ module.exports = {
   getIndex,
   getIndexName,
   upsertCandidate,
+  deleteCandidate,
   getTopCandidatesForJob,
   getCandidateScoreForJob,
   getCandidateMatchForJob,

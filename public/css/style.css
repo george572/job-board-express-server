@@ -432,6 +432,9 @@
   .h-\[60px\] {
     height: 60px;
   }
+  .h-\[70vh\] {
+    height: 70vh;
+  }
   .h-\[76px\] {
     height: 76px;
   }
@@ -444,6 +447,9 @@
   .h-screen {
     height: 100vh;
   }
+  .max-h-\[70vh\] {
+    max-height: 70vh;
+  }
   .min-h-\[48px\] {
     min-height: 48px;
   }
@@ -455,6 +461,9 @@
   }
   .min-h-\[242px\] {
     min-height: 242px;
+  }
+  .min-h-\[400px\] {
+    min-height: 400px;
   }
   .min-h-screen {
     min-height: 100vh;
@@ -648,6 +657,9 @@
   .self-start {
     align-self: flex-start;
   }
+  .overflow-auto {
+    overflow: auto;
+  }
   .overflow-hidden {
     overflow: hidden;
   }
@@ -677,9 +689,17 @@
     border-style: var(--tw-border-style);
     border-width: 1px;
   }
+  .border-0 {
+    border-style: var(--tw-border-style);
+    border-width: 0px;
+  }
   .border-2 {
     border-style: var(--tw-border-style);
     border-width: 2px;
+  }
+  .border-b {
+    border-bottom-style: var(--tw-border-style);
+    border-bottom-width: 1px;
   }
   .border-l {
     border-left-style: var(--tw-border-style);
@@ -737,6 +757,9 @@
   }
   .bg-\[\#F8F9FA\] {
     background-color: #F8F9FA;
+  }
+  .bg-\[\#FAFAFA\] {
+    background-color: #FAFAFA;
   }
   .bg-\[\#FF5B0F\] {
     background-color: #FF5B0F;
@@ -1112,6 +1135,13 @@
   .outline-none {
     --tw-outline-style: none;
     outline-style: none;
+  }
+  .hover\:bg-\[\#2a4fd9\] {
+    &:hover {
+      @media (hover: hover) {
+        background-color: #2a4fd9;
+      }
+    }
   }
   .hover\:bg-\[\#F5F8FF\] {
     &:hover {

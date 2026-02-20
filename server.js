@@ -69,9 +69,7 @@ async function runExpiredJobsPineconeCleanup() {
 // Sentinel category ID for personalized recommendations (no jobs have this category_id)
 const RECOMMENDED_CATEGORY_ID = 9999;
 
-// In-memory cache for top CV-fit Pinecone results (user_uid -> { matches, expiresAt }), TTL 2 hours
-const TOP_CV_FIT_CACHE_TTL_MS = 2 * 60 * 60 * 1000;
-const topCvFitCache = new Map();
+const cvFitCache = require("./services/cvFitCache");
 
 /**
  * Get personalized job recommendations based on visitor's past clicks.
@@ -486,6 +484,7 @@ app.get("/robots.txt", (req, res) => {
 Allow: /
 
 Disallow: /my-applications
+Disallow: /my-cv
 
 Sitemap: ${SITE_BASE_URL}/sitemap.xml
 `,
@@ -784,16 +783,13 @@ app.get("/", async (req, res) => {
       try {
         const userId = req.session.user.uid;
         let matches;
-        const cached = topCvFitCache.get(userId);
+        const cached = cvFitCache.get(userId);
         if (cached && cached.expiresAt > Date.now()) {
           matches = cached.matches;
         } else {
           const { getTopJobsForUser } = require("./services/pineconeJobs");
           matches = await getTopJobsForUser(userId, 50, 0.4);
-          topCvFitCache.set(userId, {
-            matches,
-            expiresAt: Date.now() + TOP_CV_FIT_CACHE_TTL_MS,
-          });
+          cvFitCache.set(userId, { matches });
         }
         const jobIds = matches.map((m) => parseInt(m.id, 10)).filter((id) => !isNaN(id));
         if (jobIds.length > 0) {
@@ -1215,16 +1211,13 @@ app.get("/vakansiebi-shentvis", async (req, res) => {
     if (userUid) {
       try {
         let matches;
-        const cached = topCvFitCache.get(userUid);
+        const cached = cvFitCache.get(userUid);
         if (cached && cached.expiresAt > Date.now()) {
           matches = cached.matches;
         } else {
           const { getTopJobsForUser } = require("./services/pineconeJobs");
           matches = await getTopJobsForUser(userUid, 50, 0.4);
-          topCvFitCache.set(userUid, {
-            matches,
-            expiresAt: Date.now() + TOP_CV_FIT_CACHE_TTL_MS,
-          });
+          cvFitCache.set(userUid, { matches });
         }
         const jobIds = matches.map((m) => parseInt(m.id, 10)).filter((id) => !isNaN(id));
         if (jobIds.length > 0) {
@@ -1280,7 +1273,7 @@ app.get("/vakansiebi-shentvis", async (req, res) => {
       paginationBase: "/vakansiebi-shentvis",
       slugify,
       seo: {
-        title: "ვაკანსიები სადაც შენი CV კარგად ერგება | Samushao.ge",
+        title: "ვაკანსიები სადაც შენი CV შეიძლება კარგად ერგებოდეს | Samushao.ge",
         description: "ვაკანსიები რომლებიც ზუსტად შეესაბამება შენი CV-ს.",
         canonical: "https://samushao.ge/vakansiebi-shentvis",
         ogImage:
@@ -1385,6 +1378,84 @@ app.get("/my-applications", async (req, res) => {
     console.error("my-applications error:", err);
     res.status(500).send(err.message);
   }
+});
+
+// My CV page – view, delete, upload
+app.get("/my-cv", async (req, res) => {
+  if (!req.session?.user) {
+    return res.redirect("/");
+  }
+  if (req.session.user.user_type !== "user") {
+    return res.redirect("/");
+  }
+  try {
+    const resume = await db("resumes")
+      .where("user_id", req.session.user.uid)
+      .orderBy("updated_at", "desc")
+      .first();
+    res.render("my-cv", {
+      resume: resume || null,
+      slugify,
+      seo: {
+        title: "ჩემი CV | Samushao.ge",
+        description: "ნახეთ, განაახლეთ ან წაშალეთ თქვენი CV.",
+        canonical: "https://samushao.ge/my-cv",
+      },
+    });
+  } catch (err) {
+    console.error("my-cv error:", err);
+    res.status(500).send(err.message);
+  }
+});
+
+// Proxy CV file for inline display (iframe/embed fail with Cloudinary attachment URLs)
+app.get("/my-cv/preview", async (req, res) => {
+  if (!req.session?.user || req.session.user.user_type !== "user") {
+    return res.status(403).send("Forbidden");
+  }
+  try {
+    const resume = await db("resumes")
+      .where("user_id", req.session.user.uid)
+      .orderBy("updated_at", "desc")
+      .first();
+    if (!resume?.file_url) {
+      return res.status(404).send("CV not found");
+    }
+    const url = resume.file_url;
+    const ext = (resume.file_name || "").toLowerCase().match(/\.(pdf|doc|docx|jpg|jpeg|png|gif|webp)(\?|$)/)?.[1] || "pdf";
+    const mime = { pdf: "application/pdf", doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp" }[ext] || "application/octet-stream";
+    const fetchRes = await fetch(url);
+    if (!fetchRes.ok) {
+      return res.status(502).send("Failed to fetch CV");
+    }
+    const buf = Buffer.from(await fetchRes.arrayBuffer());
+    if (ext === "pdf" && buf.length >= 5 && buf.subarray(0, 5).toString() !== "%PDF-") {
+      console.warn("[my-cv/preview] Cloudinary returned non-PDF for PDF file, first bytes:", buf.subarray(0, 50).toString("utf8"));
+      return res.status(502).send("Invalid CV file");
+    }
+    res.set("Content-Type", mime);
+    res.set("Content-Disposition", "inline");
+    res.send(buf);
+  } catch (err) {
+    console.error("my-cv preview error:", err);
+    res.status(500).send("Error loading CV");
+  }
+});
+
+app.post("/my-cv/delete", async (req, res) => {
+  if (!req.session?.user || req.session.user.user_type !== "user") {
+    return res.redirect("/");
+  }
+  const userId = req.session.user.uid;
+  try {
+    await db("resumes").where("user_id", userId).del();
+    const { deleteCandidate } = require("./services/pineconeCandidates");
+    await deleteCandidate(userId).catch((err) => console.warn("[Pinecone] Failed to delete candidate", userId, err.message));
+    cvFitCache.invalidate(userId);
+  } catch (err) {
+    console.error("my-cv delete error:", err);
+  }
+  return res.redirect("/my-cv");
 });
 
 // Accept consent (privacy / cookies) – set cookie and optional user flag
