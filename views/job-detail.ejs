@@ -747,9 +747,10 @@
             console.log('[CV Apply] Gemini summary:', data.gemini_summary || '(n/a)');
             console.log('[CV Apply] CV submitted:', data.cv_submitted !== false);
 
-            // Amplitude: CV sent using existing resume
+            // Amplitude: CV success/failure (server may return cv_submitted: false when Gemini blocks)
             try {
               if (window.amplitude) {
+                var cvSuccess = data.cv_submitted === true;
                 window.amplitude.track('CV Sent', {
                   job_id: jobId,
                   job_category: jobCategory,
@@ -757,10 +758,12 @@
                   salary_range: jobSalaryRange,
                   company: jobCompany,
                   location: jobLocation,
-                  success: true,
+                  success: cvSuccess,
                   method: 'existing_resume',
                   is_premium: jobIsPremium,
-                  is_prioritized: jobIsPrioritized
+                  is_prioritized: jobIsPrioritized,
+                  failure_reason: cvSuccess ? undefined : (data.gemini_verdict === 'WEAK_MATCH' ? 'cv_filter' : 'unknown'),
+                  gemini_verdict: data.gemini_verdict || undefined
                 });
               }
             } catch (e) {}
@@ -790,6 +793,24 @@
             submitBtn.disabled = false;
             submitBtnText.textContent = 'გააგზავნე რეზიუმე';
             console.log('შეცდომა: ' + (err.message || 'რეზიუმეს გაგზავნა ვერ მოხერხდა'));
+            // Amplitude: CV failure (server rejected: 404, 410, 500, etc.)
+            try {
+              if (window.amplitude) {
+                window.amplitude.track('CV Sent', {
+                  job_id: jobId,
+                  job_category: jobCategory,
+                  job_title: jobTitle,
+                  salary_range: jobSalaryRange,
+                  company: jobCompany,
+                  location: jobLocation,
+                  success: false,
+                  method: 'existing_resume',
+                  is_premium: jobIsPremium,
+                  is_prioritized: jobIsPrioritized,
+                  failure_reason: err.message || 'server_error'
+                });
+              }
+            } catch (e) {}
           });
 
         return;
@@ -838,9 +859,10 @@
               console.log('[CV Apply] Gemini summary:', data.gemini_summary || '(n/a)');
               console.log('[CV Apply] CV submitted:', data.cv_submitted !== false);
 
-              // Amplitude: CV sent after new upload
+              // Amplitude: CV success/failure (server may return cv_submitted: false when Gemini blocks)
               try {
                 if (window.amplitude) {
+                  var cvSuccess = data.cv_submitted === true;
                   window.amplitude.track('CV Sent', {
                     job_id: jobId,
                     job_category: jobCategory,
@@ -848,10 +870,12 @@
                     salary_range: jobSalaryRange,
                     company: jobCompany,
                     location: jobLocation,
-                    success: true,
+                    success: cvSuccess,
                     method: 'new_upload',
                     is_premium: jobIsPremium,
-                    is_prioritized: jobIsPrioritized
+                    is_prioritized: jobIsPrioritized,
+                    failure_reason: cvSuccess ? undefined : (data.gemini_verdict === 'WEAK_MATCH' ? 'cv_filter' : 'unknown'),
+                    gemini_verdict: data.gemini_verdict || undefined
                   });
                 }
               } catch (e) {}
@@ -882,6 +906,24 @@
               submitBtnText.textContent = 'გააგზავნე რეზიუმე';
               uploadProgressBox.classList.add('hidden');
               console.log('შეცდომა: ' + (err.message || 'რეზიუმეს გაგზავნა ვერ მოხერხდა'));
+              // Amplitude: CV failure (server rejected: 404, 410, 500, etc.)
+              try {
+                if (window.amplitude) {
+                  window.amplitude.track('CV Sent', {
+                    job_id: jobId,
+                    job_category: jobCategory,
+                    job_title: jobTitle,
+                    salary_range: jobSalaryRange,
+                    company: jobCompany,
+                    location: jobLocation,
+                    success: false,
+                    method: 'new_upload',
+                    is_premium: jobIsPremium,
+                    is_prioritized: jobIsPrioritized,
+                    failure_reason: err.message || 'server_error'
+                  });
+                }
+              } catch (e) {}
             });
         } else {
           var err = {};
