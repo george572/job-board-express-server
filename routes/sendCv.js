@@ -142,12 +142,10 @@ router.post("/", async (req, res) => {
     }
 
     if (job.expires_at && new Date(job.expires_at) <= new Date()) {
-      return res
-        .status(410)
-        .json({
-          error:
-            "This vacancy has expired and is no longer accepting applications",
-        });
+      return res.status(410).json({
+        error:
+          "This vacancy has expired and is no longer accepting applications",
+      });
     }
 
     const resume = await db("resumes").where("user_id", user_id).first();
@@ -169,8 +167,12 @@ router.post("/", async (req, res) => {
     let geminiSummary = null;
     if (!job.disable_cv_filter) {
       try {
-        const { getCandidateMatchForJob } = require("../services/pineconeCandidates");
-        const { assessCandidateAlignment } = require("../services/geminiCandidateAssessment");
+        const {
+          getCandidateMatchForJob,
+        } = require("../services/pineconeCandidates");
+        const {
+          assessCandidateAlignment,
+        } = require("../services/geminiCandidateAssessment");
         const match = await getCandidateMatchForJob(job, user_id);
         if (!match || !match.cvText) {
           isFit = false;
@@ -277,18 +279,16 @@ router.post("/user-vacancy-email", async (req, res) => {
   }
 
   if (!userNotificationTransporter) {
-    return res
-      .status(500)
-      .json({
-        error:
-          "User notification email is not configured (USER_NOTIFICATION_MAIL_PASS)",
-      });
+    return res.status(500).json({
+      error:
+        "User notification email is not configured (USER_NOTIFICATION_MAIL_PASS)",
+    });
   }
 
   const link = (job_link || "").trim() || `${SITE_BASE_URL}/`;
   const subject = `ვაკანსია - ${job_name}`;
   const text = `Samushao.ge-ზე არის ვაკანსია, რომელიც შეესაბამება თქვენს რეზიუმეს, ნებას თუ მოგვცემთ თქვენს რეზიუმეს გავუზიარებთ დამსაქმებელს.
-  პირობებზე და დეტალებზე შეგიძლიათ დამსაქმებელს გაესაუბროთ როცა დაგიკავშირდებიან;`
+  პირობებზე და დეტალებზე შეგიძლიათ დამსაქმებელს გაესაუბროთ როცა დაგიკავშირდებიან;`;
   const mailOptions = {
     from: PROPOSITIONAL_MAIL_USER,
     to: user_email.trim(),
@@ -322,8 +322,15 @@ router.post("/user-vacancy-email", async (req, res) => {
 // Endpoint to notify HRs about AI-selected candidates for a specific vacancy
 // Also sends emails to all candidates informing them they've been recommended
 router.post("/hr-email", async (req, res) => {
-  const { hr_email, company_name, job_name, job_id, job_link, last_seen_at, users_list } =
-    req.body || {};
+  const {
+    hr_email,
+    company_name,
+    job_name,
+    job_id,
+    job_link,
+    last_seen_at,
+    users_list,
+  } = req.body || {};
 
   if (!hr_email || !job_name) {
     return res
@@ -350,21 +357,18 @@ router.post("/hr-email", async (req, res) => {
     list.length > 0
       ? list
           .map((u) => {
-            const name =
-              u.user_name ?? u.userName ?? u.name ?? "—";
-            const email =
-              u.user_email ?? u.userEmail ?? u.email ?? "—";
+            const name = u.user_name ?? u.userName ?? u.name ?? "—";
+            const email = u.user_email ?? u.userEmail ?? u.email ?? "—";
             const url =
               u.cv_url ?? u.cvUrl ?? u.resume_url ?? u.file_url ?? "—";
-            return `სახელი : ${name}\nიმეილი : ${email}\nCV ლინკი : ${url}`;
+            const summary = u.user_summary ?? u.userSummary ?? u.summary ?? "—";
+            return `სახელი : ${name}\nიმეილი : ${email}\nCV ლინკი : ${url}\nშეფასება : ${summary}`;
           })
           .join("\n\n")
       : "";
 
   const candidatesBlock =
-    list.length > 0
-      ? `კანდიდატები:\n\n${usersText}\n\n`
-      : "";
+    list.length > 0 ? `კანდიდატები:\n\n${usersText}\n\n` : "";
 
   const countLine =
     list.length > 0
@@ -424,12 +428,15 @@ Samushao.ge`;
                 subject: candidateSubject,
                 text: candidateText,
               },
-              (err) => (err ? reject(err) : resolve())
+              (err) => (err ? reject(err) : resolve()),
             );
           });
           console.log(`[hr-email] Sent candidate notification to ${email}`);
         } catch (candErr) {
-          console.error(`[hr-email] Candidate email failed for ${email}:`, candErr?.message);
+          console.error(
+            `[hr-email] Candidate email failed for ${email}:`,
+            candErr?.message,
+          );
         }
       }
     }
