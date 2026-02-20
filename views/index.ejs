@@ -546,6 +546,16 @@
         topCvFitScroll.scrollBy({ left: 320, behavior: 'smooth' });
       });
 
+      var topCvFitScroll = document.getElementById('top-cv-fit-scroll');
+      var topCvFitPrev = document.querySelector('.top-cv-fit-prev');
+      var topCvFitNext = document.querySelector('.top-cv-fit-next');
+      if (topCvFitScroll && topCvFitPrev) topCvFitPrev.addEventListener('click', function () {
+        topCvFitScroll.scrollBy({ left: -320, behavior: 'smooth' });
+      });
+      if (topCvFitScroll && topCvFitNext) topCvFitNext.addEventListener('click', function () {
+        topCvFitScroll.scrollBy({ left: 320, behavior: 'smooth' });
+      });
+
       // Recommended: job click tracking
       const recommendedCards = document.querySelectorAll('.recommended-card a[data-job-id]');
       recommendedCards.forEach(function (card) {
