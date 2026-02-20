@@ -375,7 +375,7 @@ router.post("/hr-email", async (req, res) => {
 
 ${countLine}
 
-${candidatesBlock}კანდიდატებმა იციან რომ ჩვენ მოვახდინეთ მათი იდენტიფიცირება და თანახმა არიან რომ დაეკონტაქტოთ.
+${candidatesBlock}
 
 პატივისცემით,
 გიორგი Samushao.ge`;
