@@ -454,7 +454,7 @@ function parseSalaryNum(s) {
   return m ? parseInt(m[0], 10) : null;
 }
 
-const NEW_JOB_HTML_TEMPLATE = (job, candidate) => {
+const NEW_JOB_HTML_TEMPLATE_BEST_CANDIDATE = (job, candidate) => {
   const aiDescription =
     candidate && candidate.ai_description
       ? candidate.ai_description
@@ -464,9 +464,9 @@ const NEW_JOB_HTML_TEMPLATE = (job, candidate) => {
 
 <p>ვხედავ, რომ <b>"${job.jobName}"</b>-ს პოზიციაზე ვაკანსია გაქვთ აქტიური.</p>
 
-<p>Samushao.ge-ს AI-მ ბაზაში უკვე იპოვა 1 კანდიდატი, რომელიც თქვენს მოთხოვნებს 90%-ით ემთხვევა.</p>
+<p>Samushao.ge-ს AI-მ ბაზაში უკვე იპოვა 1 კანდიდატი, რომელიც თქვენს მოთხოვნებს ემთხვევა.</p>
 <p>აი მისი მოკლე დახასიათება (გენერირებულია ჩვენი AI-ს მიერ):</p>
-${aiDescription}
+"<i>${aiDescription}</i>"
 
 <p>მაინტერესებდა, ჯერ კიდევ ეძებთ კადრს?</p>
 
@@ -476,15 +476,40 @@ ${aiDescription}
 გიორგი | Samushao.ge</p>`;
 };
 
-const MIN_CANDIDATES = 5;
-const MIN_GOOD_MATCHES = 2;
+const NEW_JOB_HTML_TEMPLATE_PARTIAL_MATCH = (job, candidate) => {
+  const aiDescription =
+    candidate && candidate.ai_description
+      ? candidate.ai_description
+      : "—";
+  return `
+<p>გამარჯობა!</p>
+
+<p>ვხედავ, რომ <b>"${job.jobName}"</b>-ს პოზიციაზე ვაკანსია გაქვთ აქტიური.</p>
+<p>ცოტა რთულია ამ პოზიციაზე კანდიდატების პოვნა...</p>
+<p>Samushao.ge-ს AI-მ ბაზაში უკვე იპოვა 1 კანდიდატი, რომელიც თქვენს მოთხოვნებს მეტნაკლებად ემთხვევა.</p>
+<p>აი მისი მოკლე დახასიათება (გენერირებულია ჩვენი AI-ს მიერ):</p>
+"<i>${aiDescription}</i>"
+
+<p>მაინტერესებდა, ჯერ კიდევ ეძებთ კადრს?</p>
+
+<p>თუ კი, შემიძლია გამოგიგზავნოთ მისი რეზიუმეს ბმული და თავად ნახოთ რამდენად შეესაბამება თქვენს მოთხოვნებს.</p>
+
+<p>პატივისცემით,<br>
+გიორგი | Samushao.ge</p>`;
+};
+
+// Fallback when stored html is missing (legacy queue rows)
+const NEW_JOB_HTML_TEMPLATE = NEW_JOB_HTML_TEMPLATE_BEST_CANDIDATE;
+
 const VECTOR_MIN_SCORE = 0.4;
 const VECTOR_TOP_K = 20;
 
 /**
  * Evaluate job for new-job marketing email: vector search + Gemini assessment.
- * Returns { shouldQueue, bestCandidate?, reason? }
- * Best candidate: first STRONG_MATCH or first GOOD_MATCH; needs >= 5 candidates, >= 2 GOOD_MATCH.
+ * Returns { shouldQueue, bestCandidate?, matchType?, reason? }
+ * - If >= 2 good/strong: use first STRONG_MATCH or GOOD_MATCH, template BEST_CANDIDATE.
+ * - Else if >= 1 partial: use first PARTIAL_MATCH, template PARTIAL_MATCH.
+ * - Skip only if we can't find any candidate.
  */
 async function evaluateJobForNewJobEmail(job) {
   const { getTopCandidatesForJob } = require("../services/pineconeCandidates");
@@ -505,8 +530,8 @@ async function evaluateJobForNewJobEmail(job) {
     .filter((m) => (m.score || 0) >= VECTOR_MIN_SCORE)
     .slice(0, 10);
 
-  if (qualified.length < MIN_CANDIDATES) {
-    return { shouldQueue: false, reason: `fewer than ${MIN_CANDIDATES} candidates` };
+  if (qualified.length === 0) {
+    return { shouldQueue: false, reason: "no candidates found" };
   }
 
   const realUserIds = qualified
@@ -606,23 +631,31 @@ async function evaluateJobForNewJobEmail(job) {
 
   const goodMatches = assessed.filter((a) => a.verdict === "GOOD_MATCH");
   const strongMatches = assessed.filter((a) => a.verdict === "STRONG_MATCH");
-  const goodOrStrongCount = goodMatches.length + strongMatches.length;
+  const partialMatches = assessed.filter((a) => a.verdict === "PARTIAL_MATCH");
 
-  if (goodOrStrongCount < MIN_GOOD_MATCHES) {
+  let best;
+  let matchType;
+
+  if (strongMatches.length >= 1 || goodMatches.length >= 1) {
+    best = strongMatches[0] || goodMatches[0];
+    matchType = "good_or_strong";
+  } else if (partialMatches.length >= 1) {
+    best = partialMatches[0];
+    matchType = "partial";
+  } else {
     return {
       shouldQueue: false,
-      reason: `fewer than ${MIN_GOOD_MATCHES} good/strong matches`,
+      reason: "no good/strong or partial match candidates found",
     };
   }
 
-  const best =
-    strongMatches[0] || goodMatches[0];
   if (!best) {
     return { shouldQueue: false, reason: "no suitable candidate found" };
   }
 
   return {
     shouldQueue: true,
+    matchType,
     bestCandidate: {
       id: best.id,
       ai_description: best.ai_description,
@@ -702,10 +735,12 @@ async function sendNewJobEmail(job, opts = {}) {
   };
   if (bestCandidate) {
     const jobLink = `${SITE_BASE_URL}/vakansia/${slugify(job.jobName)}-${job.id}`;
-    const html = NEW_JOB_HTML_TEMPLATE(
-      { ...job, jobLink },
-      { ai_description: bestCandidate.ai_description },
-    );
+    const candidateData = { ai_description: bestCandidate.ai_description };
+    const htmlTemplate =
+      opts.matchType === "partial"
+        ? NEW_JOB_HTML_TEMPLATE_PARTIAL_MATCH
+        : NEW_JOB_HTML_TEMPLATE_BEST_CANDIDATE;
+    const html = htmlTemplate({ ...job, jobLink }, candidateData);
     insertPayload.best_candidate_id = bestCandidate.id;
     insertPayload.subject = `თქვენი ვაკანსია "${job.jobName}" - Samushao.ge`;
     insertPayload.html = html;
@@ -761,6 +796,7 @@ async function sendNewJobEmailToCompany(jobs, batchIndex, batchTotal) {
       batchIndex,
       batchTotal,
       bestCandidate: evalResult.bestCandidate,
+      matchType: evalResult.matchType,
     },
   );
 }
@@ -1577,7 +1613,7 @@ router.post("/", upload.none(), async (req, res) => {
               jobSalary: fullJob.jobSalary,
               dont_send_email: fullJob.dont_send_email,
             },
-            { bestCandidate: evalResult.bestCandidate },
+            { bestCandidate: evalResult.bestCandidate, matchType: evalResult.matchType },
           );
         }
       }
@@ -2235,7 +2271,7 @@ router.requeueJobsByIds = async (jobIds) => {
           jobSalary: j.jobSalary,
           dont_send_email: j.dont_send_email === true || j.dont_send_email === 1,
         },
-        { bestCandidate: evalResult.bestCandidate },
+        { bestCandidate: evalResult.bestCandidate, matchType: evalResult.matchType },
       );
       if (result.queued) added++;
     }
