@@ -1051,7 +1051,16 @@
           });
           return r.json();
         })
-        .then(function() {
+        .then(function(data) {
+          try {
+            if (window.amplitude) {
+              var jobInfo = data && data.job ? data.job : {};
+              window.amplitude.track('job_without_cv_submitted', {
+                job_id: String(jobInfo.id || jobId),
+                job_title: jobInfo.jobName || ''
+              });
+            }
+          } catch (e) {}
           form.reset();
           var formFields = form.querySelectorAll('input:not([type="hidden"]), textarea, button[type="submit"]');
           formFields.forEach(function(el) { el.style.display = 'none'; });
