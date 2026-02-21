@@ -258,7 +258,7 @@ async function getCandidateMatchForJob(job, userId) {
 
 /**
  * Build text for embedding from user-without-cv form data.
- * Emphasizes profession, experience, and categories for job matching.
+ * Structured like candidate text so job descriptions match well (profession, experience, categories).
  */
 function buildUserWithoutCvTextForEmbedding(data) {
   const name = (data.name || "").trim();
@@ -268,11 +268,11 @@ function buildUserWithoutCvTextForEmbedding(data) {
     : (data.categories || "").toString().replace(/,/g, ", ").trim();
   const other = (data.other_specify || "").trim();
   const parts = [];
+  if (desc) parts.push(`Candidate profession and work experience: ${desc}`);
+  if (cats) parts.push(`Interested in positions: ${cats}`);
   if (name) parts.push(`Name: ${name}`);
-  if (desc) parts.push(`What they do: ${desc}`);
-  if (cats) parts.push(`Categories: ${cats}`);
   if (other) parts.push(`Other: ${other}`);
-  return parts.length ? parts.join(". ") : "";
+  return parts.length ? parts.join(". ") : (name ? `Candidate: ${name}` : "");
 }
 
 /**
