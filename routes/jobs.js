@@ -513,9 +513,11 @@ const VECTOR_TOP_K = 20;
  */
 async function evaluateJobForNewJobEmail(job) {
   const { getTopCandidatesForJob } = require("../services/pineconeCandidates");
-  const { assessCandidateAlignment } = require("../services/geminiCandidateAssessment");
+  const {
+    assessCandidateAlignment,
+    assessNoCvAlignment,
+  } = require("../services/geminiCandidateAssessment");
   const { extractTextFromCv } = require("../services/cvTextExtractor");
-  const { generateNoCvDescription } = require("../services/geminiNoCvDescription");
 
   const jobInput = {
     job_role: job.jobName || job.job_role,
@@ -575,28 +577,24 @@ async function evaluateJobForNewJobEmail(job) {
       const nid = parseInt(String(m.id).replace("no_cv_", ""), 10);
       const row = noCvMap[nid];
       if (!row) continue;
-      let aiDescription = row.ai_description;
-      if (!aiDescription || !aiDescription.trim()) {
-        try {
-          aiDescription = await generateNoCvDescription(row);
-        } catch (e) {
-          console.warn(
-            `[evaluateJob] generateNoCvDescription failed for no_cv_${nid}:`,
-            e.message,
-          );
-          aiDescription = "—";
-        }
+      try {
+        const result = await assessNoCvAlignment(job, row);
+        assessed.push({
+          id: m.id,
+          verdict: result.verdict,
+          ai_description: result.summary,
+          name: row.name,
+          email: row.email,
+          phone: row.phone,
+          cv_url: null,
+          cv_file_name: null,
+        });
+      } catch (e) {
+        console.warn(
+          `[evaluateJob] assessNoCvAlignment failed for no_cv_${nid}:`,
+          e.message,
+        );
       }
-      assessed.push({
-        id: m.id,
-        verdict: "GOOD_MATCH",
-        ai_description: aiDescription,
-        name: row.name,
-        email: row.email,
-        phone: row.phone,
-        cv_url: null,
-        cv_file_name: null,
-      });
     } else {
       const r = resumeMap[m.id];
       const cvText =
@@ -1262,12 +1260,25 @@ router.get("/:id/top-candidates", async (req, res) => {
     if (assessWithGemini && candidates.length > 0) {
       const {
         assessCandidateAlignment,
+        assessNoCvAlignment,
       } = require("../services/geminiCandidateAssessment");
       const { extractTextFromCv } = require("../services/cvTextExtractor");
 
-      const toAssess = candidates.filter((c) => c.cv_url).slice(0, assessLimit);
+      const cvCandidates = candidates.filter((c) => c.cv_url);
+      const noCvCandidates = candidates.filter((c) => c.no_cv);
+      const toAssessCv = cvCandidates.slice(0, assessLimit);
 
-      const assessOne = async (c) => {
+      const noCvFullRows =
+        noCvIds.length > 0
+          ? await db("user_without_cv")
+              .whereIn("id", noCvIds)
+              .select("id", "name", "short_description", "categories", "other_specify")
+          : [];
+      const noCvRowMap = Object.fromEntries(
+        noCvFullRows.map((r) => [r.id, r]),
+      );
+
+      const assessCvOne = async (c) => {
         try {
           const cvText = await extractTextFromCv(c.cv_url, c.cv_file_name);
           if (!cvText || cvText.length < 50) {
@@ -1286,10 +1297,36 @@ router.get("/:id/top-candidates", async (req, res) => {
         }
       };
 
-      const assessed = await Promise.all(toAssess.map(assessOne));
-      const assessedMap = Object.fromEntries(
-        assessed.map((a) => [a.user_id, a]),
-      );
+      const assessNoCvOne = async (c) => {
+        const nid = parseInt(String(c.user_id).replace("no_cv_", ""), 10);
+        const row = noCvRowMap[nid];
+        if (!row) {
+          return { ...c, gemini_assessment: { error: "No-CV row not found" } };
+        }
+        try {
+          const assessment = await assessNoCvAlignment(job, row);
+          return {
+            ...c,
+            ai_description: assessment.summary,
+            gemini_assessment: assessment,
+          };
+        } catch (err) {
+          return {
+            ...c,
+            gemini_assessment: { error: err.message || "Assessment failed" },
+          };
+        }
+      };
+
+      const [assessedCv, assessedNoCv] = await Promise.all([
+        Promise.all(toAssessCv.map(assessCvOne)),
+        Promise.all(noCvCandidates.slice(0, assessLimit).map(assessNoCvOne)),
+      ]);
+
+      const assessedMap = {};
+      assessedCv.forEach((a) => { assessedMap[a.user_id] = a; });
+      assessedNoCv.forEach((a) => { assessedMap[a.user_id] = a; });
+
       const result = candidates.map((c) => assessedMap[c.user_id] || c);
       return res.json({ job_id: jobId, candidates: result });
     }

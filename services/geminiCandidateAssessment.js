@@ -101,4 +101,123 @@ Verdict mapping: 80-100=STRONG_MATCH, 60-79=GOOD_MATCH, 40-59=PARTIAL_MATCH, 0-3
   }
 }
 
-module.exports = { assessCandidateAlignment };
+/**
+ * Assess alignment between job and no-CV candidate (based on short_description, categories, other_specify).
+ * Judge based on what they say they know and their chosen categories.
+ *
+ * @param {object} job - Job record: jobName, jobDescription, job_experience, job_type, job_city
+ * @param {object} noCvRow - user_without_cv: { name, short_description, categories, other_specify }
+ * @returns {Promise<{ fit_score: number, summary: string, verdict: string }>}
+ */
+async function assessNoCvAlignment(job, noCvRow) {
+  const apiKey =
+    process.env.GEMINI_CV_READER_API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "GEMINI_CV_READER_API_KEY or GEMINI_API_KEY is missing in .env"
+    );
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+
+  const jobDetails = [
+    `Job title: ${job.jobName || "N/A"}`,
+    `City: ${job.job_city || "N/A"}`,
+    `Experience required: ${job.job_experience || "N/A"}`,
+    `Job type: ${job.job_type || "N/A"}`,
+    "",
+    "Job description:",
+    (job.jobDescription || job.job_description || "").trim() || "N/A",
+  ].join("\n");
+
+  const desc = (noCvRow.short_description || "").toString().trim();
+  const cats = (noCvRow.categories || "").toString().trim();
+  const other = (noCvRow.other_specify || "").toString().trim();
+  const name = (noCvRow.name || "").toString().trim();
+
+  const candidateInfo = [
+    `Name: ${name || "—"}`,
+    `What they say they know / experience: ${desc || "Not provided"}`,
+    `Categories they're interested in: ${cats || "Not specified"}`,
+    other ? `Other: ${other}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const prompt = `You are an elite recruiter. A candidate WITHOUT a CV filled out a short form. Judge how well they might fit the job based on:
+1) What they say they know and their experience (short_description)
+2) The categories they chose (these indicate their interests/skills area)
+
+Summary output must be in Georgian (ქართული ენა). Be concise – 2-3 sentences max.
+
+Job details:
+${jobDetails}
+
+---
+
+Candidate info (no CV, form submission only):
+${candidateInfo}
+
+---
+
+SCORING (0-100):
+1. Relevance of stated skills/experience to job (50%)
+2. Category overlap with job requirements (30%)
+3. General fit / potential (20%)
+
+Verdict mapping: 80-100=STRONG_MATCH, 60-79=GOOD_MATCH, 40-59=PARTIAL_MATCH, 0-39=WEAK_MATCH
+
+Respond in this exact JSON format (no other text):
+{"fit_score": <0-100>, "summary": "<2-3 sentence explanation in Georgian>", "verdict": "STRONG_MATCH"|"GOOD_MATCH"|"PARTIAL_MATCH"|"WEAK_MATCH"}`;
+
+  const result = await model.generateContent(prompt);
+  const response = result.response;
+  if (!response || !response.text) {
+    throw new Error("Empty response from Gemini");
+  }
+
+  const text = response.text().trim();
+  let jsonStr = text;
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) jsonStr = jsonMatch[0];
+
+  try {
+    const parsed = JSON.parse(jsonStr);
+    const fit_score = Math.min(100, Math.max(0, Number(parsed.fit_score) || 0));
+    const summary = String(parsed.summary || "").trim() || "No summary.";
+    const verdict =
+      parsed.verdict &&
+      ["STRONG_MATCH", "GOOD_MATCH", "PARTIAL_MATCH", "WEAK_MATCH"].includes(
+        parsed.verdict
+      )
+        ? parsed.verdict
+        : fit_score >= 80
+          ? "STRONG_MATCH"
+          : fit_score >= 60
+            ? "GOOD_MATCH"
+            : fit_score >= 40
+              ? "PARTIAL_MATCH"
+              : "WEAK_MATCH";
+    return { fit_score, summary, verdict };
+  } catch (e) {
+    const scoreMatch =
+      text.match(/fit_score["\s:]+(\d+)/i) ||
+      text.match(/(\d+)\s*%\s*(?:fit|match)/i);
+    const verdictMatch = text.match(
+      /(STRONG_MATCH|GOOD_MATCH|PARTIAL_MATCH|WEAK_MATCH)/i
+    );
+    const fit_score = scoreMatch
+      ? Math.min(100, Math.max(0, parseInt(scoreMatch[1], 10)))
+      : 50;
+    const verdict = verdictMatch
+      ? verdictMatch[1].toUpperCase()
+      : fit_score >= 60
+        ? "GOOD_MATCH"
+        : "PARTIAL_MATCH";
+    const summary = text.slice(0, 300).replace(/\n/g, " ").trim();
+    return { fit_score, summary, verdict };
+  }
+}
+
+module.exports = { assessCandidateAlignment, assessNoCvAlignment };
