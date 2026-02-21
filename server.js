@@ -652,6 +652,8 @@ app.get("/", async (req, res) => {
     let todayJobsCount = 0;
     let topCvFitJobs = [];
     let topCvFitTotalCount = 0;
+    let formSubmissionJobs = [];
+    let formSubmissionTotalCount = 0;
 
     if (!isAppendRequest) {
     if (!filtersActive && (req.visitorId || req.session?.user?.uid)) {
@@ -778,6 +780,31 @@ app.get("/", async (req, res) => {
         return true;
       });
       todayJobsCount = todayJobs.length;
+
+      // Form submission jobs (ვაკანსიები სადაც CV გარეშე მიგიღებენ) – jobs that accept form without CV
+      const formSubRaw = await db("jobs")
+        .select("*")
+        .where("job_status", "approved")
+        .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
+        .whereRaw("(accept_form_submissions IS TRUE)")
+        .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 WHEN "job_premium_status" = 'regular' THEN 5 ELSE 6 END`)
+        .orderBy("created_at", "desc")
+        .orderBy("id", "desc")
+        .limit(50);
+      const seenFormSub = new Set();
+      formSubmissionJobs = formSubRaw.filter((j) => {
+        const key = String(j.jobName || "").trim() + "|" + String(j.companyName || "").trim();
+        if (seenFormSub.has(key)) return false;
+        seenFormSub.add(key);
+        return true;
+      }).slice(0, 20);
+      const formSubCountRow = await db("jobs")
+        .where("job_status", "approved")
+        .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
+        .whereRaw("(accept_form_submissions IS TRUE)")
+        .count("* as total")
+        .first();
+      formSubmissionTotalCount = parseInt(formSubCountRow?.total || 0, 10);
     }
 
     // Top CV-fit jobs (ვაკანსიები სადაც შენი CV ზუსტად ერგება) – when user is logged in and has CV embedding
@@ -939,6 +966,8 @@ app.get("/", async (req, res) => {
       topPopularTotalCount,
       topCvFitJobs: topCvFitJobs || [],
       topCvFitTotalCount: topCvFitTotalCount || 0,
+      formSubmissionJobs: formSubmissionJobs || [],
+      formSubmissionTotalCount: formSubmissionTotalCount || 0,
       todayJobs,
       todayJobsCount,
       currentPage: pageNum,
@@ -1201,6 +1230,87 @@ app.get("/rekomendebuli-vakansiebi", async (req, res) => {
     });
   } catch (err) {
     console.error("rekomendebuli-vakansiebi error:", err);
+    res.status(500).send(err.message);
+  }
+});
+
+// Jobs that accept form without CV (ვაკანსიები სადაც CV გარეშე მიგიღებენ)
+app.get("/vakansiebi-cv-gareshe", async (req, res) => {
+  try {
+    const topLimit = 20;
+    const isBoosted = (j) => j.prioritize === true || j.prioritize === 1 || ["premium", "premiumPlus"].includes(j.job_premium_status);
+    let jobsRaw = await db("jobs")
+      .select("*")
+      .where("job_status", "approved")
+      .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
+      .whereRaw("(accept_form_submissions IS TRUE)")
+      .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 WHEN "job_premium_status" = 'regular' THEN 5 ELSE 6 END`)
+      .orderBy("created_at", "desc")
+      .orderBy("id", "desc")
+      .limit(50);
+    const prioritizedFormSub = await db("jobs")
+      .select("*")
+      .where("job_status", "approved")
+      .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
+      .whereRaw("(accept_form_submissions IS TRUE)")
+      .where((qb) => qb.where("prioritize", true).orWhereIn("job_premium_status", ["premium", "premiumPlus"]))
+      .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 ELSE 5 END`)
+      .orderBy("created_at", "desc")
+      .limit(2);
+    const seenKey = new Set();
+    jobsRaw = jobsRaw.filter((j) => {
+      const key = String(j.jobName || "").trim() + "|" + String(j.companyName || "").trim();
+      if (seenKey.has(key)) return false;
+      seenKey.add(key);
+      return true;
+    });
+    const dedupePrioritized = [];
+    const seenP = new Set();
+    for (const j of prioritizedFormSub) {
+      const key = String(j.jobName || "").trim() + "|" + String(j.companyName || "").trim();
+      if (!seenP.has(key)) {
+        seenP.add(key);
+        dedupePrioritized.push(j);
+      }
+    }
+    const nonBoosted = jobsRaw.filter((j) => !isBoosted(j));
+    const slot1 = (nonBoosted[0] || jobsRaw[0]);
+    const prioritizedFor23 = dedupePrioritized.slice(0, 2);
+    const usedIds = new Set([slot1?.id, ...prioritizedFor23.map((j) => j.id)].filter(Boolean));
+    const rest = jobsRaw.filter((j) => !usedIds.has(j.id));
+    const jobs = [slot1, ...prioritizedFor23, ...rest].filter(Boolean).slice(0, topLimit);
+
+    res.render("index", {
+      jobs,
+      recommendedJobs: [],
+      topSalaryJobs: [],
+      topSalaryTotalCount: 0,
+      topPopularJobs: [],
+      topPopularTotalCount: 0,
+      topCvFitJobs: [],
+      topCvFitTotalCount: 0,
+      formSubmissionJobs: [],
+      formSubmissionTotalCount: jobs.length,
+      todayJobs: [],
+      todayJobsCount: 0,
+      currentPage: 1,
+      totalPages: 1,
+      totalJobs: jobs.length,
+      filters: {},
+      filtersActive: false,
+      pageType: "form-submission",
+      paginationBase: "/vakansiebi-cv-gareshe",
+      slugify,
+      seo: {
+        title: "ვაკანსიები სადაც CV გარეშე მიგიღებენ | Samushao.ge",
+        description: "ვაკანსიები რომლებშიც განაცხადის ფორმის შევსება შეგიძლიათ CV-ის გაგზავნის გარეშე.",
+        canonical: "https://samushao.ge/vakansiebi-cv-gareshe",
+        ogImage:
+          "https://res.cloudinary.com/dd7gz0aqv/image/upload/v1743605652/export_l1wpwr.png",
+      },
+    });
+  } catch (err) {
+    console.error("vakansiebi-cv-gareshe error:", err);
     res.status(500).send(err.message);
   }
 });
