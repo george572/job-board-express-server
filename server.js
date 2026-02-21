@@ -2129,6 +2129,19 @@ app.post("/api/user-without-cv", async (req, res) => {
   }
 });
 
+// Admin: list candidates without CV (user_without_cv submissions)
+app.get("/api/admin/user-without-cv", async (req, res) => {
+  try {
+    const rows = await db("user_without_cv")
+      .select("*")
+      .orderBy("created_at", "desc");
+    res.json({ items: rows });
+  } catch (err) {
+    console.error("admin user-without-cv list error:", err);
+    res.status(500).json({ error: err?.message || "Server error" });
+  }
+});
+
 // User without CV banner: dismiss (record in DB, set 30-day cookie – show again after month)
 app.post("/api/user-without-cv/dismiss", async (req, res) => {
   if (req.session?.user) return res.json({ ok: true });

@@ -677,7 +677,35 @@ router.get("/searchterms", (req, res) => {
     .catch((err) => res.status(500).json({ error: err.message }));
 });
 
-// Phase 3: Top candidate matches for a job (Pinecone semantic search)
+/** Extract meaningful tokens (3+ chars) from text for overlap matching. */
+function tokensForMatch(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\u10A0-\u10FF\s]/gi, " ")
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2);
+}
+
+/** Check if no_cv row matches job by metadata (categories, other_specify, short_description vs job). */
+function noCvMatchesJob(noCvRow, jobText, jobTokens) {
+  const candText = [noCvRow.categories, noCvRow.other_specify, noCvRow.short_description]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const candTokens = new Set(tokensForMatch(candText));
+  if (candTokens.size === 0) return false;
+  // Match if any job token appears in candidate text, or any candidate token in job text
+  for (const t of jobTokens) {
+    if (t.length >= 2 && candText.includes(t)) return true;
+  }
+  for (const t of candTokens) {
+    if (t.length >= 2 && jobText.includes(t)) return true;
+  }
+  return false;
+}
+
+// Phase 3: Top candidate matches for a job (Pinecone semantic search + no_cv metadata match)
 router.get("/:id/top-candidates", async (req, res) => {
   try {
     const jobId = parseInt(req.params.id, 10);
@@ -692,6 +720,18 @@ router.get("/:id/top-candidates", async (req, res) => {
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
+    const catRow = job.category_id
+      ? await db("categories").where("id", job.category_id).select("name").first()
+      : null;
+    const jobText = [
+      job.jobName || "",
+      job.jobDescription || job.job_description || "",
+      (catRow && catRow.name) || "",
+    ]
+      .join(" ")
+      .toLowerCase();
+    const jobTokens = tokensForMatch(jobText);
+
     const { getTopCandidatesForJob } = require("../services/pineconeCandidates");
     const requireRoleMatch =
       String(req.query.requireRoleMatch || "")
@@ -713,7 +753,32 @@ router.get("/:id/top-candidates", async (req, res) => {
       topK
     );
     // Only return candidates that pass the score threshold
-    const qualifiedMatches = matches.filter((m) => (m.score || 0) >= effectiveMinScore);
+    let qualifiedMatches = matches.filter((m) => (m.score || 0) >= effectiveMinScore);
+    const existingIds = new Set(qualifiedMatches.map((m) => m.id));
+
+    // Add no_cv that match by metadata (categories, short_description, other_specify)
+    const noCvRows = await db("user_without_cv").select("*");
+    const metadataMatchedNoCv = [];
+    for (const row of noCvRows) {
+      const pid = `no_cv_${row.id}`;
+      if (existingIds.has(pid)) continue;
+      if (!noCvMatchesJob(row, jobText, jobTokens)) continue;
+      metadataMatchedNoCv.push({
+        id: pid,
+        score: 0.6, // treat as passing match
+        metadata: {
+          name: row.name,
+          email: row.email || undefined,
+          phone: row.phone,
+          short_description: row.short_description || undefined,
+          categories: row.categories || undefined,
+          other_specify: row.other_specify || undefined,
+        },
+      });
+      existingIds.add(pid);
+    }
+    qualifiedMatches = [...qualifiedMatches, ...metadataMatchedNoCv];
+
     const userIds = qualifiedMatches.map((m) => m.id).filter(Boolean);
     if (userIds.length === 0) {
       return res.json({ job_id: jobId, candidates: [] });
