@@ -268,6 +268,7 @@ async function processNewJobEmailQueue() {
         "q.email_type",
         "q.subject",
         "q.html",
+        "q.best_candidate_id",
         "j.jobName",
         "j.companyName",
         "j.company_email",
@@ -406,11 +407,19 @@ async function processNewJobEmailQueue() {
     const jobLink = `${SITE_BASE_URL}/vakansia/${slugify(job.jobName)}-${job.id}`;
     const toEmail =
       (job.company_email || "").trim().split(/[,;]/)[0].trim() || companyEmail;
+    const subject =
+      row.subject || `თქვენი ვაკანსია "${job.jobName}" - Samushao.ge`;
+    const html =
+      row.html ||
+      NEW_JOB_HTML_TEMPLATE(
+        { ...job, jobLink },
+        { ai_description: "—" },
+      );
     const mailOptions = {
       from: NEW_JOB_MAIL_USER,
       to: toEmail || job.company_email?.trim(),
-      subject: `თქვენი ვაკანსია "${job.jobName}" - Samushao.ge`,
-      html: NEW_JOB_HTML_TEMPLATE({ ...job, jobLink }),
+      subject,
+      html,
     };
     newJobTransporter.sendMail(mailOptions, async (err) => {
       if (err) {
@@ -446,6 +455,10 @@ function parseSalaryNum(s) {
 }
 
 const NEW_JOB_HTML_TEMPLATE = (job, candidate) => {
+  const aiDescription =
+    candidate && candidate.ai_description
+      ? candidate.ai_description
+      : "—";
   return `
 <p>გამარჯობა!</p>
 
@@ -453,20 +466,179 @@ const NEW_JOB_HTML_TEMPLATE = (job, candidate) => {
 
 <p>Samushao.ge-ს AI-მ ბაზაში უკვე იპოვა 1 კანდიდატი, რომელიც თქვენს მოთხოვნებს 90%-ით ემთხვევა.</p>
 <p>აი მისი მოკლე დახასიათება (გენერირებულია ჩვენი AI-ს მიერ):</p>
-${candidate.ai_description}
+${aiDescription}
 
 <p>მაინტერესებდა, ჯერ კიდევ ეძებთ კადრს?</p>
 
 <p>თუ კი, შემიძლია გამოგიგზავნოთ მისი რეზიუმეს ბმული და თავად ნახოთ რამდენად შეესაბამება თქვენს მოთხოვნებს.</p>
 
 <p>პატივისცემით,<br>
-გიორგი | Samushao.ge</p>`
+გიორგი | Samushao.ge</p>`;
 };
+
+const MIN_CANDIDATES = 5;
+const MIN_GOOD_MATCHES = 2;
+const VECTOR_MIN_SCORE = 0.4;
+const VECTOR_TOP_K = 20;
+
+/**
+ * Evaluate job for new-job marketing email: vector search + Gemini assessment.
+ * Returns { shouldQueue, bestCandidate?, reason? }
+ * Best candidate: first STRONG_MATCH or first GOOD_MATCH; needs >= 5 candidates, >= 2 GOOD_MATCH.
+ */
+async function evaluateJobForNewJobEmail(job) {
+  const { getTopCandidatesForJob } = require("../services/pineconeCandidates");
+  const { assessCandidateAlignment } = require("../services/geminiCandidateAssessment");
+  const { extractTextFromCv } = require("../services/cvTextExtractor");
+  const { generateNoCvDescription } = require("../services/geminiNoCvDescription");
+
+  const jobInput = {
+    job_role: job.jobName || job.job_role,
+    job_experience: job.job_experience,
+    job_type: job.job_type,
+    job_city: job.job_city,
+    jobDescription:
+      job.jobDescription || job.job_description || "",
+  };
+  const matches = await getTopCandidatesForJob(jobInput, VECTOR_TOP_K);
+  const qualified = matches
+    .filter((m) => (m.score || 0) >= VECTOR_MIN_SCORE)
+    .slice(0, 10);
+
+  if (qualified.length < MIN_CANDIDATES) {
+    return { shouldQueue: false, reason: `fewer than ${MIN_CANDIDATES} candidates` };
+  }
+
+  const realUserIds = qualified
+    .filter((m) => !String(m.id).startsWith("no_cv_"))
+    .map((m) => m.id);
+  const noCvIds = qualified
+    .filter((m) => String(m.id).startsWith("no_cv_"))
+    .map((m) => parseInt(String(m.id).replace("no_cv_", ""), 10))
+    .filter((n) => !isNaN(n) && n > 0);
+
+  const users =
+    realUserIds.length > 0
+      ? await db("users")
+          .whereIn("user_uid", realUserIds)
+          .select("user_uid", "user_name", "user_email")
+      : [];
+  const userMap = Object.fromEntries(users.map((u) => [u.user_uid, u]));
+
+  const resumeRows =
+    realUserIds.length > 0
+      ? await db("resumes")
+          .whereIn("user_id", realUserIds)
+          .orderBy("updated_at", "desc")
+          .select("user_id", "file_url", "file_name")
+      : [];
+  const resumeMap = {};
+  resumeRows.forEach((r) => {
+    if (!resumeMap[r.user_id]) resumeMap[r.user_id] = r;
+  });
+
+  const noCvRows =
+    noCvIds.length > 0
+      ? await db("user_without_cv").whereIn("id", noCvIds).select("*")
+      : [];
+  const noCvMap = Object.fromEntries(noCvRows.map((r) => [r.id, r]));
+
+  const assessed = [];
+  for (const m of qualified) {
+    const isNoCv = String(m.id).startsWith("no_cv_");
+    if (isNoCv) {
+      const nid = parseInt(String(m.id).replace("no_cv_", ""), 10);
+      const row = noCvMap[nid];
+      if (!row) continue;
+      let aiDescription = row.ai_description;
+      if (!aiDescription || !aiDescription.trim()) {
+        try {
+          aiDescription = await generateNoCvDescription(row);
+        } catch (e) {
+          console.warn(
+            `[evaluateJob] generateNoCvDescription failed for no_cv_${nid}:`,
+            e.message,
+          );
+          aiDescription = "—";
+        }
+      }
+      assessed.push({
+        id: m.id,
+        verdict: "GOOD_MATCH",
+        ai_description: aiDescription,
+        name: row.name,
+        email: row.email,
+        phone: row.phone,
+        cv_url: null,
+        cv_file_name: null,
+      });
+    } else {
+      const r = resumeMap[m.id];
+      const cvText =
+        m.metadata?.text ||
+        (r?.file_url
+          ? await extractTextFromCv(r.file_url, r.file_name).catch(() => "")
+          : "");
+      if (!cvText || cvText.length < 50) {
+        continue;
+      }
+      try {
+        const result = await assessCandidateAlignment(job, cvText);
+        const u = userMap[m.id];
+        assessed.push({
+          id: m.id,
+          verdict: result.verdict,
+          ai_description: result.summary,
+          name: u?.user_name || null,
+          email: u?.user_email || null,
+          phone: null,
+          cv_url: r?.file_url || null,
+          cv_file_name: r?.file_name || null,
+        });
+      } catch (e) {
+        console.warn(
+          `[evaluateJob] assessCandidateAlignment failed for ${m.id}:`,
+          e.message,
+        );
+      }
+    }
+  }
+
+  const goodMatches = assessed.filter((a) => a.verdict === "GOOD_MATCH");
+  const strongMatches = assessed.filter((a) => a.verdict === "STRONG_MATCH");
+  const goodOrStrongCount = goodMatches.length + strongMatches.length;
+
+  if (goodOrStrongCount < MIN_GOOD_MATCHES) {
+    return {
+      shouldQueue: false,
+      reason: `fewer than ${MIN_GOOD_MATCHES} good/strong matches`,
+    };
+  }
+
+  const best =
+    strongMatches[0] || goodMatches[0];
+  if (!best) {
+    return { shouldQueue: false, reason: "no suitable candidate found" };
+  }
+
+  return {
+    shouldQueue: true,
+    bestCandidate: {
+      id: best.id,
+      ai_description: best.ai_description,
+      name: best.name,
+      email: best.email,
+      phone: best.phone,
+      cv_url: best.cv_url,
+      cv_file_name: best.cv_file_name,
+    },
+  };
+}
 
 /**
  * Add job to queue with sendAfter time.
  * @param {object} job
- * @param {object} opts - { batchIndex, batchTotal } for bulk (spreads over 2-3h); omit for single job (sends soon)
+ * @param {object} opts - { batchIndex, batchTotal, bestCandidate } - bestCandidate required for new flow
  * @returns {{ queued: boolean; reason?: string }}
  */
 async function sendNewJobEmail(job, opts = {}) {
@@ -520,11 +692,26 @@ async function sendNewJobEmail(job, opts = {}) {
     sendAfterMs = deferToNextDay ? getNextDay1020Georgia().getTime() : now;
   }
   const sendAfter = new Date(sendAfterMs);
-  await db("new_job_email_queue").insert({
+  const bestCandidate = opts.bestCandidate || null;
+
+  const insertPayload = {
     job_id: job.id,
     company_email_lower: companyEmail,
     send_after: db.raw("?::timestamptz", [sendAfter.toISOString()]),
-  });
+    email_type: "new_job",
+  };
+  if (bestCandidate) {
+    const jobLink = `${SITE_BASE_URL}/vakansia/${slugify(job.jobName)}-${job.id}`;
+    const html = NEW_JOB_HTML_TEMPLATE(
+      { ...job, jobLink },
+      { ai_description: bestCandidate.ai_description },
+    );
+    insertPayload.best_candidate_id = bestCandidate.id;
+    insertPayload.subject = `თქვენი ვაკანსია "${job.jobName}" - Samushao.ge`;
+    insertPayload.html = html;
+  }
+
+  await db("new_job_email_queue").insert(insertPayload);
   if (!newJobEmailProcessorScheduled) {
     newJobEmailProcessorScheduled = true;
     processNewJobEmailQueue();
@@ -534,7 +721,7 @@ async function sendNewJobEmail(job, opts = {}) {
 
 /**
  * Send one email per company when multiple jobs are uploaded (bulk).
- * Spreads all emails over 2 hours with random jitter.
+ * Evaluates the first job for candidates, then queues if conditions met.
  * @returns {{ queued: boolean; reason?: string }}
  */
 async function sendNewJobEmailToCompany(jobs, batchIndex, batchTotal) {
@@ -546,7 +733,36 @@ async function sendNewJobEmailToCompany(jobs, batchIndex, batchTotal) {
   if (!email || first.dont_send_email) {
     return { queued: false, reason: "no_email_or_dont_send" };
   }
-  return sendNewJobEmail(first, { batchIndex, batchTotal });
+  const fullJob = await db("jobs")
+    .where("id", first.id)
+    .select("*")
+    .first();
+  if (!fullJob) return { queued: false, reason: "job_not_found" };
+
+  const evalResult = await evaluateJobForNewJobEmail(fullJob).catch((e) => {
+    console.error("[evaluateJob] Bulk failed for job", first.id, ":", e.message);
+    return { shouldQueue: false, reason: e.message };
+  });
+
+  if (!evalResult.shouldQueue || !evalResult.bestCandidate) {
+    return { queued: false, reason: evalResult.reason || "no_suitable_candidates" };
+  }
+
+  return sendNewJobEmail(
+    {
+      id: first.id,
+      jobName: first.jobName,
+      companyName: first.companyName,
+      company_email: first.company_email,
+      jobSalary: first.jobSalary,
+      dont_send_email: first.dont_send_email,
+    },
+    {
+      batchIndex,
+      batchTotal,
+      bestCandidate: evalResult.bestCandidate,
+    },
+  );
 }
 
 router.get("/", async (req, res) => {
@@ -1335,14 +1551,36 @@ router.post("/", upload.none(), async (req, res) => {
       .returning("id");
 
     if (inserted) {
-      await sendNewJobEmail({
-        id: inserted.id,
-        jobName: jName,
-        companyName: cName,
-        company_email,
-        jobSalary,
-        dont_send_email: dont_send_email === true || dont_send_email === "true",
-      });
+      const fullJob = await db("jobs")
+        .where("id", inserted.id)
+        .select("*")
+        .first();
+      if (fullJob && !fullJob.dont_send_email && fullJob.company_email) {
+        const evalResult = await evaluateJobForNewJobEmail(fullJob).catch(
+          (e) => {
+            console.error(
+              "[evaluateJob] Failed for job",
+              fullJob.id,
+              ":",
+              e.message,
+            );
+            return { shouldQueue: false, reason: e.message };
+          },
+        );
+        if (evalResult.shouldQueue && evalResult.bestCandidate) {
+          await sendNewJobEmail(
+            {
+              id: fullJob.id,
+              jobName: fullJob.jobName,
+              companyName: fullJob.companyName,
+              company_email: fullJob.company_email,
+              jobSalary: fullJob.jobSalary,
+              dont_send_email: fullJob.dont_send_email,
+            },
+            { bestCandidate: evalResult.bestCandidate },
+          );
+        }
+      }
       // Index job in Pinecone for "jobs for user" recommendations
       upsertJob(inserted.id, {
         jobName: jName,
@@ -1763,24 +2001,109 @@ router.getEmailQueueStatus = async () => {
 
 router.getEmailQueueDetails = async () => {
   try {
+    const hasBestCandidateId = await db.schema.hasColumn(
+      "new_job_email_queue",
+      "best_candidate_id",
+    );
     const pendingRows = await db("new_job_email_queue as q")
       .join("jobs as j", "j.id", "q.job_id")
       .select(
         "q.job_id",
+        "q.best_candidate_id",
         db.raw('j."jobName" as job_name'),
         db.raw('j."companyName" as company_name'),
         "j.company_email",
         "q.send_after",
       )
       .orderBy("q.send_after", "asc");
-    const pending = pendingRows.map((r) => ({
-      job_id: r.job_id,
-      job_name: r.job_name,
-      company_name: r.company_name,
-      company_email: r.company_email,
-      send_after: r.send_after,
-      status: "queued",
-    }));
+    const bestCandidateIds = hasBestCandidateId
+      ? pendingRows
+          .map((r) => r.best_candidate_id)
+          .filter(Boolean)
+      : [];
+    const realUserIds = bestCandidateIds.filter(
+      (id) => !String(id).startsWith("no_cv_"),
+    );
+    const noCvIds = bestCandidateIds
+      .filter((id) => String(id).startsWith("no_cv_"))
+      .map((id) => parseInt(String(id).replace("no_cv_", ""), 10))
+      .filter((n) => !isNaN(n) && n > 0);
+
+    let bestCandidateMap = {};
+    if (bestCandidateIds.length > 0) {
+      const resumeRows =
+        realUserIds.length > 0
+          ? await db("resumes")
+              .whereIn("user_id", realUserIds)
+              .orderBy("updated_at", "desc")
+              .select("user_id", "file_url", "file_name")
+          : [];
+      const resumeByUser = {};
+      resumeRows.forEach((r) => {
+        if (!resumeByUser[r.user_id]) resumeByUser[r.user_id] = r;
+      });
+      const userRows =
+        realUserIds.length > 0
+          ? await db("users")
+              .whereIn("user_uid", realUserIds)
+              .select("user_uid", "user_name")
+          : [];
+      const userMap = Object.fromEntries(
+        userRows.map((u) => [u.user_uid, u]),
+      );
+      const noCvRows =
+        noCvIds.length > 0
+          ? await db("user_without_cv")
+              .whereIn("id", noCvIds)
+              .select("id", "name", "email", "phone")
+          : [];
+      const noCvById = Object.fromEntries(
+        noCvRows.map((r) => [`no_cv_${r.id}`, r]),
+      );
+
+      for (const id of bestCandidateIds) {
+        if (String(id).startsWith("no_cv_")) {
+          const row = noCvById[id];
+          bestCandidateMap[id] = row
+            ? {
+                id,
+                cv_url: null,
+                cv_file_name: null,
+                name: row.name,
+                email: row.email || null,
+                phone: row.phone || null,
+              }
+            : { id, cv_url: null, email: null, phone: null };
+        } else {
+          const r = resumeByUser[id];
+          const u = userMap[id];
+          bestCandidateMap[id] = {
+            id,
+            cv_url: r?.file_url || null,
+            cv_file_name: r?.file_name || null,
+            name: u?.user_name || null,
+            email: null,
+            phone: null,
+          };
+        }
+      }
+    }
+
+    const pending = pendingRows.map((r) => {
+      const item = {
+        job_id: r.job_id,
+        job_name: r.job_name,
+        company_name: r.company_name,
+        company_email: r.company_email,
+        send_after: r.send_after,
+        status: "queued",
+      };
+      if (hasBestCandidateId && r.best_candidate_id) {
+        item.best_candidate =
+          bestCandidateMap[r.best_candidate_id] || null;
+      }
+      return item;
+    });
 
     const hasMarketingSent = await db.schema.hasColumn(
       "jobs",
@@ -1892,23 +2215,32 @@ router.requeueJobsByIds = async (jobIds) => {
   const ids = jobIds.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
   if (ids.length === 0) return { added: 0 };
   const jobs = await db("jobs")
-    .select(
-      "id",
-      "jobName",
-      "companyName",
-      "company_email",
-      "jobSalary",
-      "dont_send_email",
-    )
+    .select("*")
     .whereIn("id", ids)
     .where("job_status", "approved");
+  let added = 0;
   for (const j of jobs) {
-    await sendNewJobEmail({
-      ...j,
-      dont_send_email: j.dont_send_email === true || j.dont_send_email === 1,
+    if (j.dont_send_email || !j.company_email) continue;
+    const evalResult = await evaluateJobForNewJobEmail(j).catch((e) => {
+      console.error("[requeue] evaluateJob failed for job", j.id, ":", e.message);
+      return { shouldQueue: false };
     });
+    if (evalResult.shouldQueue && evalResult.bestCandidate) {
+      const result = await sendNewJobEmail(
+        {
+          id: j.id,
+          jobName: j.jobName,
+          companyName: j.companyName,
+          company_email: j.company_email,
+          jobSalary: j.jobSalary,
+          dont_send_email: j.dont_send_email === true || j.dont_send_email === 1,
+        },
+        { bestCandidate: evalResult.bestCandidate },
+      );
+      if (result.queued) added++;
+    }
   }
-  return { added: jobs.length, pending: await getQueueCount() };
+  return { added, pending: await getQueueCount() };
 };
 
 function triggerNewJobEmailQueue() {
