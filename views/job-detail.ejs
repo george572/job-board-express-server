@@ -235,11 +235,15 @@
               <dd class="mt-1 font-[500]"><%= job.job_experience ? job.job_experience + ' წელი' : '-' %></dd>
             </dl>
           </section>
-          <% if (job.isHelio && job.helio_url) { %>
+          <%
+            const isHelioJob = job.isHelio === true || job.isHelio === 1 || job.isHelio === 'true' || job.is_helio === true || job.is_helio === 1;
+            const helioApplyUrl = (job.helio_url || job.helioUrl || '').toString().trim();
+          %>
+          <% if (isHelioJob && helioApplyUrl) { %>
           <div class="hidden lg:flex flex-col items-start justify-center">
-            <a id="helioApplyBtnDesktop" href="<%= job.helio_url %>" class="bg-[#315EFF] w-[296px] h-[52px] text-white rounded-lg my-8 mb-1 text-[16px] mt-8 flex items-center justify-center cursor-pointer no-underline hover:opacity-90">განაცხადის გაგზავნა</a>
+            <a id="helioApplyBtnDesktop" href="<%= helioApplyUrl %>" target="_blank" rel="noopener noreferrer" class="bg-[#315EFF] w-[296px] h-[52px] text-white rounded-lg my-8 mb-1 text-[16px] mt-8 flex items-center justify-center cursor-pointer no-underline hover:opacity-90">განაცხადის გაგზავნა</a>
           </div>
-          <% } else if (!job.isHelio) { %>
+          <% } else if (!isHelioJob) { %>
           <% if (!user) { %>
           <p class="mt-4 text-[12px] block text-center text-red-400 pb-1 mx-auto">
             რეზიუმეს გასაგზავნად გაიარეთ ავტორიზაცია
@@ -302,11 +306,11 @@
     </section>
     <% } %>
 
-    <% if (job.isHelio && job.helio_url) { %>
+    <% if (isHelioJob && helioApplyUrl) { %>
     <footer class="fixed bg-white bottom-0 left-0 right-0 w-full px-2 pb-1 flex lg:hidden flex-col items-between justify-between border border-[#E5E5E5] z-40">
-      <a id="helioApplyBtnMobile" href="<%= job.helio_url %>" class="bg-[#315EFF] mt-2 w-full min-h-[52px] text-white rounded-lg my-8 mt-0 mb-1 text-[16px] flex items-center justify-center cursor-pointer no-underline hover:opacity-90">განაცხადის გაგზავნა</a>
+      <a id="helioApplyBtnMobile" href="<%= helioApplyUrl %>" target="_blank" rel="noopener noreferrer" class="bg-[#315EFF] mt-2 w-full min-h-[52px] text-white rounded-lg my-8 mt-0 mb-1 text-[16px] flex items-center justify-center cursor-pointer no-underline hover:opacity-90">განაცხადის გაგზავნა</a>
     </footer>
-    <% } else if (!job.isHelio) { %>
+    <% } else if (!isHelioJob) { %>
     <footer class="fixed bg-white bottom-0 left-0 right-0 w-full px-2 pb-1 flex lg:hidden flex-col items-between justify-between border border-[#E5E5E5] z-40">
       <% if (!user) { %>
       <p class="mt-2 text-[12px] block text-center text-red-400 pb-1 mx-auto">
@@ -335,7 +339,7 @@
     </footer>
     <% } %>
 
-    <% if (!job.isHelio) { %>
+    <% if (!isHelioJob) { %>
     <!-- Job upload dialog -->
     <dialog id="uploadDialog" class="slide-dialog">
       <!-- Custom backdrop for click-to-close -->

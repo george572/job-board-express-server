@@ -1633,8 +1633,10 @@ app.get("/vakansia/:slug", async (req, res) => {
       "https://samushao.ge/vakansia/" + slugify(job.jobName) + "-" + job.id;
     const acceptFormSubmissions = job.accept_form_submissions === true || job.accept_form_submissions === 1;
     const userAlreadyAppliedOrSubmitted = userAlreadyApplied || userAlreadySubmittedForm;
+    const isHelio = job.isHelio === true || job.isHelio === 1 || job.is_helio === true || job.is_helio === 1;
+    const helioUrl = (job.helio_url || job.helioUrl || "").toString().trim() || null;
     res.render("job-detail", {
-      job: { ...job, accept_form_submissions: acceptFormSubmissions },
+      job: { ...job, accept_form_submissions: acceptFormSubmissions, isHelio: !!isHelio, helio_url: helioUrl },
       acceptFormSubmissions,
       relatedJobs,
       slugify,
