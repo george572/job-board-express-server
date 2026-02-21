@@ -19,10 +19,22 @@ const db = knex(knexConfig[environment]);
 
 // Email for freshly uploaded jobs (to HR)
 const NEW_JOB_MAIL_USER = (process.env.PROPOSITIONAL_MAIL_USER || "").trim();
-const NEW_JOB_MAIL_PASS = (process.env.PROPOSITIONAL_MAIL_PASS || "").trim().replace(/\s/g, "");
+const NEW_JOB_MAIL_PASS = (process.env.PROPOSITIONAL_MAIL_PASS || "")
+  .trim()
+  .replace(/\s/g, "");
 // Marketing email (3rd CV, from giorgi@samushao.ge)
-const MARKETING_MAIL_USER = (process.env.APPLICANTS_MAIL_USER || process.env.MARKETING_MAIL_USER || "").trim();
-const MARKETING_MAIL_PASS = (process.env.APPLICANTS_MAIL_PASS || process.env.MARKETING_MAIL_PASS || "").trim().replace(/\s/g, "");
+const MARKETING_MAIL_USER = (
+  process.env.APPLICANTS_MAIL_USER ||
+  process.env.MARKETING_MAIL_USER ||
+  ""
+).trim();
+const MARKETING_MAIL_PASS = (
+  process.env.APPLICANTS_MAIL_PASS ||
+  process.env.MARKETING_MAIL_PASS ||
+  ""
+)
+  .trim()
+  .replace(/\s/g, "");
 const SITE_BASE_URL = process.env.SITE_BASE_URL || "https://samushao.ge";
 const EMAIL_SIGNATURE = (process.env.EMAIL_SIGNATURE || "").trim();
 
@@ -31,7 +43,10 @@ let blacklistLoaded = false;
 
 async function loadBlacklist() {
   try {
-    const rows = await db("blacklisted_company_emails").select("email", "company_name");
+    const rows = await db("blacklisted_company_emails").select(
+      "email",
+      "company_name",
+    );
     const emails = new Set();
     const companyNames = new Set();
     rows.forEach((r) => {
@@ -51,8 +66,20 @@ async function loadBlacklist() {
 }
 
 async function isBlacklisted(jobOrEmail, companyName) {
-  const email = (typeof jobOrEmail === "string" ? jobOrEmail : jobOrEmail?.company_email || "").trim().toLowerCase();
-  const name = (companyName ?? (typeof jobOrEmail === "object" ? jobOrEmail?.companyName : ""))?.trim().toLowerCase() || "";
+  const email = (
+    typeof jobOrEmail === "string"
+      ? jobOrEmail
+      : jobOrEmail?.company_email || ""
+  )
+    .trim()
+    .toLowerCase();
+  const name =
+    (
+      companyName ??
+      (typeof jobOrEmail === "object" ? jobOrEmail?.companyName : "")
+    )
+      ?.trim()
+      .toLowerCase() || "";
   if (!email && !name) return false;
   if (!blacklistLoaded) await loadBlacklist();
   if (email && blacklistCache.emails.has(email)) return true;
@@ -88,7 +115,12 @@ const marketingTransporter =
 // Marketing email scheduling: all times in Tbilisi (Asia/Tbilisi, UTC+4)
 const TZ_GEORGIA = "Asia/Tbilisi";
 function isAfter1830() {
-  const pts = new Intl.DateTimeFormat("en-US", { timeZone: TZ_GEORGIA, hour: "numeric", minute: "numeric", hour12: false }).formatToParts(new Date());
+  const pts = new Intl.DateTimeFormat("en-US", {
+    timeZone: TZ_GEORGIA,
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
+  }).formatToParts(new Date());
   const hour = parseInt(pts.find((p) => p.type === "hour").value, 10);
   const minute = parseInt(pts.find((p) => p.type === "minute").value, 10);
   // Defer to next morning only when between 18:30 and 00:00 Georgia time
@@ -97,7 +129,12 @@ function isAfter1830() {
 /** Returns Date for next calendar day 10:00 Tbilisi, stored as UTC (10:00 Tbilisi = 06:00 UTC) */
 function getNextDay1020Georgia() {
   const now = new Date();
-  const opts = { timeZone: TZ_GEORGIA, year: "numeric", month: "2-digit", day: "2-digit" };
+  const opts = {
+    timeZone: TZ_GEORGIA,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  };
   const parts = new Intl.DateTimeFormat("en-US", opts).formatToParts(now);
   const y = parseInt(parts.find((p) => p.type === "year").value, 10);
   const m = parseInt(parts.find((p) => p.type === "month").value, 10);
@@ -107,7 +144,12 @@ function getNextDay1020Georgia() {
 /** Returns Date for next calendar day 10:00 Tbilisi (06:00 UTC) */
 function getNextDay0900Georgia() {
   const now = new Date();
-  const opts = { timeZone: TZ_GEORGIA, year: "numeric", month: "2-digit", day: "2-digit" };
+  const opts = {
+    timeZone: TZ_GEORGIA,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  };
   const parts = new Intl.DateTimeFormat("en-US", opts).formatToParts(now);
   const y = parseInt(parts.find((p) => p.type === "year").value, 10);
   const m = parseInt(parts.find((p) => p.type === "month").value, 10);
@@ -116,10 +158,10 @@ function getNextDay0900Georgia() {
 }
 
 // Bulk emails spread over 2 hours
-const BULK_SPREAD_MS = 2 * 60 * 60 * 1000;       // 2 hours total window
-const MIN_DELAY_BETWEEN_SENDS_MS = 60 * 1000;     // at least 1 min between sends
+const BULK_SPREAD_MS = 2 * 60 * 60 * 1000; // 2 hours total window
+const MIN_DELAY_BETWEEN_SENDS_MS = 60 * 1000; // at least 1 min between sends
 const MAX_DELAY_BETWEEN_SENDS_MS = 5 * 60 * 1000; // random 1–5 min before next check
-const RESCHEDULE_SLOT_MINUTES = 7;                 // 7 min between rescheduled emails (09:00, 09:07, 09:14…)
+const RESCHEDULE_SLOT_MINUTES = 7; // 7 min between rescheduled emails (09:00, 09:07, 09:14…)
 
 let newJobEmailLastSentAt = 0;
 let newJobEmailProcessorScheduled = false;
@@ -148,7 +190,7 @@ async function claimAndSendToCompany(companyEmail) {
        DO UPDATE SET sent_at = now()
        WHERE new_job_email_sent.sent_at < now() - interval '7 days'
        RETURNING company_email_lower`,
-      [companyEmail]
+      [companyEmail],
     );
     return result.rows && result.rows.length > 0;
   } catch (e) {
@@ -170,13 +212,15 @@ async function getQueueCount() {
 
 // Start processor on startup if queue has items
 const RETRY_WHEN_NO_TRANSPORTER_MS = 5 * 60 * 1000; // 5 min
-const MAX_WAIT_BEFORE_RECHECK_MS = 60 * 1000;      // Wake every 1 min when all items deferred
-const POLL_INTERVAL_MS = 60 * 1000;                 // Fallback: poll every 1 min no matter what
+const MAX_WAIT_BEFORE_RECHECK_MS = 60 * 1000; // Wake every 1 min when all items deferred
+const POLL_INTERVAL_MS = 60 * 1000; // Fallback: poll every 1 min no matter what
 
 (async () => {
   const n = await getQueueCount();
   const transportOk = !!newJobTransporter;
-  console.log(`[Email queue] Startup: ${n} items in queue, transporter: ${transportOk ? "configured" : "NOT CONFIGURED (set PROPOSITIONAL_MAIL_USER/PASS)"}`);
+  console.log(
+    `[Email queue] Startup: ${n} items in queue, transporter: ${transportOk ? "configured" : "NOT CONFIGURED (set PROPOSITIONAL_MAIL_USER/PASS)"}`,
+  );
   if (n > 0) {
     newJobEmailProcessorScheduled = true;
     processNewJobEmailQueue();
@@ -204,9 +248,15 @@ async function processNewJobEmailQueue() {
       return;
     }
     // Compare: send_after <= NOW() (both UTC in DB)
-    const debug = await db.raw("SELECT NOW() as db_now, (SELECT send_after FROM new_job_email_queue ORDER BY send_after LIMIT 1) as first_send_after").then((r) => r.rows?.[0]);
+    const debug = await db
+      .raw(
+        "SELECT NOW() as db_now, (SELECT send_after FROM new_job_email_queue ORDER BY send_after LIMIT 1) as first_send_after",
+      )
+      .then((r) => r.rows?.[0]);
     if (debug) {
-      console.log(`[Email queue] DB now: ${debug.db_now}, first send_after: ${debug.first_send_after}`);
+      console.log(
+        `[Email queue] DB now: ${debug.db_now}, first send_after: ${debug.first_send_after}`,
+      );
     }
     const row = await db("new_job_email_queue as q")
       .leftJoin("jobs as j", "j.id", "q.job_id")
@@ -222,20 +272,25 @@ async function processNewJobEmailQueue() {
         "j.companyName",
         "j.company_email",
         "j.jobSalary",
-        "j.jobSalary_min"
+        "j.jobSalary_min",
       )
       .whereRaw("q.send_after <= NOW()")
       .orderBy("q.send_after")
       .first();
     if (!row) {
-      const nextRow = await db("new_job_email_queue").select("send_after").orderBy("send_after").first();
+      const nextRow = await db("new_job_email_queue")
+        .select("send_after")
+        .orderBy("send_after")
+        .first();
       if (nextRow) {
         const idealWait = new Date(nextRow.send_after).getTime() - Date.now();
         const waitMs = Math.min(
           Math.max(MIN_DELAY_BETWEEN_SENDS_MS, idealWait),
-          MAX_WAIT_BEFORE_RECHECK_MS
+          MAX_WAIT_BEFORE_RECHECK_MS,
         );
-        console.log(`[Email queue] All ${count} items scheduled for later; recheck in ${Math.round(waitMs / 1000)}s`);
+        console.log(
+          `[Email queue] All ${count} items scheduled for later; recheck in ${Math.round(waitMs / 1000)}s`,
+        );
         newJobEmailProcessorScheduled = true;
         setTimeout(processNewJobEmailQueue, waitMs);
       } else {
@@ -248,16 +303,23 @@ async function processNewJobEmailQueue() {
       const next0900 = getNextDay0900Georgia();
       const windowEnd = new Date(next0900.getTime() + BULK_SPREAD_MS);
       const existingCount = await db("new_job_email_queue")
-        .whereBetween("send_after", [next0900.toISOString(), windowEnd.toISOString()])
+        .whereBetween("send_after", [
+          next0900.toISOString(),
+          windowEnd.toISOString(),
+        ])
         .count("id as n")
         .first()
         .then((r) => parseInt(r?.n || 0, 10));
       const offsetMs = existingCount * RESCHEDULE_SLOT_MINUTES * 60 * 1000;
       const newSendAfter = new Date(next0900.getTime() + offsetMs);
-      await db("new_job_email_queue").where("id", row.queue_id).update({
-        send_after: db.raw("?::timestamptz", [newSendAfter.toISOString()]),
-      });
-      console.log(`[Email queue] Rescheduled job #${row.job_id} to next day ${new Date(newSendAfter).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: TZ_GEORGIA })} (slot ${existingCount + 1}, was due after 18:30)`);
+      await db("new_job_email_queue")
+        .where("id", row.queue_id)
+        .update({
+          send_after: db.raw("?::timestamptz", [newSendAfter.toISOString()]),
+        });
+      console.log(
+        `[Email queue] Rescheduled job #${row.job_id} to next day ${new Date(newSendAfter).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: TZ_GEORGIA })} (slot ${existingCount + 1}, was due after 18:30)`,
+      );
       newJobEmailProcessorScheduled = true;
       setTimeout(processNewJobEmailQueue, MIN_DELAY_BETWEEN_SENDS_MS);
       return;
@@ -282,15 +344,25 @@ async function processNewJobEmailQueue() {
         if (err) {
           console.error("Third CV marketing email error:", err);
         } else {
-          const hasCvSubmissions = await db.schema.hasColumn("jobs", "cv_submissions_email_sent");
+          const hasCvSubmissions = await db.schema.hasColumn(
+            "jobs",
+            "cv_submissions_email_sent",
+          );
           if (hasCvSubmissions) {
-            await db("jobs").where("id", row.job_id).update({ cv_submissions_email_sent: true });
+            await db("jobs")
+              .where("id", row.job_id)
+              .update({ cv_submissions_email_sent: true });
           }
-          console.log(`📧 Sent third-CV marketing email to ${companyEmail} (job #${row.job_id})`);
+          console.log(
+            `📧 Sent third-CV marketing email to ${companyEmail} (job #${row.job_id})`,
+          );
         }
         await db("new_job_email_queue").where("id", row.queue_id).del();
         newJobEmailLastSentAt = Date.now();
-        const nextDelay = randomBetween(MIN_DELAY_BETWEEN_SENDS_MS, MAX_DELAY_BETWEEN_SENDS_MS);
+        const nextDelay = randomBetween(
+          MIN_DELAY_BETWEEN_SENDS_MS,
+          MAX_DELAY_BETWEEN_SENDS_MS,
+        );
         newJobEmailProcessorScheduled = true;
         setTimeout(processNewJobEmailQueue, nextDelay);
       });
@@ -298,20 +370,26 @@ async function processNewJobEmailQueue() {
     }
 
     if (companyEmail && (await hasRecentlySentToCompany(companyEmail))) {
-      console.log(`[Email queue] Skip job #${row.job_id} → ${companyEmail}: already sent in last 7 days`);
+      console.log(
+        `[Email queue] Skip job #${row.job_id} → ${companyEmail}: already sent in last 7 days`,
+      );
       await db("new_job_email_queue").where("id", row.queue_id).del();
       processNewJobEmailQueue();
       return;
     }
     const claimed = companyEmail && (await claimAndSendToCompany(companyEmail));
     if (companyEmail && !claimed) {
-      console.log(`[Email queue] Skip job #${row.job_id} → ${companyEmail}: claim failed (another process or rate limit)`);
+      console.log(
+        `[Email queue] Skip job #${row.job_id} → ${companyEmail}: claim failed (another process or rate limit)`,
+      );
       await db("new_job_email_queue").where("id", row.queue_id).del();
       processNewJobEmailQueue();
       return;
     }
     if (!newJobTransporter) {
-      console.error("[Email queue] PROPOSITIONAL_MAIL_USER/PASS not set – NOT deleting queue item, will retry in 5 min. Set env vars to send emails.");
+      console.error(
+        "[Email queue] PROPOSITIONAL_MAIL_USER/PASS not set – NOT deleting queue item, will retry in 5 min. Set env vars to send emails.",
+      );
       newJobEmailProcessorScheduled = true;
       setTimeout(processNewJobEmailQueue, RETRY_WHEN_NO_TRANSPORTER_MS);
       return;
@@ -326,7 +404,8 @@ async function processNewJobEmailQueue() {
     };
     newJobEmailLastSentAt = Date.now();
     const jobLink = `${SITE_BASE_URL}/vakansia/${slugify(job.jobName)}-${job.id}`;
-    const toEmail = (job.company_email || "").trim().split(/[,;]/)[0].trim() || companyEmail;
+    const toEmail =
+      (job.company_email || "").trim().split(/[,;]/)[0].trim() || companyEmail;
     const mailOptions = {
       from: NEW_JOB_MAIL_USER,
       to: toEmail || job.company_email?.trim(),
@@ -337,12 +416,19 @@ async function processNewJobEmailQueue() {
       if (err) {
         console.error("New job email error:", err);
       } else {
-        await db("jobs").where("id", row.job_id).update({ marketing_email_sent: true });
-        console.log(`📧 Sent new-job email to ${job.company_email?.trim()} (job #${job.id}: ${job.jobName})`);
+        await db("jobs")
+          .where("id", row.job_id)
+          .update({ marketing_email_sent: true });
+        console.log(
+          `📧 Sent new-job email to ${job.company_email?.trim()} (job #${job.id}: ${job.jobName})`,
+        );
       }
       await db("new_job_email_queue").where("id", row.queue_id).del();
       newJobEmailLastSentAt = Date.now();
-      const nextDelay = randomBetween(MIN_DELAY_BETWEEN_SENDS_MS, MAX_DELAY_BETWEEN_SENDS_MS);
+      const nextDelay = randomBetween(
+        MIN_DELAY_BETWEEN_SENDS_MS,
+        MAX_DELAY_BETWEEN_SENDS_MS,
+      );
       newJobEmailProcessorScheduled = true;
       setTimeout(processNewJobEmailQueue, nextDelay);
     });
@@ -361,12 +447,18 @@ function parseSalaryNum(s) {
 
 const NEW_JOB_HTML_TEMPLATE = (job) => {
   const salaryNum = parseSalaryNum(job.jobSalary ?? job.jobSalary_min);
-  const salaryDisplay = job.jobSalary ? String(job.jobSalary).replace(/<[^>]*>/g, "") : "—";
+  const salaryDisplay = job.jobSalary
+    ? String(job.jobSalary).replace(/<[^>]*>/g, "")
+    : "—";
   const salaryParagraph =
     salaryNum != null && salaryNum >= 1200
-      ? "ვინაიდან თქვენი კომპანია იხდის " + salaryDisplay + " ლარს, გამოხმაურება ისედაც იქნება, და ამიტომ გთავაზობთ სტანდარტული პაკეტით სარგებლობას."
+      ? "ვინაიდან თქვენი კომპანია იხდის " +
+        salaryDisplay +
+        " ლარს, გამოხმაურება ისედაც იქნება, და ამიტომ გთავაზობთ სტანდარტული პაკეტით სარგებლობას."
       : salaryNum != null && salaryNum < 1200
-        ? "ვინაიდან თქვენი კომპანია იხდის " + salaryDisplay + " ლარს, გთავაზობთ პრემიუმ/პრემიუმ+ პაკეტით სარგებლობას, ასე ბევრი ადამიანი ნახავს ვაკანსიას და მაღალი შანსია რომ მეტი რელევანტური რეზიუმეები გამოიგზავნება."
+        ? "ვინაიდან თქვენი კომპანია იხდის " +
+          salaryDisplay +
+          " ლარს, გთავაზობთ პრემიუმ/პრემიუმ+ პაკეტით სარგებლობას, ასე ბევრი ადამიანი ნახავს ვაკანსიას და მაღალი შანსია რომ მეტი რელევანტური რეზიუმეები გამოიგზავნება."
         : "";
 
   const lowSalaryBonus =
@@ -376,11 +468,22 @@ const NEW_JOB_HTML_TEMPLATE = (job) => {
 
   return `
 <p>გამარჯობა!</p>
-<p>გაცნობებთ, რომ თქვენი ვაკანსია რომელიც საჯაროდ ხელმისაწვდომია ინტერნეტში, გავაზიარეთ ჩვენს პლატფორმაზე ( samushao.ge ), თუ აღნიშული თქვენთვის მიუღებელია, გთხოვთ შეგვატყობინოთ და განცხადებას წავშლით.</p>
-<p>თუ არ ხართ წინააღმდეგი, გთავაზობთ სრულიად უფასო 7 დღიან პრემიუმ სტატუსს თქვენი ვაკანსიისთვის, რადგან გამოსცადოთ ჩვენი პლატფორმა.</p>
-<p>დამიდასტურეთ მეილის მიღება და თქვენს ვაკანსიას პრემიუმ სტატუსს მივანიჭებთ.</p>
-<p>პატივისცემით,</p>
-<p>გიორგი</p>
+<p>ვხედავთ, რომ <b>"${job.jobName}"</b>-ის პოზიციაზე კადრს აქტიურად ეძებთ.</p>
+
+<p>პირდაპირ საქმეზე გადავალ: Samushao.ge-ს ხელოვნურმა ინტელექტმა ჩვენს ბაზაში უკვე დააჯგუფა რამდენიმე კანდიდატი, რომლებიც თქვენს მოთხოვნებს 90%-ზე მეტად ემთხვევიან.</p>
+
+<p>აი ერთ-ერთი მათგანის მოკლე დახასიათება (გენერირებულია AI-ს მიერ):</p>
+${job.ai_description}
+
+<p>ჩვენი ალგორითმი მხოლოდ "განცხადებებს" არ აქვეყნებს — ის ყოველდღიურად გიგზავნით საუკეთესო კანდიდატებს პირდაპირ მეილზე, სანამ ვაკანსიას არ დახურავთ.</p>
+
+<p>ვინაიდან ახლა ვიწყებთ მასიურ კამპანიას, 15-დღიან <b>Premium</b> მომსახურებას (კანდიდატების საკონტაქტოები + ყოველდღიური Matching) გთავაზობთ 150 ლარის ნაცვლად მხოლოდ <b>70 ლარად</b>.</p>
+
+<p><b>დაინტერესების შემთხვევაში, უბრალოდ მიპასუხეთ ამ მეილზე და გამოგიგზავნით პირველი კანდიდატის მონაცემებს.</b></p>
+
+<p>პატივისცემით,<br>
+გიორგი | Samushao.ge</p>
+
 `;
 };
 
@@ -399,17 +502,23 @@ async function sendNewJobEmail(job, opts = {}) {
   try {
     const existingJob = await db("new_job_email_queue")
       .where("job_id", job.id)
-      .where((qb) => qb.where("email_type", "new_job").orWhereNull("email_type"))
+      .where((qb) =>
+        qb.where("email_type", "new_job").orWhereNull("email_type"),
+      )
       .first();
     if (existingJob) return { queued: false, reason: "duplicate_job_in_queue" };
     const existingCompany = await db("new_job_email_queue")
       .where("company_email_lower", companyEmail)
-      .where((qb) => qb.where("email_type", "new_job").orWhereNull("email_type"))
+      .where((qb) =>
+        qb.where("email_type", "new_job").orWhereNull("email_type"),
+      )
       .first();
-    if (existingCompany) return { queued: false, reason: "company_already_in_queue" };
+    if (existingCompany)
+      return { queued: false, reason: "company_already_in_queue" };
   } catch (e) {
-    if (e.code === "42P01") { /* table doesn't exist yet */ }
-    else throw e;
+    if (e.code === "42P01") {
+      /* table doesn't exist yet */
+    } else throw e;
   }
   if (await hasRecentlySentToCompany(companyEmail)) {
     return { queued: false, reason: "already_sent_last_7_days" };
@@ -417,7 +526,11 @@ async function sendNewJobEmail(job, opts = {}) {
 
   const now = Date.now();
   let sendAfterMs;
-  if (opts.batchTotal != null && opts.batchTotal > 0 && opts.batchIndex != null) {
+  if (
+    opts.batchTotal != null &&
+    opts.batchTotal > 0 &&
+    opts.batchIndex != null
+  ) {
     const totalWindow = BULK_SPREAD_MS;
     const slotSize = totalWindow / opts.batchTotal;
     const base = opts.batchIndex * slotSize;
@@ -486,32 +599,36 @@ router.get("/", async (req, res) => {
     if (category)
       query.whereIn(
         "category_id",
-        Array.isArray(category) ? category : [category]
+        Array.isArray(category) ? category : [category],
       );
     if (job_experience)
       query.whereIn(
         "job_experience",
-        Array.isArray(job_experience) ? job_experience : [job_experience]
+        Array.isArray(job_experience) ? job_experience : [job_experience],
       );
     if (job_city)
       query.whereIn(
         "job_city",
-        Array.isArray(job_city) ? job_city : [job_city]
+        Array.isArray(job_city) ? job_city : [job_city],
       );
     if (job_type)
       query.whereIn(
         "job_type",
-        Array.isArray(job_type) ? job_type : [job_type]
+        Array.isArray(job_type) ? job_type : [job_type],
       );
     if (hasSalary === "true") query.whereNotNull("jobSalary");
     if (job_premium_status)
       query.whereIn(
         "job_premium_status",
-        Array.isArray(job_premium_status) ? job_premium_status : [job_premium_status]
+        Array.isArray(job_premium_status)
+          ? job_premium_status
+          : [job_premium_status],
       );
 
     const jobs = await query
-      .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 WHEN "job_premium_status" = 'regular' THEN 5 ELSE 6 END`)
+      .orderByRaw(
+        `CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 WHEN "job_premium_status" = 'regular' THEN 5 ELSE 6 END`,
+      )
       .orderBy("created_at", "desc")
       .limit(Number(limit) + 1)
       .offset(offset);
@@ -520,11 +637,11 @@ router.get("/", async (req, res) => {
     if (hasMore) jobs.pop();
 
     // Render template instead of returning JSON
-    res.render('jobs', { 
-      jobs: jobs, 
+    res.render("jobs", {
+      jobs: jobs,
       hasMore: hasMore,
       currentPage: parseInt(page),
-      filters: req.query 
+      filters: req.query,
     });
   } catch (err) {
     res.status(500).send(err.message);
@@ -540,46 +657,77 @@ router.get("/adm", async (req, res) => {
       const pattern = "%" + q.replace(/%/g, "\\%").replace(/_/g, "\\_") + "%";
       query = query.whereRaw(
         '"company_email" ILIKE ? OR "jobName" ILIKE ? OR "companyName" ILIKE ?',
-        [pattern, pattern, pattern]
+        [pattern, pattern, pattern],
       );
     }
     const rows = await query;
     const jobIds = rows.map((r) => r.id);
     if (jobIds.length === 0) {
-      return res.json({ data: rows.map((j) => ({ ...j, cv_stats: { tried: 0, succeeded: 0, failed: 0 }, cv_accepted: [], cv_refused: [] })) });
+      return res.json({
+        data: rows.map((j) => ({
+          ...j,
+          cv_stats: { tried: 0, succeeded: 0, failed: 0 },
+          cv_accepted: [],
+          cv_refused: [],
+        })),
+      });
     }
-    const [succeededByJob, failedByJob, acceptedRows, refusedRows] = await Promise.all([
-      db("job_applications")
-        .select("job_id")
-        .count("id as n")
-        .whereIn("job_id", jobIds)
-        .groupBy("job_id"),
-      db("cv_refusals")
-        .select("job_id")
-        .count("id as n")
-        .whereIn("job_id", jobIds)
-        .groupBy("job_id"),
-      db("job_applications as ja")
-        .join("users as u", "u.user_uid", "ja.user_id")
-        .leftJoin(
-          db.raw('(SELECT DISTINCT ON (user_id) user_id, file_url FROM resumes ORDER BY user_id, updated_at DESC NULLS LAST) as r'),
-          "r.user_id",
-          "ja.user_id"
-        )
-        .whereIn("ja.job_id", jobIds)
-        .select("ja.job_id", "ja.user_id", "ja.created_at", "u.user_name", "u.user_email", "r.file_url as cv_url"),
-      db("cv_refusals as cr")
-        .join("users as u", "u.user_uid", "cr.user_id")
-        .leftJoin(
-          db.raw('(SELECT DISTINCT ON (user_id) user_id, file_url FROM resumes ORDER BY user_id, updated_at DESC NULLS LAST) as r'),
-          "r.user_id",
-          "cr.user_id"
-        )
-        .whereIn("cr.job_id", jobIds)
-        .select("cr.job_id", "cr.user_id", "cr.created_at", "cr.complaint_sent", "u.user_name", "u.user_email", "r.file_url as cv_url"),
-    ]);
-    const succeededMap = new Map(succeededByJob.map((r) => [r.job_id, parseInt(r.n || 0, 10)]));
-    const failedMap = new Map(failedByJob.map((r) => [r.job_id, parseInt(r.n || 0, 10)]));
+    const [succeededByJob, failedByJob, acceptedRows, refusedRows] =
+      await Promise.all([
+        db("job_applications")
+          .select("job_id")
+          .count("id as n")
+          .whereIn("job_id", jobIds)
+          .groupBy("job_id"),
+        db("cv_refusals")
+          .select("job_id")
+          .count("id as n")
+          .whereIn("job_id", jobIds)
+          .groupBy("job_id"),
+        db("job_applications as ja")
+          .join("users as u", "u.user_uid", "ja.user_id")
+          .leftJoin(
+            db.raw(
+              "(SELECT DISTINCT ON (user_id) user_id, file_url FROM resumes ORDER BY user_id, updated_at DESC NULLS LAST) as r",
+            ),
+            "r.user_id",
+            "ja.user_id",
+          )
+          .whereIn("ja.job_id", jobIds)
+          .select(
+            "ja.job_id",
+            "ja.user_id",
+            "ja.created_at",
+            "u.user_name",
+            "u.user_email",
+            "r.file_url as cv_url",
+          ),
+        db("cv_refusals as cr")
+          .join("users as u", "u.user_uid", "cr.user_id")
+          .leftJoin(
+            db.raw(
+              "(SELECT DISTINCT ON (user_id) user_id, file_url FROM resumes ORDER BY user_id, updated_at DESC NULLS LAST) as r",
+            ),
+            "r.user_id",
+            "cr.user_id",
+          )
+          .whereIn("cr.job_id", jobIds)
+          .select(
+            "cr.job_id",
+            "cr.user_id",
+            "cr.created_at",
+            "cr.complaint_sent",
+            "u.user_name",
+            "u.user_email",
+            "r.file_url as cv_url",
+          ),
+      ]);
+    const succeededMap = new Map(
+      succeededByJob.map((r) => [r.job_id, parseInt(r.n || 0, 10)]),
+    );
+    const failedMap = new Map(
+      failedByJob.map((r) => [r.job_id, parseInt(r.n || 0, 10)]),
+    );
     const acceptedByJob = new Map();
     for (const r of acceptedRows) {
       if (!acceptedByJob.has(r.job_id)) acceptedByJob.set(r.job_id, []);
@@ -658,7 +806,7 @@ router.post("/searchquery", (req, res) => {
           .where({ searchTerm })
           .increment("count", 1)
           .then(() =>
-            res.status(200).json({ message: "Search term count incremented" })
+            res.status(200).json({ message: "Search term count incremented" }),
           );
       } else {
         // If the search term doesn't exist, insert it
@@ -689,7 +837,11 @@ function tokensForMatch(text) {
 
 /** Check if no_cv row matches job by metadata (categories, other_specify, short_description vs job). */
 function noCvMatchesJob(noCvRow, jobText, jobTokens) {
-  const candText = [noCvRow.categories, noCvRow.other_specify, noCvRow.short_description]
+  const candText = [
+    noCvRow.categories,
+    noCvRow.other_specify,
+    noCvRow.short_description,
+  ]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
@@ -709,7 +861,10 @@ function noCvMatchesJob(noCvRow, jobText, jobTokens) {
 router.get("/:id/top-candidates", async (req, res) => {
   try {
     const jobId = parseInt(req.params.id, 10);
-    const topK = Math.min(100, Math.max(1, parseInt(req.query.topK, 10) || 100)); // Default 100, max 100
+    const topK = Math.min(
+      100,
+      Math.max(1, parseInt(req.query.topK, 10) || 100),
+    ); // Default 100, max 100
     // Default 0.5: CV-job reranker scores rarely reach 0.9; 0.5–0.7 = decent match. Use minScore=0.7+ for stricter.
     const minScore = parseFloat(req.query.minScore);
     const effectiveMinScore = Number.isFinite(minScore) ? minScore : 0.5;
@@ -721,7 +876,10 @@ router.get("/:id/top-candidates", async (req, res) => {
       return res.status(404).json({ error: "Job not found" });
     }
     const catRow = job.category_id
-      ? await db("categories").where("id", job.category_id).select("name").first()
+      ? await db("categories")
+          .where("id", job.category_id)
+          .select("name")
+          .first()
       : null;
     const jobText = [
       job.jobName || "",
@@ -732,7 +890,9 @@ router.get("/:id/top-candidates", async (req, res) => {
       .toLowerCase();
     const jobTokens = tokensForMatch(jobText);
 
-    const { getTopCandidatesForJob } = require("../services/pineconeCandidates");
+    const {
+      getTopCandidatesForJob,
+    } = require("../services/pineconeCandidates");
     const requireRoleMatch =
       String(req.query.requireRoleMatch || "")
         .trim()
@@ -750,10 +910,12 @@ router.get("/:id/top-candidates", async (req, res) => {
         jobDescription: job.jobDescription || job.job_description || "",
         requireRoleMatch,
       },
-      topK
+      topK,
     );
     // Only return candidates that pass the score threshold
-    let qualifiedMatches = matches.filter((m) => (m.score || 0) >= effectiveMinScore);
+    let qualifiedMatches = matches.filter(
+      (m) => (m.score || 0) >= effectiveMinScore,
+    );
     const existingIds = new Set(qualifiedMatches.map((m) => m.id));
 
     // Add no_cv that match by metadata (categories, short_description, other_specify)
@@ -783,7 +945,9 @@ router.get("/:id/top-candidates", async (req, res) => {
     if (userIds.length === 0) {
       return res.json({ job_id: jobId, candidates: [] });
     }
-    const realUserIds = userIds.filter((id) => !String(id).startsWith("no_cv_"));
+    const realUserIds = userIds.filter(
+      (id) => !String(id).startsWith("no_cv_"),
+    );
     const users = await db("users")
       .whereIn("user_uid", realUserIds)
       .select("user_uid", "user_name", "user_email");
@@ -814,9 +978,13 @@ router.get("/:id/top-candidates", async (req, res) => {
       .map((m) => parseInt(String(m.id).replace("no_cv_", ""), 10))
       .filter((n) => !isNaN(n) && n > 0);
     const noCvDescRows = noCvIds.length
-      ? await db("user_without_cv").whereIn("id", noCvIds).select("id", "ai_description")
+      ? await db("user_without_cv")
+          .whereIn("id", noCvIds)
+          .select("id", "ai_description")
       : [];
-    const noCvAiDescMap = Object.fromEntries(noCvDescRows.map((r) => [`no_cv_${r.id}`, r.ai_description]));
+    const noCvAiDescMap = Object.fromEntries(
+      noCvDescRows.map((r) => [`no_cv_${r.id}`, r.ai_description]),
+    );
 
     const candidates = qualifiedMatches.map((m) => {
       const isNoCv = String(m.id).startsWith("no_cv_");
@@ -852,26 +1020,33 @@ router.get("/:id/top-candidates", async (req, res) => {
 
     // Optional: Gemini alignment assessment (assessWithGemini=1&assessLimit=10)
     const assessWithGemini =
-      String(req.query.assessWithGemini || "").trim().toLowerCase() === "1" ||
-      String(req.query.assessWithGemini || "").trim().toLowerCase() === "true";
+      String(req.query.assessWithGemini || "")
+        .trim()
+        .toLowerCase() === "1" ||
+      String(req.query.assessWithGemini || "")
+        .trim()
+        .toLowerCase() === "true";
     const assessLimit = Math.min(
       20,
-      Math.max(1, parseInt(req.query.assessLimit, 10) || 10)
+      Math.max(1, parseInt(req.query.assessLimit, 10) || 10),
     );
 
     if (assessWithGemini && candidates.length > 0) {
-      const { assessCandidateAlignment } = require("../services/geminiCandidateAssessment");
+      const {
+        assessCandidateAlignment,
+      } = require("../services/geminiCandidateAssessment");
       const { extractTextFromCv } = require("../services/cvTextExtractor");
 
-      const toAssess = candidates
-        .filter((c) => c.cv_url)
-        .slice(0, assessLimit);
+      const toAssess = candidates.filter((c) => c.cv_url).slice(0, assessLimit);
 
       const assessOne = async (c) => {
         try {
           const cvText = await extractTextFromCv(c.cv_url, c.cv_file_name);
           if (!cvText || cvText.length < 50) {
-            return { ...c, gemini_assessment: { error: "Could not extract CV text" } };
+            return {
+              ...c,
+              gemini_assessment: { error: "Could not extract CV text" },
+            };
           }
           const assessment = await assessCandidateAlignment(job, cvText);
           return { ...c, gemini_assessment: assessment };
@@ -884,7 +1059,9 @@ router.get("/:id/top-candidates", async (req, res) => {
       };
 
       const assessed = await Promise.all(toAssess.map(assessOne));
-      const assessedMap = Object.fromEntries(assessed.map((a) => [a.user_id, a]));
+      const assessedMap = Object.fromEntries(
+        assessed.map((a) => [a.user_id, a]),
+      );
       const result = candidates.map((c) => assessedMap[c.user_id] || c);
       return res.json({ job_id: jobId, candidates: result });
     }
@@ -892,7 +1069,9 @@ router.get("/:id/top-candidates", async (req, res) => {
     res.json({ job_id: jobId, candidates });
   } catch (err) {
     console.error("jobs top-candidates error:", err);
-    res.status(500).json({ error: err.message || "Failed to get top candidates" });
+    res
+      .status(500)
+      .json({ error: err.message || "Failed to get top candidates" });
   }
 });
 
@@ -941,24 +1120,44 @@ router.get("/:id", async (req, res) => {
       db("job_applications as ja")
         .join("users as u", "u.user_uid", "ja.user_id")
         .leftJoin(
-          db.raw('(SELECT DISTINCT ON (user_id) user_id, file_url FROM resumes ORDER BY user_id, updated_at DESC NULLS LAST) as r'),
+          db.raw(
+            "(SELECT DISTINCT ON (user_id) user_id, file_url FROM resumes ORDER BY user_id, updated_at DESC NULLS LAST) as r",
+          ),
           "r.user_id",
-          "ja.user_id"
+          "ja.user_id",
         )
         .where("ja.job_id", jobId)
-        .select("ja.user_id", "ja.created_at", "u.user_name", "u.user_email", "r.file_url as cv_url")
+        .select(
+          "ja.user_id",
+          "ja.created_at",
+          "u.user_name",
+          "u.user_email",
+          "r.file_url as cv_url",
+        )
         .orderBy("ja.created_at", "desc"),
       db("cv_refusals as cr")
         .join("users as u", "u.user_uid", "cr.user_id")
         .leftJoin(
-          db.raw('(SELECT DISTINCT ON (user_id) user_id, file_url FROM resumes ORDER BY user_id, updated_at DESC NULLS LAST) as r'),
+          db.raw(
+            "(SELECT DISTINCT ON (user_id) user_id, file_url FROM resumes ORDER BY user_id, updated_at DESC NULLS LAST) as r",
+          ),
           "r.user_id",
-          "cr.user_id"
+          "cr.user_id",
         )
         .where("cr.job_id", jobId)
-        .select("cr.user_id", "cr.created_at", "cr.complaint_sent", "u.user_name", "u.user_email", "r.file_url as cv_url")
+        .select(
+          "cr.user_id",
+          "cr.created_at",
+          "cr.complaint_sent",
+          "u.user_name",
+          "u.user_email",
+          "r.file_url as cv_url",
+        )
         .orderBy("cr.created_at", "desc"),
-      db("job_form_submissions").where("job_id", jobId).select("*").orderBy("created_at", "desc"),
+      db("job_form_submissions")
+        .where("job_id", jobId)
+        .select("*")
+        .orderBy("created_at", "desc"),
     ]);
     const cv_accepted = acceptedRows.map((r) => ({
       user_id: r.user_id,
@@ -1011,7 +1210,10 @@ router.delete("/:id/applications/:userId", async (req, res) => {
       const cvsSent = Math.max(0, (job.cvs_sent || 0) - 1);
       await db("jobs").where("id", jobId).update({ cvs_sent: cvsSent });
     }
-    res.json({ removed: deleted > 0, message: deleted > 0 ? "Application removed" : "Application not found" });
+    res.json({
+      removed: deleted > 0,
+      message: deleted > 0 ? "Application removed" : "Application not found",
+    });
   } catch (err) {
     console.error("jobs remove application error:", err);
     res.status(500).json({ error: err.message });
@@ -1033,7 +1235,13 @@ router.delete("/:id/refusals/:userId", async (req, res) => {
     const deleted = await db("cv_refusals")
       .where({ job_id: jobId, user_id: userId })
       .del();
-    res.json({ removed: deleted > 0, message: deleted > 0 ? "Refusal removed - user can try again" : "Refusal not found" });
+    res.json({
+      removed: deleted > 0,
+      message:
+        deleted > 0
+          ? "Refusal removed - user can try again"
+          : "Refusal not found",
+    });
   } catch (err) {
     console.error("jobs remove refusal error:", err);
     res.status(500).json({ error: err.message });
@@ -1051,7 +1259,13 @@ router.post("/:id/refusals/:userId/reset-complaint", async (req, res) => {
     const updated = await db("cv_refusals")
       .where({ job_id: jobId, user_id: userId })
       .update({ complaint_sent: false });
-    res.json({ updated: updated > 0, message: updated > 0 ? "Complaint reset - user can complain again" : "Refusal not found" });
+    res.json({
+      updated: updated > 0,
+      message:
+        updated > 0
+          ? "Complaint reset - user can complain again"
+          : "Refusal not found",
+    });
   } catch (err) {
     console.error("jobs reset complaint error:", err);
     res.status(500).json({ error: err.message });
@@ -1160,7 +1374,9 @@ router.post("/", upload.none(), async (req, res) => {
         job_experience,
         job_city,
         job_type,
-      }).catch((err) => console.error("[pinecone] Failed to index job:", err.message));
+      }).catch((err) =>
+        console.error("[pinecone] Failed to index job:", err.message),
+      );
     }
 
     res.status(201).json({ message: "Job created", jobId: inserted?.id });
@@ -1191,10 +1407,7 @@ router.post("/bulk", async (req, res) => {
   for (let index = 0; index < jobsToInsert.length; index++) {
     const job = jobsToInsert[index];
     const hasRequiredFields =
-      job.companyName &&
-      job.jobName &&
-      job.user_uid &&
-      job.category_id;
+      job.companyName && job.jobName && job.user_uid && job.category_id;
 
     if (hasRequiredFields) {
       const jName = String(job.jobName || "").trim();
@@ -1202,11 +1415,19 @@ router.post("/bulk", async (req, res) => {
       const key = jName + "|" + cName;
 
       if (seenInBatch.has(key)) {
-        failedJobs.push({ index, jobName: jName, error: "Duplicate within batch" });
+        failedJobs.push({
+          index,
+          jobName: jName,
+          error: "Duplicate within batch",
+        });
         continue;
       }
       if (await isBlacklisted(job.company_email, job.companyName)) {
-        failedJobs.push({ index, jobName: jName, error: "Blacklisted company" });
+        failedJobs.push({
+          index,
+          jobName: jName,
+          error: "Blacklisted company",
+        });
         continue;
       }
       seenInBatch.add(key);
@@ -1225,32 +1446,34 @@ router.post("/bulk", async (req, res) => {
         job_address: job.job_address,
         job_type: job.job_type,
         job_status: "approved",
-        job_premium_status: 'regular',
+        job_premium_status: "regular",
         isHelio: job.isHelio || false,
         helio_url: (job.helio_url && String(job.helio_url).trim()) || null,
         prioritize: job.prioritize === true || job.prioritize === "true",
-        dont_send_email: job.dont_send_email === true || job.dont_send_email === "true",
-        company_logo: job.company_logo || null
+        dont_send_email:
+          job.dont_send_email === true || job.dont_send_email === "true",
+        company_logo: job.company_logo || null,
       });
     } else {
       console.error(`⚠️ JOB FAILED VALIDATION (Index: ${index}):`, {
         jobName: job.jobName || "UNKNOWN",
         company: job.companyName || "UNKNOWN",
-        reason: "Missing required fields (companyName, jobName, user_uid, or category_id)"
+        reason:
+          "Missing required fields (companyName, jobName, user_uid, or category_id)",
       });
       failedJobs.push({
         index,
         jobName: job.jobName || "Unknown",
-        error: "Missing required fields"
+        error: "Missing required fields",
       });
     }
   }
 
   // If everything failed validation, stop here
   if (validJobs.length === 0) {
-    return res.status(400).json({ 
-      error: "No valid jobs to insert", 
-      failedCount: failedJobs.length 
+    return res.status(400).json({
+      error: "No valid jobs to insert",
+      failedCount: failedJobs.length,
     });
   }
 
@@ -1259,14 +1482,23 @@ router.post("/bulk", async (req, res) => {
       .select("jobName", "companyName")
       .where("job_status", "approved");
     const existingSet = new Set(
-      existingRows.map((r) => String(r.jobName || "").trim() + "|" + String(r.companyName || "").trim())
+      existingRows.map(
+        (r) =>
+          String(r.jobName || "").trim() +
+          "|" +
+          String(r.companyName || "").trim(),
+      ),
     );
 
-    const toInsert = validJobs.filter((j) => !existingSet.has(j.jobName + "|" + j.companyName));
+    const toInsert = validJobs.filter(
+      (j) => !existingSet.has(j.jobName + "|" + j.companyName),
+    );
     const skippedAsDuplicates = validJobs.length - toInsert.length;
 
     if (skippedAsDuplicates > 0) {
-      console.warn(`[!] Skipped ${skippedAsDuplicates} jobs – duplicate of existing approved job`);
+      console.warn(
+        `[!] Skipped ${skippedAsDuplicates} jobs – duplicate of existing approved job`,
+      );
     }
 
     if (toInsert.length === 0) {
@@ -1280,7 +1512,10 @@ router.post("/bulk", async (req, res) => {
     const ids = await db("jobs").insert(toInsert).returning("id");
 
     // Index each new job in Pinecone for "jobs for user" recommendations
-    const insertedJobs = toInsert.map((j, i) => ({ ...j, id: ids[i]?.id ?? ids[i] }));
+    const insertedJobs = toInsert.map((j, i) => ({
+      ...j,
+      id: ids[i]?.id ?? ids[i],
+    }));
     for (const j of insertedJobs) {
       upsertJob(j.id, {
         jobName: j.jobName,
@@ -1288,11 +1523,14 @@ router.post("/bulk", async (req, res) => {
         job_experience: j.job_experience,
         job_city: j.job_city,
         job_type: j.job_type,
-      }).catch((err) => console.error("[pinecone] Failed to index job:", err.message));
+      }).catch((err) =>
+        console.error("[pinecone] Failed to index job:", err.message),
+      );
     }
 
     // Send one email per company (group by company_email to avoid duplicates when company uploads multiple jobs)
-    const jobsWithIds = toInsert.map((j, i) => ({ ...j, id: ids[i]?.id ?? ids[i] }))
+    const jobsWithIds = toInsert
+      .map((j, i) => ({ ...j, id: ids[i]?.id ?? ids[i] }))
       .filter((j) => !j.dont_send_email && (j.company_email || "").trim());
     const byCompany = new Map();
     for (const j of jobsWithIds) {
@@ -1301,9 +1539,17 @@ router.post("/bulk", async (req, res) => {
       byCompany.get(key).push(j);
     }
     const companies = Array.from(byCompany.values());
-    const emailStats = { queued: 0, skippedNoEmail: toInsert.length - jobsWithIds.length, skipped: {} };
+    const emailStats = {
+      queued: 0,
+      skippedNoEmail: toInsert.length - jobsWithIds.length,
+      skipped: {},
+    };
     for (let i = 0; i < companies.length; i++) {
-      const result = await sendNewJobEmailToCompany(companies[i], i, companies.length);
+      const result = await sendNewJobEmailToCompany(
+        companies[i],
+        i,
+        companies.length,
+      );
       if (result.queued) {
         emailStats.queued++;
       } else {
@@ -1312,13 +1558,18 @@ router.post("/bulk", async (req, res) => {
       }
     }
 
-    console.log(`✅ SUCCESS: Inserted ${ids.length} jobs. Emails: ${emailStats.queued} queued, ${companies.length - emailStats.queued} skipped.`);
+    console.log(
+      `✅ SUCCESS: Inserted ${ids.length} jobs. Emails: ${emailStats.queued} queued, ${companies.length - emailStats.queued} skipped.`,
+    );
     if (failedJobs.length > 0) {
-      console.warn(`[!] Note: ${failedJobs.length} jobs were skipped due to errors.`);
+      console.warn(
+        `[!] Note: ${failedJobs.length} jobs were skipped due to errors.`,
+      );
     }
 
-    res.status(201).json({ 
-      message: "Jobs inserted. Emails will be sent over the next 2-3 hours (see emailQueue).", 
+    res.status(201).json({
+      message:
+        "Jobs inserted. Emails will be sent over the next 2-3 hours (see emailQueue).",
       insertedCount: ids.length,
       failedCount: failedJobs.length,
       skippedAsDuplicates,
@@ -1328,23 +1579,49 @@ router.post("/bulk", async (req, res) => {
         queued: emailStats.queued,
         skippedNoEmail: emailStats.skippedNoEmail,
         skipped: emailStats.skipped,
-        pending: await getQueueCount()
-      }
+        pending: await getQueueCount(),
+      },
     });
   } catch (err) {
     // This catches DB-level crashes (e.g. unique constraint violations)
     console.error("🔥 DATABASE CRITICAL ERROR:", err.message);
-    res.status(500).json({ error: "Database rejected the batch", details: err.message });
+    res
+      .status(500)
+      .json({ error: "Database rejected the batch", details: err.message });
   }
 });
 
 // PATCH route to update a job
 const JOB_UPDATE_WHITELIST = [
-  "companyName", "user_uid", "company_email", "jobName", "jobSalary", "jobDescription",
-  "job_experience", "job_city", "job_address", "job_type", "jobIsUrgent", "category_id",
-  "job_premium_status", "premium_until", "isHelio", "helio_url", "job_status", "cvs_sent", "company_logo", "jobSalary_min",
-  "view_count", "expires_at", "prioritize", "dont_send_email", "marketing_email_sent",
-  "cv_submissions_email_sent", "disable_cv_filter", "accept_form_submissions", "updated_at",
+  "companyName",
+  "user_uid",
+  "company_email",
+  "jobName",
+  "jobSalary",
+  "jobDescription",
+  "job_experience",
+  "job_city",
+  "job_address",
+  "job_type",
+  "jobIsUrgent",
+  "category_id",
+  "job_premium_status",
+  "premium_until",
+  "isHelio",
+  "helio_url",
+  "job_status",
+  "cvs_sent",
+  "company_logo",
+  "jobSalary_min",
+  "view_count",
+  "expires_at",
+  "prioritize",
+  "dont_send_email",
+  "marketing_email_sent",
+  "cv_submissions_email_sent",
+  "disable_cv_filter",
+  "accept_form_submissions",
+  "updated_at",
 ];
 // Admin apps often send camelCase; map to DB column names
 const CAMEL_TO_SNAKE = {
@@ -1362,19 +1639,43 @@ const patchOrPutJob = async (req, res) => {
     }
     const body = req.body;
 
-    console.log("[PATCH/PUT jobs] jobId=" + jobId + " body keys=" + Object.keys(body).join(",") + " accept_form_submissions=" + JSON.stringify(body.accept_form_submissions ?? body.acceptFormSubmissions));
+    console.log(
+      "[PATCH/PUT jobs] jobId=" +
+        jobId +
+        " body keys=" +
+        Object.keys(body).join(",") +
+        " accept_form_submissions=" +
+        JSON.stringify(
+          body.accept_form_submissions ?? body.acceptFormSubmissions,
+        ),
+    );
 
     const updateData = {};
-    const booleanFields = new Set(["accept_form_submissions", "disable_cv_filter", "isHelio", "jobIsUrgent", "prioritize", "dont_send_email", "marketing_email_sent", "cv_submissions_email_sent"]);
+    const booleanFields = new Set([
+      "accept_form_submissions",
+      "disable_cv_filter",
+      "isHelio",
+      "jobIsUrgent",
+      "prioritize",
+      "dont_send_email",
+      "marketing_email_sent",
+      "cv_submissions_email_sent",
+    ]);
     for (const key of Object.keys(body)) {
       const dbKey = CAMEL_TO_SNAKE[key] || key;
       if (JOB_UPDATE_WHITELIST.includes(dbKey) && body[key] !== undefined) {
         let val = body[key];
         if (dbKey === "premium_until") {
           val = parsePremiumUntil(val);
-          if (val === null && body[key] !== "" && body[key] !== undefined) continue; // invalid, skip
+          if (val === null && body[key] !== "" && body[key] !== undefined)
+            continue; // invalid, skip
         } else if (booleanFields.has(dbKey)) {
-          val = val === true || val === 1 || val === "true" || val === "1" || val === "on";
+          val =
+            val === true ||
+            val === 1 ||
+            val === "true" ||
+            val === "1" ||
+            val === "on";
         }
         updateData[dbKey] = val;
       }
@@ -1387,7 +1688,10 @@ const patchOrPutJob = async (req, res) => {
     // Force accept_form_submissions via raw SQL (bypasses any Knex/pg serialization quirks)
     if (updateData.accept_form_submissions !== undefined) {
       const boolVal = !!updateData.accept_form_submissions;
-      const rawResult = await db.raw("UPDATE jobs SET accept_form_submissions = ? WHERE id = ?", [boolVal, jobId]);
+      const rawResult = await db.raw(
+        "UPDATE jobs SET accept_form_submissions = ? WHERE id = ?",
+        [boolVal, jobId],
+      );
       const rowCount = rawResult.rowCount ?? rawResult[1] ?? 0;
       if (rowCount === 0) {
         return res.status(404).json({ error: "Job not found" });
@@ -1401,13 +1705,34 @@ const patchOrPutJob = async (req, res) => {
         return res.status(404).json({ error: "Job not found" });
       }
       // Re-index or remove from Pinecone when job content/expiry changes
-      const pineconeFields = ["jobName", "jobDescription", "job_experience", "job_type", "job_city", "expires_at"];
-      const touchedPinecone = Object.keys(updateData).some((k) => pineconeFields.includes(k));
+      const pineconeFields = [
+        "jobName",
+        "jobDescription",
+        "job_experience",
+        "job_type",
+        "job_city",
+        "expires_at",
+      ];
+      const touchedPinecone = Object.keys(updateData).some((k) =>
+        pineconeFields.includes(k),
+      );
       if (touchedPinecone) {
-        const job = await db("jobs").where("id", jobId).select("jobName", "jobDescription", "job_experience", "job_type", "job_city", "expires_at").first();
+        const job = await db("jobs")
+          .where("id", jobId)
+          .select(
+            "jobName",
+            "jobDescription",
+            "job_experience",
+            "job_type",
+            "job_city",
+            "expires_at",
+          )
+          .first();
         if (job) {
           if (job.expires_at && new Date(job.expires_at) <= new Date()) {
-            deleteJob(jobId).catch((err) => console.error("[pinecone] Failed to delete job:", err.message));
+            deleteJob(jobId).catch((err) =>
+              console.error("[pinecone] Failed to delete job:", err.message),
+            );
           } else {
             upsertJob(jobId, {
               jobName: job.jobName,
@@ -1415,7 +1740,9 @@ const patchOrPutJob = async (req, res) => {
               job_experience: job.job_experience,
               job_type: job.job_type,
               job_city: job.job_city,
-            }).catch((err) => console.error("[pinecone] Failed to re-index job:", err.message));
+            }).catch((err) =>
+              console.error("[pinecone] Failed to re-index job:", err.message),
+            );
           }
         }
       }
@@ -1440,7 +1767,9 @@ router.delete("/:id", async (req, res) => {
     if (count === 0) {
       return res.status(404).json({ error: "Job not found" });
     }
-    deleteJob(jobId).catch((err) => console.error("[pinecone] Failed to delete job:", err.message));
+    deleteJob(jobId).catch((err) =>
+      console.error("[pinecone] Failed to delete job:", err.message),
+    );
     res.status(200).json({ message: "Job deleted successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1465,7 +1794,7 @@ router.getEmailQueueDetails = async () => {
         db.raw('j."jobName" as job_name'),
         db.raw('j."companyName" as company_name'),
         "j.company_email",
-        "q.send_after"
+        "q.send_after",
       )
       .orderBy("q.send_after", "asc");
     const pending = pendingRows.map((r) => ({
@@ -1477,9 +1806,19 @@ router.getEmailQueueDetails = async () => {
       status: "queued",
     }));
 
-    const hasMarketingSent = await db.schema.hasColumn("jobs", "marketing_email_sent");
-    const hasGeneralMarketingSent = await db.schema.hasColumn("jobs", "general_marketing_email_sent");
-    const sentFlagCol = hasMarketingSent ? "marketing_email_sent" : hasGeneralMarketingSent ? "general_marketing_email_sent" : null;
+    const hasMarketingSent = await db.schema.hasColumn(
+      "jobs",
+      "marketing_email_sent",
+    );
+    const hasGeneralMarketingSent = await db.schema.hasColumn(
+      "jobs",
+      "general_marketing_email_sent",
+    );
+    const sentFlagCol = hasMarketingSent
+      ? "marketing_email_sent"
+      : hasGeneralMarketingSent
+        ? "general_marketing_email_sent"
+        : null;
     const sentRows = sentFlagCol
       ? await db.raw(
           `SELECT s.company_email_lower, s.sent_at, j.id as job_id, j.job_name, j.company_name
@@ -1491,10 +1830,10 @@ router.getEmailQueueDetails = async () => {
              LIMIT 1
            ) j ON true
            WHERE s.sent_at > now() - interval '7 days'
-           ORDER BY s.sent_at DESC`
+           ORDER BY s.sent_at DESC`,
         )
       : { rows: [] };
-    const sentData = Array.isArray(sentRows) ? sentRows : (sentRows?.rows || []);
+    const sentData = Array.isArray(sentRows) ? sentRows : sentRows?.rows || [];
     const sent = sentData.map((r) => ({
       job_id: r.job_id,
       job_name: r.job_name,
@@ -1510,7 +1849,8 @@ router.getEmailQueueDetails = async () => {
       summary: { queued: pending.length, sent: sent.length },
     };
   } catch (e) {
-    if (e.code === "42P01") return { pending: [], sent: [], summary: { queued: 0, sent: 0 } };
+    if (e.code === "42P01")
+      return { pending: [], sent: [], summary: { queued: 0, sent: 0 } };
     throw e;
   }
 };
@@ -1546,7 +1886,8 @@ router.post("/blacklist", async (req, res) => {
     await refreshBlacklistCache();
     res.status(201).json(row);
   } catch (e) {
-    if (e.code === "23505") return res.status(409).json({ error: "Email already blacklisted" });
+    if (e.code === "23505")
+      return res.status(409).json({ error: "Email already blacklisted" });
     console.error("blacklist POST error:", e);
     res.status(500).json({ error: e.message });
   }
@@ -1554,9 +1895,13 @@ router.post("/blacklist", async (req, res) => {
 
 router.delete("/blacklist/:email", async (req, res) => {
   try {
-    const email = decodeURIComponent(req.params.email || "").trim().toLowerCase();
+    const email = decodeURIComponent(req.params.email || "")
+      .trim()
+      .toLowerCase();
     if (!email) return res.status(400).json({ error: "email required" });
-    const count = await db("blacklisted_company_emails").where("email", email).del();
+    const count = await db("blacklisted_company_emails")
+      .where("email", email)
+      .del();
     if (count === 0) return res.status(404).json({ error: "Not found" });
     await refreshBlacklistCache();
     res.json({ deleted: true });
@@ -1571,7 +1916,14 @@ router.requeueJobsByIds = async (jobIds) => {
   const ids = jobIds.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
   if (ids.length === 0) return { added: 0 };
   const jobs = await db("jobs")
-    .select("id", "jobName", "companyName", "company_email", "jobSalary", "dont_send_email")
+    .select(
+      "id",
+      "jobName",
+      "companyName",
+      "company_email",
+      "jobSalary",
+      "dont_send_email",
+    )
     .whereIn("id", ids)
     .where("job_status", "approved");
   for (const j of jobs) {
