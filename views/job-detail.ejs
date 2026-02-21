@@ -235,7 +235,11 @@
               <dd class="mt-1 font-[500]"><%= job.job_experience ? job.job_experience + ' წელი' : '-' %></dd>
             </dl>
           </section>
-          <% if (!job.isHelio) { %>
+          <% if (job.isHelio && job.helio_url) { %>
+          <div class="hidden lg:flex flex-col items-start justify-center">
+            <a id="helioApplyBtnDesktop" href="<%= job.helio_url %>" class="bg-[#315EFF] w-[296px] h-[52px] text-white rounded-lg my-8 mb-1 text-[16px] mt-8 flex items-center justify-center cursor-pointer no-underline hover:opacity-90">განაცხადის გაგზავნა</a>
+          </div>
+          <% } else if (!job.isHelio) { %>
           <% if (!user) { %>
           <p class="mt-4 text-[12px] block text-center text-red-400 pb-1 mx-auto">
             რეზიუმეს გასაგზავნად გაიარეთ ავტორიზაცია
@@ -298,7 +302,11 @@
     </section>
     <% } %>
 
-    <% if (!job.isHelio) { %>
+    <% if (job.isHelio && job.helio_url) { %>
+    <footer class="fixed bg-white bottom-0 left-0 right-0 w-full px-2 pb-1 flex lg:hidden flex-col items-between justify-between border border-[#E5E5E5] z-40">
+      <a id="helioApplyBtnMobile" href="<%= job.helio_url %>" class="bg-[#315EFF] mt-2 w-full min-h-[52px] text-white rounded-lg my-8 mt-0 mb-1 text-[16px] flex items-center justify-center cursor-pointer no-underline hover:opacity-90">განაცხადის გაგზავნა</a>
+    </footer>
+    <% } else if (!job.isHelio) { %>
     <footer class="fixed bg-white bottom-0 left-0 right-0 w-full px-2 pb-1 flex lg:hidden flex-col items-between justify-between border border-[#E5E5E5] z-40">
       <% if (!user) { %>
       <p class="mt-2 text-[12px] block text-center text-red-400 pb-1 mx-auto">

@@ -984,6 +984,7 @@ router.post("/", upload.none(), async (req, res) => {
     job_type,
     job_premium_status,
     isHelio,
+    helio_url,
     prioritize,
     dont_send_email,
   } = req.body;
@@ -1042,6 +1043,7 @@ router.post("/", upload.none(), async (req, res) => {
         job_type,
         job_premium_status,
         isHelio,
+        helio_url: (helio_url && String(helio_url).trim()) || null,
         prioritize: prioritize === true || prioritize === "true",
         dont_send_email: dont_send_email === true || dont_send_email === "true",
         job_status: "approved",
@@ -1131,6 +1133,7 @@ router.post("/bulk", async (req, res) => {
         job_status: "approved",
         job_premium_status: 'regular',
         isHelio: job.isHelio || false,
+        helio_url: (job.helio_url && String(job.helio_url).trim()) || null,
         prioritize: job.prioritize === true || job.prioritize === "true",
         dont_send_email: job.dont_send_email === true || job.dont_send_email === "true",
         company_logo: job.company_logo || null
@@ -1245,7 +1248,7 @@ router.post("/bulk", async (req, res) => {
 const JOB_UPDATE_WHITELIST = [
   "companyName", "user_uid", "company_email", "jobName", "jobSalary", "jobDescription",
   "job_experience", "job_city", "job_address", "job_type", "jobIsUrgent", "category_id",
-  "job_premium_status", "premium_until", "isHelio", "job_status", "cvs_sent", "company_logo", "jobSalary_min",
+  "job_premium_status", "premium_until", "isHelio", "helio_url", "job_status", "cvs_sent", "company_logo", "jobSalary_min",
   "view_count", "expires_at", "prioritize", "dont_send_email", "marketing_email_sent",
   "cv_submissions_email_sent", "disable_cv_filter", "accept_form_submissions", "updated_at",
 ];
@@ -1254,6 +1257,7 @@ const CAMEL_TO_SNAKE = {
   acceptFormSubmissions: "accept_form_submissions",
   disableCvFilter: "disable_cv_filter",
   premiumUntil: "premium_until",
+  helioUrl: "helio_url",
 };
 
 const patchOrPutJob = async (req, res) => {
