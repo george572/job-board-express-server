@@ -296,16 +296,21 @@ router.post("/hr-email", async (req, res) => {
           .map((u) => {
             const name = u.user_name ?? u.userName ?? u.name ?? "—";
             const email = u.user_email ?? u.userEmail ?? u.email ?? "—";
-            const url =
-              u.cv_url ?? u.cvUrl ?? u.resume_url ?? u.file_url ?? "—";
-            const summary = u.user_summary ?? u.userSummary ?? u.summary ?? "—";
-            return `სახელი : ${name}\nიმეილი : ${email}\nCV ლინკი : ${url}\n AI შეფასება : ${summary}`;
+            const url = u.cv_url ?? u.cvUrl ?? u.resume_url ?? u.file_url ?? "";
+            const summary =
+              u.user_summary ?? u.userSummary ?? u.summary ?? "";
+            const lines = [`სახელი : ${name}`, `იმეილი : ${email}`];
+            if (url && url.trim() && url !== "—")
+              lines.push(`CV ლინკი : ${url}`);
+            if (summary && summary.trim() && summary !== "—")
+              lines.push(`AI შეფასება : ${summary}`);
+            return lines.join("\n");
           })
           .join("\n\n")
       : "";
 
   const candidatesBlock =
-    list.length > 0 ? `კანდიდატები:\n\n${usersText}\n\n` : "";
+    list.length === 1 ? `კანდიდატი:\n\n${usersText}\n\n` : list.length > 0 ? `კანდიდატები:\n\n${usersText}\n\n` : "";
 
   const countLine =
     list.length > 0
