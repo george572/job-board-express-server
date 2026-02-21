@@ -376,7 +376,6 @@ app.use(session(sessionOptions));
 
 // Then your res.locals middleware
 const ENLISTED_FB_COOKIE = "enlisted_fb";
-const CONSENT_COOKIE = "samushao_consent_v2";
 const NO_CV_BANNER_COOKIE = "no_cv_banner_dismissed";
 function hasCookie(req, name) {
   const raw = req?.headers?.cookie || "";
@@ -388,32 +387,7 @@ function hasEnlistedFbCookie(req) {
 app.use((req, res, next) => {
   res.locals.user = req.session?.user || null;
   res.locals.enlistedInFb = hasCookie(req, ENLISTED_FB_COOKIE);
-  // default: don't show banner until we decide below
-  res.locals.showConsentBanner = false;
   res.locals.showNoCvBanner = !req.session?.user && !hasCookie(req, NO_CV_BANNER_COOKIE);
-  next();
-});
-
-// Consent banner middleware: show until user or cookie has consented
-app.use(async (req, res, next) => {
-  try {
-    let hasConsent = hasCookie(req, CONSENT_COOKIE);
-
-    if (!hasConsent && req.session?.user?.uid) {
-      const userRow = await db("users")
-        .where("user_uid", req.session.user.uid)
-        .select("consent")
-        .first();
-      if (userRow && userRow.consent === true) {
-        hasConsent = true;
-      }
-    }
-
-    res.locals.showConsentBanner = !hasConsent;
-  } catch (e) {
-    // On error, don't block the request; just hide banner
-    res.locals.showConsentBanner = false;
-  }
   next();
 });
 
@@ -1580,34 +1554,6 @@ app.post("/my-cv/delete", async (req, res) => {
     console.error("my-cv delete error:", err);
   }
   return res.redirect("/my-cv");
-});
-
-// Accept consent (privacy / cookies) – set cookie and optional user flag
-app.post("/consent/accept", async (req, res) => {
-  const redirectTo =
-    (req.body && req.body.redirect) ||
-    req.get("Referrer") ||
-    "/";
-  try {
-    if (req.session?.user?.uid) {
-      await db("users")
-        .where("user_uid", req.session.user.uid)
-        .update({
-          consent: true,
-          consent_updated_at: db.fn.now(),
-        });
-    }
-    res.cookie(CONSENT_COOKIE, "1", {
-      maxAge: 365 * 24 * 60 * 60 * 1000,
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-    });
-  } catch (err) {
-    console.error("consent/accept error:", err);
-  }
-  return res.redirect(303, redirectTo);
 });
 
 // Toggle automatic CV sending preference for current user
