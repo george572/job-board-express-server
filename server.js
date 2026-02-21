@@ -1234,10 +1234,17 @@ app.get("/rekomendebuli-vakansiebi", async (req, res) => {
   }
 });
 
-// Jobs that accept form without CV (ვაკანსიები სადაც CV გარეშე მიგიღებენ)
+// Jobs that accept form without CV (ვაკანსიები სადაც CV გარეშე მიგიღებენ) – infinite scroll
 app.get("/vakansiebi-cv-gareshe", async (req, res) => {
   try {
-    const topLimit = 20;
+    const limit = 20;
+    const pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const isAppendRequest = req.query.append === "1";
+    if (isAppendRequest) {
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+      res.set("Pragma", "no-cache");
+    }
+
     const isBoosted = (j) => j.prioritize === true || j.prioritize === 1 || ["premium", "premiumPlus"].includes(j.job_premium_status);
     let jobsRaw = await db("jobs")
       .select("*")
@@ -1246,8 +1253,7 @@ app.get("/vakansiebi-cv-gareshe", async (req, res) => {
       .whereRaw("(accept_form_submissions IS TRUE)")
       .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 WHEN "job_premium_status" = 'regular' THEN 5 ELSE 6 END`)
       .orderBy("created_at", "desc")
-      .orderBy("id", "desc")
-      .limit(50);
+      .orderBy("id", "desc");
     const prioritizedFormSub = await db("jobs")
       .select("*")
       .where("job_status", "approved")
@@ -1278,7 +1284,13 @@ app.get("/vakansiebi-cv-gareshe", async (req, res) => {
     const prioritizedFor23 = dedupePrioritized.slice(0, 2);
     const usedIds = new Set([slot1?.id, ...prioritizedFor23.map((j) => j.id)].filter(Boolean));
     const rest = jobsRaw.filter((j) => !usedIds.has(j.id));
-    const jobs = [slot1, ...prioritizedFor23, ...rest].filter(Boolean).slice(0, topLimit);
+    const allJobs = [slot1, ...prioritizedFor23, ...rest].filter(Boolean);
+
+    const totalJobs = allJobs.length;
+    const totalPages = Math.max(1, Math.ceil(totalJobs / limit));
+    const offset = isAppendRequest ? (pageNum - 1) * limit : 0;
+    const fetchLimit = isAppendRequest ? limit : pageNum * limit;
+    const jobs = allJobs.slice(offset, offset + fetchLimit);
 
     res.render("index", {
       jobs,
@@ -1290,12 +1302,12 @@ app.get("/vakansiebi-cv-gareshe", async (req, res) => {
       topCvFitJobs: [],
       topCvFitTotalCount: 0,
       formSubmissionJobs: [],
-      formSubmissionTotalCount: jobs.length,
+      formSubmissionTotalCount: totalJobs,
       todayJobs: [],
       todayJobsCount: 0,
-      currentPage: 1,
-      totalPages: 1,
-      totalJobs: jobs.length,
+      currentPage: pageNum,
+      totalPages,
+      totalJobs,
       filters: {},
       filtersActive: false,
       pageType: "form-submission",
