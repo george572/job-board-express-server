@@ -2115,11 +2115,21 @@ app.post("/api/user-without-cv", async (req, res) => {
   }
 });
 
-// User without CV banner: dismiss (sets cookie only)
-app.post("/api/user-without-cv/dismiss", (req, res) => {
+// User without CV banner: dismiss (record in DB, set 30-day cookie – show again after month)
+app.post("/api/user-without-cv/dismiss", async (req, res) => {
   if (req.session?.user) return res.json({ ok: true });
+  try {
+    if (req.visitorId) {
+      await db("no_cv_banner_dismissals").insert({
+        visitor_id: req.visitorId,
+        dismissed_at: db.fn.now(),
+      });
+    }
+  } catch (err) {
+    console.error("no_cv_banner_dismissals insert error:", err?.message);
+  }
   res.cookie(NO_CV_BANNER_COOKIE, "1", {
-    maxAge: 365 * 24 * 60 * 60 * 1000,
+    maxAge: 30 * 24 * 60 * 60 * 1000,
     httpOnly: false,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
