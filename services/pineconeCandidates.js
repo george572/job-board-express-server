@@ -256,6 +256,66 @@ async function getCandidateMatchForJob(job, userId) {
   };
 }
 
+const USER_WITHOUT_CV_NAMESPACE = "user_without_cv";
+
+/**
+ * Build text for embedding from user-without-cv form data.
+ * Emphasizes profession, experience, and categories for job matching.
+ */
+function buildUserWithoutCvTextForEmbedding(data) {
+  const name = (data.name || "").trim();
+  const desc = (data.short_description || "").trim();
+  const cats = Array.isArray(data.categories)
+    ? data.categories.join(", ")
+    : (data.categories || "").toString().replace(/,/g, ", ").trim();
+  const other = (data.other_specify || "").trim();
+  const parts = [];
+  if (name) parts.push(`Name: ${name}`);
+  if (desc) parts.push(`What they do: ${desc}`);
+  if (cats) parts.push(`Categories: ${cats}`);
+  if (other) parts.push(`Other: ${other}`);
+  return parts.length ? parts.join(". ") : "";
+}
+
+/**
+ * Upsert a user-without-cv form submission to Pinecone for semantic job matching.
+ * Uses same index as candidates, namespace "user_without_cv".
+ *
+ * @param {number} id - user_without_cv row id
+ * @param {object} data - { name, email, phone, short_description, categories, other_specify }
+ * @returns {Promise<boolean>} true if upserted, false if skipped (no text)
+ */
+async function upsertUserWithoutCv(id, data) {
+  if (!id || !data) return false;
+  const text = buildUserWithoutCvTextForEmbedding(data);
+  if (!text) return false;
+
+  const index = getIndex();
+  const [embedding] = await embedWithJina([text], "retrieval.passage");
+
+  const categoriesStr =
+    Array.isArray(data.categories) ? data.categories.join(",") : String(data.categories || "");
+  const meta = {
+    text,
+    user_without_cv_id: id,
+    name: (data.name || "").toString().slice(0, 255),
+    phone: (data.phone || "").toString().slice(0, 50),
+  };
+  const emailVal = (data.email || "").toString().trim().slice(0, 255);
+  if (emailVal) meta.email = emailVal;
+  const descVal = (data.short_description || "").toString().trim().slice(0, 1000);
+  if (descVal) meta.short_description = descVal;
+  if (categoriesStr) meta.categories = categoriesStr;
+  const otherVal = (data.other_specify || "").toString().trim().slice(0, 255);
+  if (otherVal) meta.other_specify = otherVal;
+
+  await index.upsert({
+    records: [{ id: `no_cv_${id}`, values: embedding, metadata: meta }],
+    namespace: USER_WITHOUT_CV_NAMESPACE,
+  });
+  return true;
+}
+
 /**
  * Delete a candidate's vector from Pinecone. Call when CV is deleted.
  *
@@ -288,9 +348,11 @@ module.exports = {
   getIndexName,
   upsertCandidate,
   deleteCandidate,
+  upsertUserWithoutCv,
   getTopCandidatesForJob,
   getCandidateScoreForJob,
   getCandidateMatchForJob,
   indexCandidateFromCvUrl,
   NAMESPACE,
+  USER_WITHOUT_CV_NAMESPACE,
 };

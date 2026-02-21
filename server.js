@@ -2092,15 +2092,29 @@ app.post("/api/user-without-cv", async (req, res) => {
   const trimmedPhone = (phone || "").toString().trim();
   if (!trimmedName) return res.status(400).json({ error: "სახელი აუცილებელია" });
   if (!trimmedPhone) return res.status(400).json({ error: "ტელეფონის ნომერი აუცილებელია" });
+  const row = {
+    name: trimmedName,
+    email: (email || "").toString().trim() || null,
+    phone: trimmedPhone,
+    short_description: (short_description || "").toString().trim() || null,
+    categories: Array.isArray(categories) ? categories.join(",") : (categories || "").toString().trim() || null,
+    other_specify: (other_specify || "").toString().trim() || null,
+  };
   try {
-    await db("user_without_cv").insert({
-      name: trimmedName,
-      email: (email || "").toString().trim() || null,
-      phone: trimmedPhone,
-      short_description: (short_description || "").toString().trim() || null,
-      categories: Array.isArray(categories) ? categories.join(",") : (categories || "").toString().trim() || null,
-      other_specify: (other_specify || "").toString().trim() || null,
-    });
+    const [inserted] = await db("user_without_cv").insert(row).returning("id");
+    const id = inserted?.id ?? inserted;
+    if (id && (process.env.PINECONE_API_KEY || "").trim()) {
+      const { upsertUserWithoutCv } = require("./services/pineconeCandidates");
+      const cats = Array.isArray(categories) ? categories : (row.categories || "").split(",").map((s) => s.trim()).filter(Boolean);
+      upsertUserWithoutCv(id, {
+        name: trimmedName,
+        email: row.email || "",
+        phone: trimmedPhone,
+        short_description: row.short_description || "",
+        categories: cats,
+        other_specify: row.other_specify || "",
+      }).catch((err) => console.error("[pinecone] user-without-cv upsert error:", err?.message));
+    }
     res.cookie(NO_CV_BANNER_COOKIE, "1", {
       maxAge: 365 * 24 * 60 * 60 * 1000,
       httpOnly: false,
