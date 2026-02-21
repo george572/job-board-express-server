@@ -796,6 +796,48 @@
           } catch (e) {}
         });
       });
+
+      // Jobs without CV requirement: job click tracking
+      const formSubmissionCards = document.querySelectorAll('.form-submission-card a[data-job-id]');
+      formSubmissionCards.forEach(function (card) {
+        card.addEventListener('click', function () {
+          try {
+            if (window.amplitude) {
+              const categoryId = this.getAttribute('data-job-category');
+              window.amplitude.track('Jobs Without CV Requirement Job Clicked', {
+                job_id: this.getAttribute('data-job-id'),
+                job_category: categoryNames[categoryId] || categoryId,
+                job_title: this.getAttribute('data-job-title'),
+                salary_range: this.getAttribute('data-salary-range'),
+                title: this.getAttribute('data-job-title'),
+                company: this.getAttribute('data-job-company'),
+                location: this.getAttribute('data-job-location')
+              });
+              trackPremiumPrioritizedClicks(this, 'jobs_without_cv_requirement');
+            }
+          } catch (e) {}
+        });
+      });
+
+      // Jobs without CV requirement: swipe/scroll tracking
+      if (formSubmissionScroll) {
+        var lastFormSubmissionScrollLeft = formSubmissionScroll.scrollLeft;
+        var formSubmissionScrollTimeout;
+        formSubmissionScroll.addEventListener('scroll', function () {
+          clearTimeout(formSubmissionScrollTimeout);
+          formSubmissionScrollTimeout = setTimeout(function () {
+            var now = formSubmissionScroll.scrollLeft;
+            if (now !== lastFormSubmissionScrollLeft && window.amplitude) {
+              try {
+                window.amplitude.track('Jobs Without CV Requirement Slider Swiped', {
+                  direction: now > lastFormSubmissionScrollLeft ? 'left' : 'right'
+                });
+              } catch (e) {}
+              lastFormSubmissionScrollLeft = now;
+            }
+          }, 150);
+        });
+      }
     });
   </script>
 </body>
