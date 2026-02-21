@@ -377,6 +377,7 @@ app.use(session(sessionOptions));
 // Then your res.locals middleware
 const ENLISTED_FB_COOKIE = "enlisted_fb";
 const CONSENT_COOKIE = "samushao_consent_v2";
+const NO_CV_BANNER_COOKIE = "no_cv_banner_dismissed";
 function hasCookie(req, name) {
   const raw = req?.headers?.cookie || "";
   return new RegExp(`\\b${name}=([^;]+)`).test(raw);
@@ -389,6 +390,7 @@ app.use((req, res, next) => {
   res.locals.enlistedInFb = hasCookie(req, ENLISTED_FB_COOKIE);
   // default: don't show banner until we decide below
   res.locals.showConsentBanner = false;
+  res.locals.showNoCvBanner = !req.session?.user && !hasCookie(req, NO_CV_BANNER_COOKIE);
   next();
 });
 
@@ -1969,6 +1971,52 @@ app.use("/send-cv", sendCvRouter);
 // Job form submission (alternative to CV)
 const jobFormSubmitRouter = require("./routes/jobFormSubmit")(db);
 app.use("/submit-job-form", jobFormSubmitRouter);
+
+// User without CV banner: submit form (saves to DB, sets cookie)
+app.post("/api/user-without-cv", async (req, res) => {
+  if (req.session?.user) {
+    return res.status(400).json({ error: "Only for non-authenticated users" });
+  }
+  const { name, email, phone, short_description, categories, other_specify } = req.body || {};
+  const trimmedName = (name || "").toString().trim();
+  const trimmedPhone = (phone || "").toString().trim();
+  if (!trimmedName) return res.status(400).json({ error: "სახელი აუცილებელია" });
+  if (!trimmedPhone) return res.status(400).json({ error: "ტელეფონის ნომერი აუცილებელია" });
+  try {
+    await db("user_without_cv").insert({
+      name: trimmedName,
+      email: (email || "").toString().trim() || null,
+      phone: trimmedPhone,
+      short_description: (short_description || "").toString().trim() || null,
+      categories: Array.isArray(categories) ? categories.join(",") : (categories || "").toString().trim() || null,
+      other_specify: (other_specify || "").toString().trim() || null,
+    });
+    res.cookie(NO_CV_BANNER_COOKIE, "1", {
+      maxAge: 365 * 24 * 60 * 60 * 1000,
+      httpOnly: false,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("user-without-cv error:", err);
+    res.status(500).json({ error: err.message || "Server error" });
+  }
+});
+
+// User without CV banner: dismiss (sets cookie only)
+app.post("/api/user-without-cv/dismiss", (req, res) => {
+  if (req.session?.user) return res.json({ ok: true });
+  res.cookie(NO_CV_BANNER_COOKIE, "1", {
+    maxAge: 365 * 24 * 60 * 60 * 1000,
+    httpOnly: false,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  });
+  res.json({ ok: true });
+});
 
 // Visitors API
 app.post("/api/visitors/record-duration", async (req, res) => {

@@ -82,6 +82,9 @@
 <% if (typeof showConsentBanner !== 'undefined' && showConsentBanner) { %>
   <%- include('consentBanner') %>
 <% } %>
+<% if (typeof showNoCvBanner !== 'undefined' && showNoCvBanner) { %>
+  <%- include('noCvBanner') %>
+<% } %>
 <style>
   #burgerToggle.active .burger-line:nth-child(1) {
     transform: rotate(45deg) translateY(12px);
