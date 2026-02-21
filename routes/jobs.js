@@ -809,6 +809,15 @@ router.get("/:id/top-candidates", async (req, res) => {
       lastSeenMap[row.user_id] = row.last_seen;
     });
 
+    const noCvIds = qualifiedMatches
+      .filter((m) => String(m.id).startsWith("no_cv_"))
+      .map((m) => parseInt(String(m.id).replace("no_cv_", ""), 10))
+      .filter((n) => !isNaN(n) && n > 0);
+    const noCvDescRows = noCvIds.length
+      ? await db("user_without_cv").whereIn("id", noCvIds).select("id", "ai_description")
+      : [];
+    const noCvAiDescMap = Object.fromEntries(noCvDescRows.map((r) => [`no_cv_${r.id}`, r.ai_description]));
+
     const candidates = qualifiedMatches.map((m) => {
       const isNoCv = String(m.id).startsWith("no_cv_");
       if (isNoCv) {
@@ -825,6 +834,7 @@ router.get("/:id/top-candidates", async (req, res) => {
           phone: meta.phone || null,
           short_description: meta.short_description || null,
           categories: meta.categories || null,
+          ai_description: noCvAiDescMap[m.id] || null,
         };
       }
       const u = userMap[m.id];
