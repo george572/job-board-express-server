@@ -256,8 +256,6 @@ async function getCandidateMatchForJob(job, userId) {
   };
 }
 
-const USER_WITHOUT_CV_NAMESPACE = "user_without_cv";
-
 /**
  * Build text for embedding from user-without-cv form data.
  * Emphasizes profession, experience, and categories for job matching.
@@ -311,7 +309,7 @@ async function upsertUserWithoutCv(id, data) {
 
   await index.upsert({
     records: [{ id: `no_cv_${id}`, values: embedding, metadata: meta }],
-    namespace: USER_WITHOUT_CV_NAMESPACE,
+    namespace: NAMESPACE,
   });
   return true;
 }
@@ -354,5 +352,4 @@ module.exports = {
   getCandidateMatchForJob,
   indexCandidateFromCvUrl,
   NAMESPACE,
-  USER_WITHOUT_CV_NAMESPACE,
 };

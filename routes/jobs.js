@@ -718,13 +718,14 @@ router.get("/:id/top-candidates", async (req, res) => {
     if (userIds.length === 0) {
       return res.json({ job_id: jobId, candidates: [] });
     }
+    const realUserIds = userIds.filter((id) => !String(id).startsWith("no_cv_"));
     const users = await db("users")
-      .whereIn("user_uid", userIds)
+      .whereIn("user_uid", realUserIds)
       .select("user_uid", "user_name", "user_email");
     const userMap = Object.fromEntries(users.map((u) => [u.user_uid, u]));
 
     const resumeRows = await db("resumes")
-      .whereIn("user_id", userIds)
+      .whereIn("user_id", realUserIds)
       .orderBy("updated_at", "desc")
       .select("user_id", "file_url", "file_name");
     const resumeMap = {};
@@ -734,7 +735,7 @@ router.get("/:id/top-candidates", async (req, res) => {
 
     // Last visit info per user: aggregate from visitors table
     const lastSeenRows = await db("visitors")
-      .whereIn("user_id", userIds)
+      .whereIn("user_id", realUserIds)
       .select("user_id")
       .groupBy("user_id")
       .max("last_seen as last_seen");
@@ -742,7 +743,25 @@ router.get("/:id/top-candidates", async (req, res) => {
     lastSeenRows.forEach((row) => {
       lastSeenMap[row.user_id] = row.last_seen;
     });
+
     const candidates = qualifiedMatches.map((m) => {
+      const isNoCv = String(m.id).startsWith("no_cv_");
+      if (isNoCv) {
+        const meta = m.metadata || {};
+        return {
+          user_id: m.id,
+          score: m.score,
+          user_name: meta.name || null,
+          user_email: meta.email || null,
+          cv_url: null,
+          cv_file_name: null,
+          last_seen_at: null,
+          no_cv: true,
+          phone: meta.phone || null,
+          short_description: meta.short_description || null,
+          categories: meta.categories || null,
+        };
+      }
       const u = userMap[m.id];
       const r = resumeMap[m.id];
       return {
