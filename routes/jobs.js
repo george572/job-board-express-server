@@ -1233,6 +1233,7 @@ router.get("/:id/top-candidates", async (req, res) => {
 
     const {
       getTopCandidatesForJob,
+      getCandidateScoreForJob,
     } = require("../services/pineconeCandidates");
     const requireRoleMatch =
       String(req.query.requireRoleMatch || "")
@@ -1259,16 +1260,18 @@ router.get("/:id/top-candidates", async (req, res) => {
     );
     const existingIds = new Set(qualifiedMatches.map((m) => m.id));
 
-    // Add no_cv that match by metadata (categories, short_description, other_specify)
+    // Add no_cv that match by metadata; use real vector score from Pinecone (respects minScore)
     const noCvRows = await db("user_without_cv").select("*");
     const metadataMatchedNoCv = [];
     for (const row of noCvRows) {
       const pid = `no_cv_${row.id}`;
       if (existingIds.has(pid)) continue;
       if (!noCvMatchesJob(row, jobText, jobTokens)) continue;
+      const score = await getCandidateScoreForJob(job, pid);
+      if (score == null || score < effectiveMinScore) continue;
       metadataMatchedNoCv.push({
         id: pid,
-        score: 0.6, // treat as passing match
+        score,
         metadata: {
           name: row.name,
           email: row.email || undefined,
