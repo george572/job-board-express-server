@@ -9,6 +9,7 @@ const multer = require("multer");
 
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 const { slugify } = require("../utils/slugify");
+const { JOBS_LIST_COLUMNS } = require("../utils/jobColumns");
 const { upsertJob, deleteJob } = require("../services/pineconeJobs");
 const { invalidate: invalidateFilterCountsCache } = require("../services/filterCountsCache");
 const { parsePremiumUntil } = require("../utils/parsePremiumUntil");
@@ -932,7 +933,7 @@ router.get("/", async (req, res) => {
     const offset = (Number(page) - 1) * Number(limit);
 
     let query = db("jobs")
-      .select("*")
+      .select(...JOBS_LIST_COLUMNS)
       .where("job_status", "approved")
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())");
 
@@ -994,7 +995,7 @@ router.get("/", async (req, res) => {
 router.get("/adm", async (req, res) => {
   try {
     const q = String(req.query.q || "").trim();
-    let query = db("jobs").select("*").orderBy("created_at", "desc");
+    let query = db("jobs").select(...JOBS_LIST_COLUMNS).orderBy("created_at", "desc");
     if (q) {
       const pattern = "%" + q.replace(/%/g, "\\%").replace(/_/g, "\\_") + "%";
       query = query.whereRaw(

@@ -10,6 +10,7 @@ const knexfile = require("./knexfile");
 const environment = process.env.NODE_ENV || "development";
 const db = knex(knexfile[environment]);
 const { slugify, extractIdFromSlug } = require("./utils/slugify");
+const { JOBS_LIST_COLUMNS } = require("./utils/jobColumns");
 const { parseJobIdsFromCookie } = require("./utils/formSubmittedCookie");
 const NodeCache = require("node-cache");
 
@@ -185,7 +186,7 @@ async function getRecommendedJobs(db, visitorId, opts = {}) {
   }
 
   let baseQuery = db("jobs")
-    .select("*")
+    .select(...JOBS_LIST_COLUMNS)
     .where("job_status", "approved")
     .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
     .whereNot("category_id", IGNORED_CATEGORY_OTHER)
@@ -709,14 +710,14 @@ app.get("/", async (req, res) => {
       // Top salary: slot 1 = highest paid non-boosted; slots 2-3 = premium first, then prioritized (premium > prioritize)
         const isBoosted = (j) => j.prioritize === true || j.prioritize === 1 || j.prioritize === "true" || ["premium", "premiumPlus"].includes(j.job_premium_status);
         let topSalaryRaw = await db("jobs")
-          .select("*")
+          .select(...JOBS_LIST_COLUMNS)
           .where("job_status", "approved")
           .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
           .whereNotNull("jobSalary_min")
           .orderBy("jobSalary_min", "desc")
           .limit(50);
         const prioritizedWithSalary = await db("jobs")
-          .select("*")
+          .select(...JOBS_LIST_COLUMNS)
           .where("job_status", "approved")
           .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
           .where((qb) => qb.where("prioritize", true).orWhereIn("job_premium_status", ["premium", "premiumPlus"]))
@@ -763,13 +764,13 @@ app.get("/", async (req, res) => {
 
       // Top popular: slot 1 = most viewed non-boosted; slots 2-3 = premium first, then prioritized
         let topPopularRaw = await db("jobs")
-          .select("*")
+          .select(...JOBS_LIST_COLUMNS)
           .where("job_status", "approved")
           .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
           .orderByRaw("COALESCE(view_count, 0) DESC")
           .limit(50);
         const prioritizedForPopular = await db("jobs")
-          .select("*")
+          .select(...JOBS_LIST_COLUMNS)
           .where("job_status", "approved")
           .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
           .where((qb) => qb.where("prioritize", true).orWhereIn("job_premium_status", ["premium", "premiumPlus"]))
@@ -803,7 +804,7 @@ app.get("/", async (req, res) => {
       // Today's jobs (დღევანდელი ვაკანსიები) – skipped when deferBelowFold (loaded on scroll)
       if (!deferBelowFold) {
         todayJobs = await db("jobs")
-          .select("*")
+          .select(...JOBS_LIST_COLUMNS)
           .where("job_status", "approved")
           .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
           .whereRaw(`${DATE_IN_GEORGIA} = ${TODAY_IN_GEORGIA}`)
@@ -822,7 +823,7 @@ app.get("/", async (req, res) => {
 
       // Form submission jobs (ვაკანსიები სადაც CV გარეშე მიგიღებენ) – jobs that accept form without CV
       const formSubRaw = await db("jobs")
-        .select("*")
+        .select(...JOBS_LIST_COLUMNS)
         .where("job_status", "approved")
         .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
         .whereRaw("(accept_form_submissions IS TRUE)")
@@ -864,7 +865,7 @@ app.get("/", async (req, res) => {
           const jobsFromDb = await db("jobs")
             .whereIn("id", jobIds)
             .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
-            .select("*");
+            .select(...JOBS_LIST_COLUMNS);
           const scoreMap = Object.fromEntries(matches.map((m) => [parseInt(m.id, 10), m.score]));
           const withScore = jobIds
             .map((id) => {
@@ -897,7 +898,7 @@ app.get("/", async (req, res) => {
     }
 
     let query = db("jobs")
-      .select("*")
+      .select(...JOBS_LIST_COLUMNS)
       .where("job_status", "approved")
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())");
     let countQuery = db("jobs")
@@ -1037,13 +1038,13 @@ app.get("/kvelaze-motkhovnadi-vakansiebi", async (req, res) => {
     const topLimit = 20;
     const isBoosted = (j) => j.prioritize === true || j.prioritize === 1 || ["premium", "premiumPlus"].includes(j.job_premium_status);
     let jobsRaw = await db("jobs")
-      .select("*")
+      .select(...JOBS_LIST_COLUMNS)
       .where("job_status", "approved")
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
       .orderByRaw("COALESCE(view_count, 0) DESC")
       .limit(50);
     const prioritizedWithViews = await db("jobs")
-      .select("*")
+      .select(...JOBS_LIST_COLUMNS)
       .where("job_status", "approved")
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
       .where((qb) => qb.where("prioritize", true).orWhereIn("job_premium_status", ["premium", "premiumPlus"]))
@@ -1112,14 +1113,14 @@ app.get("/kvelaze-magalanazgaurebadi-vakansiebi", async (req, res) => {
     // Top salary: slot 1 = highest paid non-boosted; slots 2-3 = premium first, then prioritized
     const isBoosted = (j) => j.prioritize === true || j.prioritize === 1 || ["premium", "premiumPlus"].includes(j.job_premium_status);
     let jobsRaw = await db("jobs")
-      .select("*")
+      .select(...JOBS_LIST_COLUMNS)
       .where("job_status", "approved")
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
       .whereNotNull("jobSalary_min")
       .orderBy("jobSalary_min", "desc")
       .limit(50);
     const prioritizedWithSalary = await db("jobs")
-      .select("*")
+      .select(...JOBS_LIST_COLUMNS)
       .where("job_status", "approved")
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
       .where((qb) => qb.where("prioritize", true).orWhereIn("job_premium_status", ["premium", "premiumPlus"]))
@@ -1186,7 +1187,7 @@ app.get("/kvelaze-magalanazgaurebadi-vakansiebi", async (req, res) => {
 app.get("/dgevandeli-vakansiebi", async (req, res) => {
   try {
     let jobs = await db("jobs")
-      .select("*")
+      .select(...JOBS_LIST_COLUMNS)
       .where("job_status", "approved")
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
       .whereRaw(`${DATE_IN_GEORGIA} = ${TODAY_IN_GEORGIA}`)
@@ -1287,7 +1288,7 @@ app.get("/vakansiebi-cv-gareshe", async (req, res) => {
 
     const isBoosted = (j) => j.prioritize === true || j.prioritize === 1 || ["premium", "premiumPlus"].includes(j.job_premium_status);
     let jobsRaw = await db("jobs")
-      .select("*")
+      .select(...JOBS_LIST_COLUMNS)
       .where("job_status", "approved")
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
       .whereRaw("(accept_form_submissions IS TRUE)")
@@ -1295,7 +1296,7 @@ app.get("/vakansiebi-cv-gareshe", async (req, res) => {
       .orderBy("created_at", "desc")
       .orderBy("id", "desc");
     const prioritizedFormSub = await db("jobs")
-      .select("*")
+      .select(...JOBS_LIST_COLUMNS)
       .where("job_status", "approved")
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
       .whereRaw("(accept_form_submissions IS TRUE)")
@@ -1388,7 +1389,7 @@ app.get("/vakansiebi-shentvis", async (req, res) => {
           const jobsFromDb = await db("jobs")
             .whereIn("id", jobIds)
             .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
-            .select("*");
+            .select(...JOBS_LIST_COLUMNS);
           const scoreMap = Object.fromEntries(matches.map((m) => [parseInt(m.id, 10), m.score]));
           const withScore = jobIds
             .map((id) => {
@@ -1774,7 +1775,7 @@ app.get("/api/jobs/:id/related", async (req, res) => {
     if (!job) return res.status(404).json({ error: "Job not found" });
 
     const relatedJobsRaw = await db("jobs")
-      .select("*")
+      .select(...JOBS_LIST_COLUMNS)
       .where("job_status", "approved")
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
       .where((qb) => {
@@ -2078,7 +2079,7 @@ app.get("/api/home/section", async (req, res) => {
 
     if (section === "today" && !filtersActive) {
       let todayJobs = await db("jobs")
-        .select("*")
+        .select(...JOBS_LIST_COLUMNS)
         .where("job_status", "approved")
         .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
         .whereRaw(`${DATE_IN_GEORGIA} = ${TODAY_IN_GEORGIA}`)
@@ -2106,7 +2107,7 @@ app.get("/api/home/section", async (req, res) => {
 
     if (section === "main") {
       let query = db("jobs")
-        .select("*")
+        .select(...JOBS_LIST_COLUMNS)
         .where("job_status", "approved")
         .whereRaw("(expires_at IS NULL OR expires_at > NOW())");
       let countQuery = db("jobs")
