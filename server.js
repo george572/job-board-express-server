@@ -1904,6 +1904,8 @@ app.get("/api/jobs/:id/description", async (req, res) => {
   }
 });
 
+app.get("/api/ping", (req, res) => res.json({ ok: 1 }));
+
 app.get("/api/jobs/:id/related", async (req, res) => {
   try {
     const jobId = parseInt(req.params.id, 10);

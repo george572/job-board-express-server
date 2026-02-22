@@ -202,6 +202,7 @@
       var link = e.target.closest('a.js-job-link[data-job-id]');
       if (link) prefetchDesc(link.getAttribute('data-job-id'));
     }, { passive: true, capture: true });
+    fetch('/api/ping', { credentials: 'same-origin' }).catch(function(){});
   }
 
   document.addEventListener('click', function(e) {
