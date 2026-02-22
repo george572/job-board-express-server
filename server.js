@@ -14,7 +14,9 @@ const { JOBS_LIST_COLUMNS } = require("./utils/jobColumns");
 const { parseJobIdsFromCookie } = require("./utils/formSubmittedCookie");
 const NodeCache = require("node-cache");
 
+const compression = require("compression");
 const app = express();
+app.use(compression());
 const pageCache = new NodeCache({ stdTTL: 86400 }); // 24 hours
 app.locals.pageCache = pageCache;
 const port = process.env.PORT || 4000;
@@ -375,6 +377,50 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
+// Fast path: serve cached HTML for anonymous visitors BEFORE session/visitor/DB middleware
+// Skips 3 sequential DB round-trips (~15-30ms) for every cached anonymous page view
+app.use((req, res, next) => {
+  if (req.method !== "GET") return next();
+  if (hasCookie(req, "connect.sid")) return next();
+  const pathOnly = req.path;
+  if (pathOnly === "/" || CACHEABLE_PATHS.test(pathOnly)) {
+    const key = req.originalUrl || req.url;
+    const cached = pageCache.get(key);
+    if (cached) {
+      const jobMatch = pathOnly.match(/^\/vakansia\/(.+)$/);
+      if (jobMatch) {
+        const jobIdRaw = extractIdFromSlug(jobMatch[1]);
+        const jobId = jobIdRaw ? parseInt(jobIdRaw, 10) : null;
+        if (jobId && !isNaN(jobId)) {
+          db.raw("UPDATE jobs SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?", [jobId]).catch(() => {});
+          const vidMatch = (req.headers.cookie || "").match(/\bvid=([^;]+)/);
+          const visitorId = vidMatch ? decodeURIComponent(vidMatch[1]) : null;
+          if (visitorId) {
+            db("jobs").where({ id: jobId }).select("jobSalary", "jobName", "category_id", "job_city", "job_experience", "job_type").first().then(async (job) => {
+              if (!job) return;
+              const catName = await getCategoryName(job.category_id);
+              return db("visitor_job_clicks").insert({
+                visitor_id: visitorId,
+                job_id: jobId,
+                job_salary: job.jobSalary || null,
+                job_title: job.jobName || null,
+                category_id: job.category_id || null,
+                job_category_name: catName,
+                job_city: job.job_city || null,
+                job_experience: job.job_experience || null,
+                job_type: job.job_type || null,
+                from_recommended: req.query.from === "recommended",
+              });
+            }).catch(() => {});
+          }
+        }
+      }
+      return res.set("Content-Type", "text/html; charset=utf-8").send(cached);
+    }
+  }
+  next();
+});
+
 // Session middleware MUST come before the route
 app.use(session(sessionOptions));
 
@@ -498,9 +544,9 @@ app.use(
   }),
 );
 
-// Serve static files
-app.use(express.static(path.join(__dirname, "public")));
-app.use("/uploads", express.static("uploads"));
+// Serve static files with long cache
+app.use(express.static(path.join(__dirname, "public"), { maxAge: "7d" }));
+app.use("/uploads", express.static("uploads", { maxAge: "30d" }));
 
 // Redirect trailing slash to clean URL (prevents duplicate canonicals)
 // Only for GET/HEAD – redirecting POST etc. would lose the request body

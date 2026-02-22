@@ -42,6 +42,7 @@
     "@tailwindcss/cli": "^4.1.18",
     "aa-sqlite": "^1.0.29",
     "cloudinary": "^2.5.1",
+    "compression": "^1.8.1",
     "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.5",
     "docx-preview": "^0.3.7",

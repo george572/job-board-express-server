@@ -206,6 +206,7 @@
       document.open();
       document.write(html);
       document.close();
+      window.scrollTo(0, 0);
       window.history.pushState({}, '', pathOnly);
     }).catch(function() { window.location.href = href; });
   }, true);
