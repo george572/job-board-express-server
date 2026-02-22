@@ -1,0 +1,23 @@
+<section id="today-jobs-section" class="w-full mx-auto px-4 mt-6 mb-4">
+  <div class="flex items-center justify-between mb-4 gap-3">
+    <div class="flex flex-col gap-1 flex-1">
+      <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515]">
+        დღევანდელი ვაკანსიები
+      </h2>
+      <% if (typeof todayJobsCount !== 'undefined' && todayJobsCount > 0) { %>
+      <a href="/dgevandeli-vakansiebi" class="text-sm text-[#315EFF] hover:underline">
+        ყველას ნახვა (<%= todayJobsCount %>)
+      </a>
+      <% } %>
+    </div>
+  </div>
+  <div class="w-full mx-auto flex flex-col gap-0">
+    <% if (todayJobs && todayJobs.length > 0) { %>
+    <% todayJobs.slice(0, 5).forEach(job => { %>
+    <%- include('partials/jobItem.ejs', { job, slugify }) %>
+    <% }) %>
+    <% } else { %>
+    <p class="text-sm text-gray-500 py-4">დღევანდელი ვაკანსიები არ მოიძებნა.</p>
+    <% } %>
+  </div>
+</section>

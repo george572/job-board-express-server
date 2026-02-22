@@ -11,8 +11,11 @@ const environment = process.env.NODE_ENV || "development";
 const db = knex(knexfile[environment]);
 const { slugify, extractIdFromSlug } = require("./utils/slugify");
 const { parseJobIdsFromCookie } = require("./utils/formSubmittedCookie");
+const NodeCache = require("node-cache");
 
 const app = express();
+const pageCache = new NodeCache({ stdTTL: 86400 }); // 24 hours
+app.locals.pageCache = pageCache;
 const port = process.env.PORT || 4000;
 const session = require("express-session");
 const pgSession = require("connect-pg-simple")(session);
@@ -417,6 +420,63 @@ app.use(async (req, res, next) => {
   next();
 });
 
+// Page cache: serve cached HTML for anonymous visitors (24h)
+// Runs after visitor middleware so req.visitorId is set for job view tracking on cache hits
+const CACHEABLE_PATHS = /^\/(vakansia\/[^/]+|kvelaze-motkhovnadi-vakansiebi|kvelaze-magalanazgaurebadi-vakansiebi|dgevandeli-vakansiebi|rekomendebuli-vakansiebi|vakansiebi-cv-gareshe|vakansiebi-shentvis|privacy-policy|terms-of-use|pricing)(\?.*)?$/;
+app.use((req, res, next) => {
+  if (req.method !== "GET") return next();
+  if (req.session?.user) return next();
+  const pathOnly = req.path;
+  if (pathOnly === "/" || CACHEABLE_PATHS.test(pathOnly)) {
+    const key = req.originalUrl || req.url;
+    const cached = pageCache.get(key);
+    if (cached) {
+      // For job detail pages: record view_count and visitor_job_clicks on cache hit
+      const jobMatch = pathOnly.match(/^\/vakansia\/(.+)$/);
+      if (jobMatch) {
+        const jobIdRaw = extractIdFromSlug(jobMatch[1]);
+        const jobId = jobIdRaw ? parseInt(jobIdRaw, 10) : null;
+        if (jobId && !isNaN(jobId)) {
+          db.raw("UPDATE jobs SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?", [jobId]).catch((e) =>
+            console.error("view_count increment error:", e?.message)
+          );
+          if (req.visitorId) {
+            db("jobs").where({ id: jobId }).first().then((job) => {
+              if (!job) return;
+              const catPromise = job.category_id
+                ? db("categories").where("id", job.category_id).select("name").first()
+                : Promise.resolve(null);
+              return catPromise.then((cat) =>
+                db("visitor_job_clicks").insert({
+                  visitor_id: req.visitorId,
+                  job_id: jobId,
+                  job_salary: job.jobSalary || null,
+                  job_title: job.jobName || null,
+                  category_id: job.category_id || null,
+                  job_category_name: (cat && cat.name) || null,
+                  job_city: job.job_city || null,
+                  job_experience: job.job_experience || null,
+                  job_type: job.job_type || null,
+                  from_recommended: req.query.from === "recommended",
+                })
+              );
+            }).catch((e) => console.error("visitor_job_clicks insert error:", e?.message));
+          }
+        }
+      }
+      return res.set("Content-Type", "text/html; charset=utf-8").send(cached);
+    }
+    const origSend = res.send.bind(res);
+    res.send = function (body) {
+      if (typeof body === "string" && (body.startsWith("<!") || body.startsWith("<html"))) {
+        pageCache.set(key, body);
+      }
+      return origSend(body);
+    };
+  }
+  next();
+});
+
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 
@@ -574,7 +634,7 @@ app.get("/", async (req, res) => {
       job_type,
       job_city,
       page = 1,
-      limit: limitParam = 10,
+      limit: limitParam = 5,
       hasSalary,
       job_premium_status,
       min_salary,
@@ -628,6 +688,9 @@ app.get("/", async (req, res) => {
     let topCvFitTotalCount = 0;
     let formSubmissionJobs = [];
     let formSubmissionTotalCount = 0;
+
+    // Defer below-fold sections (today's jobs, main jobs) on initial load when no filters – load on scroll
+    const deferBelowFold = !isAppendRequest && !filtersActive;
 
     if (!isAppendRequest) {
     if (!filtersActive && (req.visitorId || req.session?.user?.uid)) {
@@ -737,23 +800,25 @@ app.get("/", async (req, res) => {
         topPopularJobs = [slot1Pop, ...prioritizedFor23Pop, ...restByViews].filter(Boolean).slice(0, 20);
         topPopularTotalCount = topPopularJobs.length;
 
-      // Today's jobs (დღევანდელი ვაკანსიები)
-      todayJobs = await db("jobs")
-        .select("*")
-        .where("job_status", "approved")
-        .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
-        .whereRaw(`${DATE_IN_GEORGIA} = ${TODAY_IN_GEORGIA}`)
-        .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 WHEN "job_premium_status" = 'regular' THEN 5 ELSE 6 END`)
-        .orderBy("created_at", "desc")
-        .orderBy("id", "desc");
-      const seenToday = new Set();
-      todayJobs = todayJobs.filter((j) => {
-        const key = String(j.jobName || "").trim() + "|" + String(j.companyName || "").trim();
-        if (seenToday.has(key)) return false;
-        seenToday.add(key);
-        return true;
-      });
-      todayJobsCount = todayJobs.length;
+      // Today's jobs (დღევანდელი ვაკანსიები) – skipped when deferBelowFold (loaded on scroll)
+      if (!deferBelowFold) {
+        todayJobs = await db("jobs")
+          .select("*")
+          .where("job_status", "approved")
+          .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
+          .whereRaw(`${DATE_IN_GEORGIA} = ${TODAY_IN_GEORGIA}`)
+          .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 WHEN "job_premium_status" = 'regular' THEN 5 ELSE 6 END`)
+          .orderBy("created_at", "desc")
+          .orderBy("id", "desc");
+        const seenToday = new Set();
+        todayJobs = todayJobs.filter((j) => {
+          const key = String(j.jobName || "").trim() + "|" + String(j.companyName || "").trim();
+          if (seenToday.has(key)) return false;
+          seenToday.add(key);
+          return true;
+        });
+        todayJobsCount = todayJobs.length;
+      }
 
       // Form submission jobs (ვაკანსიები სადაც CV გარეშე მიგიღებენ) – jobs that accept form without CV
       const formSubRaw = await db("jobs")
@@ -950,6 +1015,7 @@ app.get("/", async (req, res) => {
       filters: req.query,
       filtersActive,
       paginationBase: "/",
+      deferBelowFold: deferBelowFold || false,
       slugify,
       seo: {
         title: "ვაკანსიები | Samushao.ge",
@@ -1817,9 +1883,17 @@ app.get("/api/enlist-fb/count", async (req, res) => {
 });
 
 // Filter counts (contextual: when category=2 active, other counts reflect jobs in that category)
+// Cached server-side; invalidated only when new jobs are inserted.
+const { getFilterCountsKey, get: getFilterCounts, set: setFilterCounts } = require("./services/filterCountsCache");
+
 app.get("/api/filter-counts", async (req, res) => {
   try {
     const { category, min_salary, job_experience, job_type, job_city, q } = req.query;
+    const cacheKey = getFilterCountsKey({ category, min_salary, job_experience, job_type, job_city, q });
+    const cached = getFilterCounts(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
     const hasAnyFilter =
       (category && category.length > 0) ||
       (min_salary && min_salary.length > 0) ||
@@ -1945,16 +2019,193 @@ app.get("/api/filter-counts", async (req, res) => {
       if (r.job_city) cityCounts[String(r.job_city)] = parseInt(r.c, 10) || 0;
     });
 
-    res.json({
+    const result = {
       category: categoryCounts,
       min_salary: salaryCounts,
       job_experience: experienceCounts,
       job_type: jobTypeCounts,
       job_city: cityCounts,
-    });
+    };
+    setFilterCounts(cacheKey, result);
+    res.json(result);
   } catch (err) {
     console.error("filter-counts error:", err.message, "query params:", req.query);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Lazy-loaded home sections (today's jobs, main jobs area) – used for below-fold content
+app.get("/api/home/section", async (req, res) => {
+  try {
+    const { section } = req.query;
+    if (!section || !["today", "main"].includes(section)) {
+      return res.status(400).send("Missing or invalid section");
+    }
+
+    const {
+      category,
+      company,
+      job_experience,
+      job_type,
+      job_city,
+      page = 1,
+      limit: limitParam = 5,
+      hasSalary,
+      job_premium_status,
+      min_salary,
+      q: searchQuery,
+    } = req.query;
+
+    const limit = Number(limitParam);
+    const pageNum = Number(page);
+
+    const filterParamKeys = [
+      "category",
+      "company",
+      "job_experience",
+      "job_type",
+      "job_city",
+      "hasSalary",
+      "job_premium_status",
+      "min_salary",
+      "q",
+    ];
+    const filtersActive = filterParamKeys.some((key) => {
+      const v = req.query[key];
+      if (v === undefined || v === "") return false;
+      return Array.isArray(v) ? v.length > 0 : true;
+    });
+
+    if (section === "today" && !filtersActive) {
+      let todayJobs = await db("jobs")
+        .select("*")
+        .where("job_status", "approved")
+        .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
+        .whereRaw(`${DATE_IN_GEORGIA} = ${TODAY_IN_GEORGIA}`)
+        .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 WHEN "job_premium_status" = 'regular' THEN 5 ELSE 6 END`)
+        .orderBy("created_at", "desc")
+        .orderBy("id", "desc");
+      const seenToday = new Set();
+      todayJobs = todayJobs.filter((j) => {
+        const key = String(j.jobName || "").trim() + "|" + String(j.companyName || "").trim();
+        if (seenToday.has(key)) return false;
+        seenToday.add(key);
+        return true;
+      });
+      const todayJobsCount = todayJobs.length;
+      req.app.render(
+        "partials/homeTodaySection",
+        { todayJobs, todayJobsCount, slugify, filtersActive },
+        (err, html) => {
+          if (err) return res.status(500).send(err.message);
+          res.type("text/html").send(html);
+        }
+      );
+      return;
+    }
+
+    if (section === "main") {
+      let query = db("jobs")
+        .select("*")
+        .where("job_status", "approved")
+        .whereRaw("(expires_at IS NULL OR expires_at > NOW())");
+      let countQuery = db("jobs")
+        .count("* as total")
+        .where("job_status", "approved")
+        .whereRaw("(expires_at IS NULL OR expires_at > NOW())");
+      if (!filtersActive) {
+        query.whereRaw(`${DATE_IN_GEORGIA} < ${TODAY_IN_GEORGIA}`);
+        countQuery.whereRaw(`${DATE_IN_GEORGIA} < ${TODAY_IN_GEORGIA}`);
+      }
+      if (company) {
+        query.where("companyName", company);
+        countQuery.where("companyName", company);
+      }
+      if (category) {
+        const cats = Array.isArray(category) ? category : [category];
+        query.whereIn("category_id", cats);
+        countQuery.whereIn("category_id", cats);
+      }
+      if (job_experience) {
+        const exp = Array.isArray(job_experience) ? job_experience : [job_experience];
+        query.whereIn("job_experience", exp);
+        countQuery.whereIn("job_experience", exp);
+      }
+      if (min_salary) {
+        const min = parseInt(min_salary, 10);
+        if (!isNaN(min)) {
+          query.where("jobSalary_min", ">=", min);
+          countQuery.where("jobSalary_min", ">=", min);
+        }
+      }
+      if (job_type) {
+        const types = Array.isArray(job_type) ? job_type : [job_type];
+        query.whereIn("job_type", types);
+        countQuery.whereIn("job_type", types);
+      }
+      if (job_city) {
+        const cities = Array.isArray(job_city) ? job_city : [job_city];
+        query.whereIn("job_city", cities);
+        countQuery.whereIn("job_city", cities);
+      }
+      if (hasSalary === "true") {
+        query.whereNotNull("jobSalary");
+        countQuery.whereNotNull("jobSalary");
+      }
+      if (job_premium_status) {
+        const premium = Array.isArray(job_premium_status) ? job_premium_status : [job_premium_status];
+        query.whereIn("job_premium_status", premium);
+        countQuery.whereIn("job_premium_status", premium);
+      }
+      if (searchQuery && typeof searchQuery === "string" && searchQuery.trim()) {
+        const term =
+          "%" +
+          searchQuery.trim().replace(/%/g, "\\%").replace(/_/g, "\\_") +
+          "%";
+        query.andWhereRaw(
+          '("jobName" ilike ? OR "companyName" ilike ? OR COALESCE("jobDescription", \'\') ilike ?)',
+          [term, term, term]
+        );
+        countQuery.andWhereRaw(
+          '("jobName" ilike ? OR "companyName" ilike ? OR COALESCE("jobDescription", \'\') ilike ?)',
+          [term, term, term]
+        );
+      }
+
+      const [{ total }] = await countQuery;
+      const totalPages = Math.ceil(total / limit);
+      const PREMIUM_PRIORITIZE_ORDER = `CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 WHEN "job_premium_status" = 'regular' THEN 5 ELSE 6 END`;
+      let jobs = await query
+        .orderByRaw(PREMIUM_PRIORITIZE_ORDER)
+        .orderBy("created_at", "desc")
+        .orderBy("id", "desc")
+        .limit(pageNum * limit)
+        .offset((pageNum - 1) * limit);
+
+      const seenKey = new Set();
+      jobs = jobs.filter((j) => {
+        const key = String(j.jobName || "").trim() + "|" + String(j.companyName || "").trim();
+        if (seenKey.has(key)) return false;
+        seenKey.add(key);
+        return true;
+      });
+
+      const paginationBase = "/";
+      req.app.render(
+        "partials/homeJobsArea",
+        { jobs, currentPage: pageNum, totalPages, filtersActive, paginationBase, slugify },
+        (err, html) => {
+          if (err) return res.status(500).send(err.message);
+          res.type("text/html").send(html);
+        }
+      );
+      return;
+    }
+
+    res.status(400).send("Invalid section");
+  } catch (err) {
+    console.error("api/home/section error:", err);
+    res.status(500).send(err.message);
   }
 });
 

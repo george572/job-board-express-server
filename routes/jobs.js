@@ -10,6 +10,7 @@ const multer = require("multer");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 const { slugify } = require("../utils/slugify");
 const { upsertJob, deleteJob } = require("../services/pineconeJobs");
+const { invalidate: invalidateFilterCountsCache } = require("../services/filterCountsCache");
 const { parsePremiumUntil } = require("../utils/parsePremiumUntil");
 
 // Use the same environment-based Knex config as the main app
@@ -1785,6 +1786,7 @@ router.post("/", upload.none(), async (req, res) => {
       }).catch((err) =>
         console.error("[pinecone] Failed to index job:", err.message),
       );
+      invalidateFilterCountsCache();
     }
 
     res.status(201).json({ message: "Job created", jobId: inserted?.id });
@@ -1975,6 +1977,8 @@ router.post("/bulk", async (req, res) => {
       );
     }
 
+    invalidateFilterCountsCache();
+
     res.status(201).json({
       message:
         "Jobs inserted. Emails will be sent over the next 2-3 hours (see emailQueue).",
@@ -2105,6 +2109,11 @@ const patchOrPutJob = async (req, res) => {
         return res.status(404).json({ error: "Job not found" });
       }
       delete updateData.accept_form_submissions;
+      const cache = req.app.locals.pageCache;
+      if (cache) {
+        const job = await db("jobs").where("id", jobId).select("jobName").first();
+        if (job) cache.del(`/vakansia/${slugify(job.jobName)}-${jobId}`);
+      }
     }
 
     if (Object.keys(updateData).length > 0) {
@@ -2154,6 +2163,11 @@ const patchOrPutJob = async (req, res) => {
           }
         }
       }
+      const cache = req.app.locals.pageCache;
+      if (cache) {
+        const job = await db("jobs").where("id", jobId).select("jobName").first();
+        if (job) cache.del(`/vakansia/${slugify(job.jobName)}-${jobId}`);
+      }
     }
 
     res.status(200).json({ message: "Job updated successfully" });
@@ -2168,13 +2182,19 @@ router.put("/:id", patchOrPutJob);
 
 // DELETE route to remove a job
 router.delete("/:id", async (req, res) => {
-  const jobId = req.params.id;
+  const jobId = parseInt(req.params.id, 10);
+  if (!jobId || isNaN(jobId)) {
+    return res.status(400).json({ error: "Invalid job id" });
+  }
 
   try {
+    const job = await db("jobs").where("id", jobId).select("jobName").first();
     const count = await db("jobs").where("id", jobId).del();
     if (count === 0) {
       return res.status(404).json({ error: "Job not found" });
     }
+    const cache = req.app.locals.pageCache;
+    if (cache && job) cache.del(`/vakansia/${slugify(job.jobName)}-${jobId}`);
     deleteJob(jobId).catch((err) =>
       console.error("[pinecone] Failed to delete job:", err.message),
     );

@@ -243,8 +243,12 @@
 
   <div id="facebook-promo-main"><%- include('partials/facebookPromo') %></div>
 
-  <!-- Today's jobs (დღევანდელი ვაკანსიები) - hidden when any filter is active -->
-  <% if (todayJobs && todayJobs.length > 0 && !filtersActive) { %>
+  <!-- Today's jobs (დღევანდელი ვაკანსიები) - hidden when any filter is active. Lazy-loaded when deferBelowFold. -->
+  <% if (typeof deferBelowFold !== 'undefined' && deferBelowFold && !filtersActive) { %>
+  <div id="lazy-today-placeholder" class="lazy-section-placeholder w-full mx-auto px-4 mt-6 mb-4 min-h-[120px] flex items-center justify-center" data-lazy-section="today" data-lazy-loaded="false">
+    <div class="text-gray-400 text-sm">იტვირთება...</div>
+  </div>
+  <% } else if (todayJobs && todayJobs.length > 0 && !filtersActive) { %>
   <section id="today-jobs-section" class="w-full mx-auto px-4 mt-6 mb-4">
     <div class="flex items-center justify-between mb-4 gap-3">
       <div class="flex flex-col gap-1 flex-1">
@@ -259,7 +263,7 @@
       </div>
     </div>
     <div class="w-full mx-auto flex flex-col gap-0">
-      <% todayJobs.slice(0, 10).forEach(job => { %>
+      <% todayJobs.slice(0, 5).forEach(job => { %>
       <%- include('partials/jobItem.ejs', { job, slugify }) %>
       <% }) %>
     </div>
@@ -485,6 +489,69 @@
     bindNormalJobClicks(container);
     initLoadMore();
     window.reinitLoadMore = initLoadMore;
+
+    // Lazy-load below-fold sections (today's jobs, main jobs) when they scroll into view
+    (function initLazySections() {
+      const sections = document.querySelectorAll('[data-lazy-section][data-lazy-loaded="false"]');
+      if (sections.length === 0) return;
+
+      const loadSection = function (el) {
+        const section = el.getAttribute('data-lazy-section');
+        if (!section || el.getAttribute('data-lazy-loaded') === 'true') return;
+        el.setAttribute('data-lazy-loaded', 'true');
+
+        const params = new URLSearchParams(window.location.search);
+        params.set('section', section);
+        if (section === 'main') params.set('page', '1');
+        const url = '/api/home/section?' + params.toString();
+
+        fetch(url, { cache: 'no-store' })
+          .then(function (res) { return res.text(); })
+          .then(function (html) {
+            if (section === 'today') {
+              var wrapper = document.createElement('div');
+              wrapper.innerHTML = html.trim();
+              var sectionEl = wrapper.firstChild;
+              if (sectionEl && el.parentNode) {
+                el.parentNode.replaceChild(sectionEl, el);
+              }
+            } else if (section === 'main') {
+              var jobsArea = document.getElementById('jobs-area');
+              if (jobsArea) {
+                jobsArea.innerHTML = html;
+                var meta = jobsArea.querySelector('#jobs-area-meta');
+                if (meta) {
+                  jobsArea.dataset.currentPage = meta.getAttribute('data-current-page') || '1';
+                  jobsArea.dataset.totalPages = meta.getAttribute('data-total-pages') || '1';
+                }
+                bindNormalJobClicks(document.getElementById('jobs-container'));
+                if (window.reinitLoadMore) window.reinitLoadMore();
+                if (window.removeDuplicateJobs) window.removeDuplicateJobs();
+              }
+            }
+          })
+          .catch(function (err) {
+            console.error('Lazy section load error:', err);
+            el.setAttribute('data-lazy-loaded', 'false');
+          });
+      };
+
+      var io = window.IntersectionObserver ? new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            var el = entry.target;
+            io.unobserve(el);
+            loadSection(el);
+          }
+        });
+      }, { rootMargin: '200px 0px', threshold: 0.01 }) : null;
+
+      if (io) {
+        sections.forEach(function (el) { io.observe(el); });
+      } else {
+        sections.forEach(loadSection);
+      }
+    })();
 
     function loadPage(targetPage) {
       var params = new URLSearchParams(window.location.search);

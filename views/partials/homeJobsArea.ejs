@@ -1,0 +1,54 @@
+<span id="jobs-area-meta" data-current-page="<%= currentPage || 1 %>" data-total-pages="<%= totalPages || 1 %>" style="display:none" aria-hidden="true"></span>
+<% if (filtersActive) { %><%- include('partials/facebookPromo') %><% } %>
+<h1 id="all-vacancies-heading" class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1 pb-4 w-full mx-auto px-4" style="<%= filtersActive ? 'display:none' : '' %>">
+  <%= typeof pageType === 'string' && pageType === 'top-salary' ? 'ყველაზე მაღალანაზღაურებადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'top-views' ? 'ყველაზე ნახვადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'today' ? 'დღევანდელი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'recommended' ? 'შენთვის რეკომენდებული ვაკანსიები' : (typeof pageType === 'string' && pageType === 'top-cv-fit' ? 'ვაკანსიები სადაც შენი CV ერგება' : (typeof pageType === 'string' && pageType === 'form-submission' ? 'ვაკანსიები სადაც CV გარეშე მიგიღებენ' : 'ყველა ვაკანსია'))))) %>
+</h1>
+<div class="w-full relative mx-auto px-4" id="jobs-container">
+  <% if (jobs && jobs.length > 0) { %>
+  <% jobs.forEach(job => { %>
+  <%- include('partials/jobItem.ejs', { job, slugify, fromRecommended: typeof pageType !== 'undefined' && pageType === 'recommended', fromTopCvFit: typeof pageType !== 'undefined' && pageType === 'top-cv-fit' }) %>
+  <% }) %>
+  <% } %>
+</div>
+
+<!-- Loading indicator -->
+<div id="loading-indicator" class="flex justify-center" style="text-align: center; padding: 20px; color: #999; font-size: 14px; display: none;">
+  იტვირთება...
+</div>
+<!-- TOP.GE ASYNC COUNTER CODE -->
+<div id="top-ge-counter-container" data-site-id="117980"></div>
+<script async src="//counter.top.ge/counter.js"></script>
+<!-- / END OF TOP.GE COUNTER CODE -->
+
+<% if (totalPages > 1) { %>
+<% const _paginationBase = (typeof paginationBase !== 'undefined' && paginationBase) ? paginationBase : '/'; %>
+<% const _pageUrl = _paginationBase + '?page='; %>
+<nav class="pagination pagination-small w-full flex justify-center items-center gap-2 py-4" style="display:none">
+  <% if (currentPage > 1) { %>
+  <a href="<%= _pageUrl %><%= currentPage - 1 %>" class="p-2 bg-primary text-white rounded-xl">← წინა</a>
+  <% } %>
+
+  <% 
+  const maxVisible = 5;
+  let startPage = Math.max(1, currentPage - 2);
+  let endPage = Math.min(totalPages, currentPage + 2);
+  
+  if (startPage > 1) { %>
+  <a href="<%= _pageUrl %>1" class="p-2 bg-primary text-white rounded-xl min-w-[30px] text-center">1</a>
+  <% if (startPage > 2) { %><span>...</span><% } %>
+  <% }
+  
+  for (let i = startPage; i <= endPage; i++) { %>
+  <a href="<%= _pageUrl %><%= i %>" class="<%= i === currentPage ? 'active' : '' %> p-2 bg-primary text-white rounded-xl min-w-[30px] text-center"><%= i %></a>
+  <% }
+  
+  if (endPage < totalPages) { 
+    if (endPage < totalPages - 1) { %><span>...</span><% } %>
+  <a href="<%= _pageUrl %><%= totalPages %>" class="p-2 bg-primary text-white rounded-xl min-w-[30px] text-center"><%= totalPages %></a>
+  <% } %>
+
+  <% if (currentPage < totalPages) { %>
+  <a href="<%= _pageUrl %><%= currentPage + 1 %>" class="p-2 bg-primary text-white rounded-xl">შემდეგი →</a>
+  <% } %>
+</nav>
+<% } %>

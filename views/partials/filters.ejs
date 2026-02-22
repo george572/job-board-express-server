@@ -155,8 +155,54 @@
     const activeFiltersList = document.getElementById('activeFiltersList');
     const clearAllFiltersBtn = document.getElementById('clearAllFiltersBtn');
 
-    // Fetch and display filter counts (contextual: updates when other filters are active)
-    function updateFilterCounts() {
+    // Client-side cache for filter counts (keyed by current URL params). Loaded only when a filter is opened.
+    var filterCountsCache = {};
+
+    function applyFilterCountsToDropdowns(data) {
+      const cat = (data && data.category) || {};
+      const sal = (data && data.min_salary) || {};
+      const exp = (data && data.job_experience) || {};
+      const typ = (data && data.job_type) || {};
+      const cityData = (data && data.job_city) || {};
+      if (categoryFilter) {
+        for (var i = 0; i < categoryFilter.options.length; i++) {
+          var opt = categoryFilter.options[i];
+          var val = opt.value;
+          opt.text = val ? (categoryNames[val] || val) + (cat[val] !== undefined ? ' (' + cat[val] + ')' : '') : 'კატეგორიები';
+        }
+      }
+      if (salaryFilter) {
+        for (var i = 0; i < salaryFilter.options.length; i++) {
+          var opt = salaryFilter.options[i];
+          var val = opt.value;
+          opt.text = val ? (salaryNames[val] || val) + (sal[val] !== undefined ? ' (' + sal[val] + ')' : '') : 'ანაზღაურება';
+        }
+      }
+      if (experienceFilter) {
+        for (var i = 0; i < experienceFilter.options.length; i++) {
+          var opt = experienceFilter.options[i];
+          var val = opt.value;
+          opt.text = val ? (experienceNames[val] || val) + (exp[val] !== undefined ? ' (' + exp[val] + ')' : '') : 'გამოცდილება';
+        }
+      }
+      if (jobTypeFilter) {
+        for (var i = 0; i < jobTypeFilter.options.length; i++) {
+          var opt = jobTypeFilter.options[i];
+          var val = opt.value;
+          opt.text = val ? (jobTypeNames[val] || val) + (typ[val] !== undefined ? ' (' + typ[val] + ')' : '') : 'განაკვეთი';
+        }
+      }
+      if (cityFilter) {
+        for (var i = 0; i < cityFilter.options.length; i++) {
+          var opt = cityFilter.options[i];
+          var val = opt.value;
+          opt.text = val ? (cityNames[val] || val) + (cityData[val] !== undefined ? ' (' + cityData[val] + ')' : '') : 'ქალაქი';
+        }
+      }
+    }
+
+    // Load filter counts when a filter is opened (focus/click). Uses client and server cache.
+    function ensureFilterCountsLoaded() {
       const params = getUrlParams();
       const qs = new URLSearchParams();
       if (params.category && params.category.length > 0) params.category.forEach(c => qs.append('category', c));
@@ -165,49 +211,17 @@
       if (params.job_type && params.job_type.length > 0) params.job_type.forEach(t => qs.append('job_type', t));
       if (params.job_city && params.job_city.length > 0) params.job_city.forEach(c => qs.append('job_city', c));
       if (params.q && params.q.trim()) qs.set('q', params.q.trim());
-      fetch('/api/filter-counts?' + qs.toString())
+      var cacheKey = qs.toString() || 'base';
+      if (filterCountsCache[cacheKey]) {
+        applyFilterCountsToDropdowns(filterCountsCache[cacheKey]);
+        return;
+      }
+      var fetchUrl = qs.toString() ? '/api/filter-counts?' + qs.toString() : '/api/filter-counts';
+      fetch(fetchUrl)
         .then(function (res) { return res.json(); })
         .then(function (data) {
-          const cat = data.category || {};
-          const sal = data.min_salary || {};
-          const exp = data.job_experience || {};
-          const typ = data.job_type || {};
-          if (categoryFilter) {
-            for (var i = 0; i < categoryFilter.options.length; i++) {
-              var opt = categoryFilter.options[i];
-              var val = opt.value;
-              opt.text = val ? (categoryNames[val] || val) + (cat[val] !== undefined ? ' (' + cat[val] + ')' : '') : 'კატეგორიები';
-            }
-          }
-          if (salaryFilter) {
-            for (var i = 0; i < salaryFilter.options.length; i++) {
-              var opt = salaryFilter.options[i];
-              var val = opt.value;
-              opt.text = val ? (salaryNames[val] || val) + (sal[val] !== undefined ? ' (' + sal[val] + ')' : '') : 'ანაზღაურება';
-            }
-          }
-          if (experienceFilter) {
-            for (var i = 0; i < experienceFilter.options.length; i++) {
-              var opt = experienceFilter.options[i];
-              var val = opt.value;
-              opt.text = val ? (experienceNames[val] || val) + (exp[val] !== undefined ? ' (' + exp[val] + ')' : '') : 'გამოცდილება';
-            }
-          }
-          if (jobTypeFilter) {
-            for (var i = 0; i < jobTypeFilter.options.length; i++) {
-              var opt = jobTypeFilter.options[i];
-              var val = opt.value;
-              opt.text = val ? (jobTypeNames[val] || val) + (typ[val] !== undefined ? ' (' + typ[val] + ')' : '') : 'განაკვეთი';
-            }
-          }
-          var cityData = data.job_city || {};
-          if (cityFilter) {
-            for (var i = 0; i < cityFilter.options.length; i++) {
-              var opt = cityFilter.options[i];
-              var val = opt.value;
-              opt.text = val ? (cityNames[val] || val) + (cityData[val] !== undefined ? ' (' + cityData[val] + ')' : '') : 'ქალაქი';
-            }
-          }
+          filterCountsCache[cacheKey] = data;
+          applyFilterCountsToDropdowns(data);
         })
         .catch(function () {});
     }
@@ -311,7 +325,6 @@
           history.pushState({ filters: filters }, '', newUrl);
           setFiltersFromUrl();
           renderActiveFilters();
-          updateFilterCounts();
           updateTopSalarySliderVisibility();
           window.scrollTo(0, 0);
           setJobsLoading(false);
@@ -563,17 +576,19 @@
           }
           setFiltersFromUrl();
           renderActiveFilters();
-          updateFilterCounts();
           updateTopSalarySliderVisibility();
           window.scrollTo(0, 0);
         })
         .catch(function () { window.location.reload(); });
     });
 
-    // Initialize: set dropdowns from URL, render active filters, fetch counts
+    // Initialize: set dropdowns from URL, render active filters. Filter counts load only when a filter is opened.
     setFiltersFromUrl();
     renderActiveFilters();
-    updateFilterCounts();
     updateTopSalarySliderVisibility();
+
+    [categoryFilter, salaryFilter, experienceFilter, jobTypeFilter, cityFilter].forEach(function (el) {
+      if (el) el.addEventListener('focus', ensureFilterCountsLoaded, { passive: true });
+    });
   })();
 </script>
