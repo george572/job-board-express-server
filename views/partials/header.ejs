@@ -182,6 +182,22 @@
   // Job link interceptor: use cached job + fetch only description (no full reload)
   // Skip on touch devices – fetch+document.write+pushState breaks clicks after bfcache restore on mobile
   var isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+  // Hover prefetch: start fetching description before user clicks
+  if (!isTouch) {
+    window.__descPrefetch = window.__descPrefetch || {};
+    document.addEventListener('mouseenter', function(e) {
+      var link = e.target.closest('a.js-job-link[data-job-id]');
+      if (!link) return;
+      var jobId = link.getAttribute('data-job-id');
+      if (!jobId || window.__descPrefetch[jobId]) return;
+      window.__descPrefetch[jobId] = fetch('/api/jobs/' + jobId + '/description', { credentials: 'same-origin' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) { window.__descPrefetch[jobId] = d; return d; })
+        .catch(function() { delete window.__descPrefetch[jobId]; });
+    }, true);
+  }
+
   document.addEventListener('click', function(e) {
     if (isTouch) return;
     var link = e.target.closest('a.js-job-link[href^="/vakansia/"][data-job-b64]');

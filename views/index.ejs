@@ -38,6 +38,9 @@
 </head>
 
 <body class="font-markgeo text-secondary bg-[#F8F9FA]">
+  <script>
+    (function(){ var p=sessionStorage.getItem('currentPage'); if(p&&parseInt(p,10)>1){ var params=new URLSearchParams(window.location.search); params.set('page',p); var url=(window.location.pathname||'/').replace(/\/$/,'')||'/'; url+=params.toString()?'?'+params.toString():''; window.__restoreFetch=fetch(url,{cache:'no-store'}).then(function(r){return r.text();});}})();
+  </script>
   <%- include('partials/gtm-noscript') %>
   <%- include('partials/header') %>
   <%- include('partials/filters') %>
@@ -553,15 +556,14 @@
       }
     })();
 
-    function loadPage(targetPage) {
+    function loadPage(targetPage, htmlPromise) {
       var params = new URLSearchParams(window.location.search);
       params.set('page', String(targetPage));
       params.delete('append');
       var base = (window.location.pathname || '/').replace(/\/$/, '') || '/';
       var url = base + (params.toString() ? '?' + params.toString() : '');
-      return fetch(url, { cache: 'no-store' })
-        .then(function (res) { return res.text(); })
-        .then(function (html) {
+      var promise = htmlPromise || fetch(url, { cache: 'no-store' }).then(function (res) { return res.text(); });
+      return promise.then(function (html) {
           var parser = new DOMParser();
           var doc = parser.parseFromString(html, 'text/html');
           var fetchedJobsArea = doc.getElementById('jobs-area');
@@ -582,19 +584,22 @@
     }
     window.loadPage = loadPage;
 
-    window.addEventListener('load', function () {
+    (function restoreScroll() {
       var savedY = sessionStorage.getItem(SCROLL_KEY);
       var savedPage = sessionStorage.getItem(PAGE_KEY);
-      if (savedY !== null && savedPage !== null) {
-        loadPage(parseInt(savedPage, 10)).then(function () {
-          setTimeout(function () {
-            window.scrollTo(0, parseInt(savedY, 10));
-            sessionStorage.removeItem(SCROLL_KEY);
-            sessionStorage.removeItem(PAGE_KEY);
-          }, 100);
+      if (savedY === null || savedPage === null) return;
+      var page = parseInt(savedPage, 10);
+      var y = parseInt(savedY, 10);
+      sessionStorage.removeItem(SCROLL_KEY);
+      sessionStorage.removeItem(PAGE_KEY);
+      if (page === 1) {
+        window.scrollTo(0, y);
+      } else {
+        loadPage(page, window.__restoreFetch).then(function () {
+          requestAnimationFrame(function () { window.scrollTo(0, y); });
         });
       }
-    });
+    })();
 
     window.addEventListener('pageshow', function (e) {
       if (e.persisted) {

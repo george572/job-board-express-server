@@ -282,8 +282,8 @@
 
     <%- include('partials/facebookPromo') %>
 
-    <!-- Related jobs slider -->
-    <section id="related-jobs-section" class="w-full mx-auto px-4 mt-8 mb-8">
+    <!-- Related jobs slider (hidden in shell mode until loaded) -->
+    <section id="related-jobs-section" class="w-full mx-auto px-4 mt-8 mb-8" <% if (typeof shellMode !== 'undefined' && shellMode) { %>style="display:none"<% } %>>
       <div class="max-w-[1400px] mx-auto">
         <div class="flex items-center justify-between mb-4 gap-3">
           <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1">
@@ -443,33 +443,51 @@
   </main>
 
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const descEl = document.getElementById('jobDescription');
-      const raw = <%- JSON.stringify(mainJob.jobDescription || mainJob.job_description || '') %>;
+    (function() {
+      var descEl = document.getElementById('jobDescription');
+      var raw = <%- JSON.stringify(mainJob.jobDescription || mainJob.job_description || '') %>;
+      var jobId = <%= mainJob.id %>;
+      var isShell = <%= typeof shellMode !== 'undefined' && shellMode ? 'true' : 'false' %>;
 
-      const isHtml = function(str) {
+      function isHtml(str) {
         if (!str) return false;
         return /<[a-z][\s\S]*>/i.test(str);
-      };
+      }
 
-      const formattedDisplay = function(content) {
+      function formattedDisplay(content) {
         if (isHtml(content)) {
-          // Only strip inline styles, keep all <br> tags exactly as they are
           return content.replace(/style="[^"]*"/g, '');
         }
         return content;
-      };
-
-      if (isHtml(raw)) {
-        // render sanitized html (only stripping inline styles here)
-        descEl.classList.remove('whitespace-pre-wrap');
-        descEl.innerHTML = formattedDisplay(raw);
-      } else {
-        // plain text — preserve whitespace and line breaks
-        descEl.classList.add('whitespace-pre-wrap');
-        descEl.textContent = formattedDisplay(raw);
       }
-    });
+
+      function injectDesc(text) {
+        if (!text) { descEl.textContent = ''; return; }
+        if (isHtml(text)) {
+          descEl.classList.remove('whitespace-pre-wrap');
+          descEl.innerHTML = formattedDisplay(text);
+        } else {
+          descEl.classList.add('whitespace-pre-wrap');
+          descEl.textContent = formattedDisplay(text);
+        }
+      }
+
+      if (!isShell && raw) {
+        injectDesc(raw);
+      } else {
+        var prefetched = window.__descPrefetch && window.__descPrefetch[jobId];
+        if (prefetched && typeof prefetched.then === 'function') {
+          prefetched.then(function(d) { injectDesc(d && d.description); });
+        } else if (prefetched && prefetched.description !== undefined) {
+          injectDesc(prefetched.description);
+        } else {
+          fetch('/api/jobs/' + jobId + '/description', { credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) { injectDesc(d && d.description); })
+            .catch(function() { descEl.textContent = ''; });
+        }
+      }
+    })();
   </script>
   <script>
     // Category ID to name mapping

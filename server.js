@@ -1762,7 +1762,10 @@ app.get("/vakansia/:slug", async (req, res) => {
     }
 
     let job;
+    let shellMode = false;
     const cachedJobB64 = req.get("X-Cached-Job");
+    const isBot = /bot|crawl|spider|slurp|baidu|yandex|google|bing|facebook|twitter|linkedin/i.test(req.get("user-agent") || "");
+
     if (cachedJobB64) {
       let cached;
       try {
@@ -1771,20 +1774,20 @@ app.get("/vakansia/:slug", async (req, res) => {
         cached = null;
       }
       if (cached && cached.id === jobId && cached.jobName && cached.companyName) {
-        const row = await db("jobs")
-          .where({ id: jobId, job_status: "approved" })
-          .select("jobDescription", "job_description")
-          .first();
-        if (row) {
-          const desc = row.jobDescription || row.job_description;
-          job = { ...cached, jobDescription: desc, job_description: desc };
+        const exists = await db("jobs").where({ id: jobId, job_status: "approved" }).select("id").first();
+        if (exists) {
+          job = { ...cached, jobDescription: "", job_description: "" };
+          shellMode = true;
         }
       }
     }
     if (!job) {
-      job = await db("jobs")
-        .where({ id: jobId, job_status: "approved" })
-        .first();
+      if (isBot) {
+        job = await db("jobs").where({ id: jobId, job_status: "approved" }).first();
+      } else {
+        job = await db("jobs").where({ id: jobId, job_status: "approved" }).select(...JOBS_LIST_COLUMNS).first();
+        if (job) shellMode = true;
+      }
     }
 
     if (!job) {
@@ -1821,7 +1824,7 @@ app.get("/vakansia/:slug", async (req, res) => {
       ).catch((e) => console.error("visitor_job_clicks insert error:", e?.message));
     }
 
-    // All three queries in parallel (related jobs uses cache)
+    // In shell mode, skip related jobs (below the fold, loaded lazily by client)
     const [application, formSubmission, relatedJobs] = await Promise.all([
       req.session?.user?.uid
         ? db("job_applications")
@@ -1835,7 +1838,7 @@ app.get("/vakansia/:slug", async (req, res) => {
           : req.visitorId
             ? db("job_form_submissions").where("job_id", jobId).where("visitor_id", req.visitorId).first()
             : null,
-      getRelatedJobsCached(job.category_id, jobId),
+      shellMode ? [] : getRelatedJobsCached(job.category_id, jobId),
     ]);
 
     const isExpired = job.expires_at && new Date(job.expires_at) <= new Date();
@@ -1861,6 +1864,7 @@ app.get("/vakansia/:slug", async (req, res) => {
       userAlreadySubmittedForm,
       userAlreadyAppliedOrSubmitted,
       isExpired,
+      shellMode,
       seo: {
         title: job.jobName + " | Samushao.ge",
         description: "vakansia - " + jobDescription,
@@ -1871,6 +1875,32 @@ app.get("/vakansia/:slug", async (req, res) => {
     });
   } catch (err) {
     res.status(500).send(err.message);
+  }
+});
+
+// Lightweight description-only endpoint for shell-mode async loading
+const jobDescCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
+app.get("/api/jobs/:id/description", async (req, res) => {
+  try {
+    const jobId = parseInt(req.params.id, 10);
+    if (!jobId || isNaN(jobId)) return res.status(400).json({ error: "Invalid job ID" });
+
+    const cacheKey = `desc_${jobId}`;
+    const cached = jobDescCache.get(cacheKey);
+    if (cached !== undefined) return res.json({ description: cached });
+
+    const row = await db("jobs")
+      .where({ id: jobId, job_status: "approved" })
+      .select("jobDescription")
+      .first();
+    if (!row) return res.status(404).json({ error: "Job not found" });
+
+    const desc = row.jobDescription || "";
+    jobDescCache.set(cacheKey, desc);
+    res.json({ description: desc });
+  } catch (err) {
+    console.error("description API error:", err.message);
+    res.status(500).json({ error: "Internal error" });
   }
 });
 
