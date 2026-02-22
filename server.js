@@ -398,12 +398,19 @@ app.use((req, res, next) => {
 const { visitorMiddleware } = require("./middleware/visitor");
 app.use(visitorMiddleware(db, extractIdFromSlug));
 
-// After visitor: upgrade enlistedInFb from DB if user/visitor has interacted
+// After visitor: upgrade enlistedInFb from DB if user/visitor has interacted (cached)
+const enlistedFbCache = new NodeCache({ stdTTL: 600, checkperiod: 120 });
 app.use(async (req, res, next) => {
   if (res.locals.enlistedInFb) return next();
   const userId = req.session?.user?.uid;
   const visitorId = req.visitorId;
   if (!userId && !visitorId) return next();
+  const cacheKey = `fb_${userId || ""}_${visitorId || ""}`;
+  const cached = enlistedFbCache.get(cacheKey);
+  if (cached !== undefined) {
+    if (cached) res.locals.enlistedInFb = true;
+    return next();
+  }
   try {
     let q = db("enlisted_in_fb");
     if (userId && visitorId) {
@@ -414,6 +421,7 @@ app.use(async (req, res, next) => {
       q = q.where("visitor_id", visitorId);
     }
     const found = await q.first();
+    enlistedFbCache.set(cacheKey, !!found);
     if (found) res.locals.enlistedInFb = true;
   } catch (e) {
     /* ignore */
@@ -442,25 +450,21 @@ app.use((req, res, next) => {
             console.error("view_count increment error:", e?.message)
           );
           if (req.visitorId) {
-            db("jobs").where({ id: jobId }).first().then((job) => {
+            db("jobs").where({ id: jobId }).select("jobSalary", "jobName", "category_id", "job_city", "job_experience", "job_type").first().then(async (job) => {
               if (!job) return;
-              const catPromise = job.category_id
-                ? db("categories").where("id", job.category_id).select("name").first()
-                : Promise.resolve(null);
-              return catPromise.then((cat) =>
-                db("visitor_job_clicks").insert({
-                  visitor_id: req.visitorId,
-                  job_id: jobId,
-                  job_salary: job.jobSalary || null,
-                  job_title: job.jobName || null,
-                  category_id: job.category_id || null,
-                  job_category_name: (cat && cat.name) || null,
-                  job_city: job.job_city || null,
-                  job_experience: job.job_experience || null,
-                  job_type: job.job_type || null,
-                  from_recommended: req.query.from === "recommended",
-                })
-              );
+              const catName = await getCategoryName(job.category_id);
+              return db("visitor_job_clicks").insert({
+                visitor_id: req.visitorId,
+                job_id: jobId,
+                job_salary: job.jobSalary || null,
+                job_title: job.jobName || null,
+                category_id: job.category_id || null,
+                job_category_name: catName,
+                job_city: job.job_city || null,
+                job_experience: job.job_experience || null,
+                job_type: job.job_type || null,
+                from_recommended: req.query.from === "recommended",
+              });
             }).catch((e) => console.error("visitor_job_clicks insert error:", e?.message));
           }
         }
@@ -1648,6 +1652,55 @@ app.post("/my-applications/auto-send-toggle", async (req, res) => {
   }
 });
 
+// Related jobs cache (keyed by category_id, 5-minute TTL)
+const relatedJobsCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
+
+async function getRelatedJobsCached(categoryId, excludeJobId) {
+  const cacheKey = `related_${categoryId}`;
+  const cached = relatedJobsCache.get(cacheKey);
+  if (cached) {
+    return cached.filter((j) => j.id !== excludeJobId).slice(0, 5);
+  }
+  const relatedJobsRaw = await db("jobs")
+    .select(...JOBS_LIST_COLUMNS)
+    .where("job_status", "approved")
+    .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
+    .where((qb) => {
+      qb.where("category_id", categoryId)
+        .orWhere("prioritize", true)
+        .orWhereIn("job_premium_status", ["premium", "premiumPlus"]);
+    })
+    .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 ELSE 5 END`)
+    .orderByRaw("(CASE WHEN category_id = ? THEN 1 ELSE 0 END) DESC", [categoryId])
+    .orderBy("created_at", "desc")
+    .limit(12);
+  const isPremium = (j) => ["premium", "premiumPlus"].includes(j.job_premium_status);
+  const premiumIdx = relatedJobsRaw.findIndex((j) => isPremium(j));
+  let sorted;
+  if (relatedJobsRaw.length >= 2 && premiumIdx > 1) {
+    const [first, , ...rest] = relatedJobsRaw;
+    const premium = relatedJobsRaw[premiumIdx];
+    const restWithoutPremium = relatedJobsRaw.filter((_, i) => i !== 0 && i !== premiumIdx);
+    sorted = [first, premium, ...restWithoutPremium];
+  } else {
+    sorted = relatedJobsRaw;
+  }
+  relatedJobsCache.set(cacheKey, sorted);
+  return sorted.filter((j) => j.id !== excludeJobId).slice(0, 5);
+}
+
+// Category name cache (rarely changes)
+const categoryNameCache = new NodeCache({ stdTTL: 3600 });
+async function getCategoryName(categoryId) {
+  if (!categoryId) return null;
+  const cached = categoryNameCache.get(categoryId);
+  if (cached !== undefined) return cached;
+  const cat = await db("categories").where("id", categoryId).select("name").first();
+  const name = (cat && cat.name) || null;
+  categoryNameCache.set(categoryId, name);
+  return name;
+}
+
 // get vacancy inner page
 app.get("/vakansia/:slug", async (req, res) => {
   try {
@@ -1692,34 +1745,28 @@ app.get("/vakansia/:slug", async (req, res) => {
       return res.status(404).render("404", { message: "Job not found" });
     }
 
-    // Prevent caching so every view hits the server and gets counted
     res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
     res.set("Pragma", "no-cache");
 
-    // Generate correct slug and redirect if URL doesn't match (always to clean URL for SEO)
-    // Skip redirect when X-Cached-Job – fetch would lose the header
     const correctSlug = slugify(job.jobName) + "-" + job.id;
     if (!cachedJobB64) {
       if (slug !== correctSlug) return res.redirect(301, `/vakansia/${correctSlug}`);
       if (Object.keys(req.query).length > 0) return res.redirect(301, `/vakansia/${correctSlug}`);
     }
 
-    // Fire-and-forget: view_count and visitor tracking (don't block response)
+    // Fire-and-forget: view_count and visitor tracking
     db.raw("UPDATE jobs SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?", [jobId]).catch((e) =>
       console.error("view_count increment error:", e?.message)
     );
     if (req.visitorId) {
-      const catPromise = job.category_id
-        ? db("categories").where("id", job.category_id).select("name").first()
-        : Promise.resolve(null);
-      catPromise.then((cat) =>
+      getCategoryName(job.category_id).then((catName) =>
         db("visitor_job_clicks").insert({
           visitor_id: req.visitorId,
           job_id: jobId,
           job_salary: job.jobSalary || null,
           job_title: job.jobName || null,
           category_id: job.category_id || null,
-          job_category_name: (cat && cat.name) || null,
+          job_category_name: catName,
           job_city: job.job_city || null,
           job_experience: job.job_experience || null,
           job_type: job.job_type || null,
@@ -1728,52 +1775,21 @@ app.get("/vakansia/:slug", async (req, res) => {
       ).catch((e) => console.error("visitor_job_clicks insert error:", e?.message));
     }
 
-    const applicationPromise =
+    // All three queries in parallel (related jobs uses cache)
+    const [application, formSubmission, relatedJobs] = await Promise.all([
       req.session?.user?.uid
         ? db("job_applications")
             .where({ user_id: req.session.user.uid, job_id: jobId })
             .first()
-        : Promise.resolve(null);
-
-    const formSubmissionPromise =
+        : null,
       parseJobIdsFromCookie(req).has(jobId)
-        ? Promise.resolve(null)
+        ? null
         : req.session?.user?.uid
           ? db("job_form_submissions").where("job_id", jobId).where("user_id", req.session.user.uid).first()
           : req.visitorId
             ? db("job_form_submissions").where("job_id", jobId).where("visitor_id", req.visitorId).first()
-            : Promise.resolve(null);
-
-    const relatedJobsPromise = (async () => {
-      const relatedJobsRaw = await db("jobs")
-        .select(...JOBS_LIST_COLUMNS)
-        .where("job_status", "approved")
-        .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
-        .where((qb) => {
-          qb.where("category_id", job.category_id)
-            .orWhere("prioritize", true)
-            .orWhereIn("job_premium_status", ["premium", "premiumPlus"]);
-        })
-        .whereNot("id", jobId)
-        .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 ELSE 5 END`)
-        .orderByRaw("(CASE WHEN category_id = ? THEN 1 ELSE 0 END) DESC", [job.category_id])
-        .orderBy("created_at", "desc")
-        .limit(10);
-      const isPremium = (j) => ["premium", "premiumPlus"].includes(j.job_premium_status);
-      const premiumIdx = relatedJobsRaw.findIndex((j) => isPremium(j));
-      if (relatedJobsRaw.length >= 2 && premiumIdx > 1) {
-        const [first, , ...rest] = relatedJobsRaw;
-        const premium = relatedJobsRaw[premiumIdx];
-        const restWithoutPremium = relatedJobsRaw.filter((_, i) => i !== 0 && i !== premiumIdx);
-        return [first, premium, ...restWithoutPremium].slice(0, 5);
-      }
-      return relatedJobsRaw.slice(0, 5);
-    })();
-
-    const [application, formSubmission, relatedJobs] = await Promise.all([
-      applicationPromise,
-      formSubmissionPromise,
-      relatedJobsPromise,
+            : null,
+      getRelatedJobsCached(job.category_id, jobId),
     ]);
 
     const isExpired = job.expires_at && new Date(job.expires_at) <= new Date();
@@ -1819,32 +1835,7 @@ app.get("/api/jobs/:id/related", async (req, res) => {
     const job = await db("jobs").where({ id: jobId, job_status: "approved" }).first();
     if (!job) return res.status(404).json({ error: "Job not found" });
 
-    const relatedJobsRaw = await db("jobs")
-      .select(...JOBS_LIST_COLUMNS)
-      .where("job_status", "approved")
-      .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
-      .where((qb) => {
-        qb.where("category_id", job.category_id)
-          .orWhere("prioritize", true)
-          .orWhereIn("job_premium_status", ["premium", "premiumPlus"]);
-      })
-      .whereNot("id", jobId)
-      .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 ELSE 5 END`)
-      .orderByRaw("(CASE WHEN category_id = ? THEN 1 ELSE 0 END) DESC", [job.category_id])
-      .orderBy("created_at", "desc")
-      .limit(10);
-
-    const isPremium = (j) => ["premium", "premiumPlus"].includes(j.job_premium_status);
-    const premiumIdx = relatedJobsRaw.findIndex((j) => isPremium(j));
-    let relatedJobs;
-    if (relatedJobsRaw.length >= 2 && premiumIdx > 1) {
-      const [first, , ...rest] = relatedJobsRaw;
-      const premium = relatedJobsRaw[premiumIdx];
-      const restWithoutPremium = relatedJobsRaw.filter((_, i) => i !== 0 && i !== premiumIdx);
-      relatedJobs = [first, premium, ...restWithoutPremium].slice(0, 5);
-    } else {
-      relatedJobs = relatedJobsRaw.slice(0, 5);
-    }
+    const relatedJobs = await getRelatedJobsCached(job.category_id, jobId);
 
     const cards = [];
     for (const j of relatedJobs) {
@@ -2314,7 +2305,7 @@ app.post("/logout", (req, res) => {
   });
 });
 // jobs router
-const jobsRouter = require("./routes/jobs");
+const jobsRouter = require("./routes/jobs")(db);
 app.get("/jobs/email-queue-status", async (req, res) => {
   const status = await jobsRouter.getEmailQueueStatus();
   res.json(status);
@@ -2350,28 +2341,22 @@ app.post("/jobs/requeue-new-job-emails", async (req, res) => {
 app.use("/jobs", jobsRouter);
 
 // users router
-const usersRouter = require("./routes/users");
-app.use("/users", usersRouter);
+app.use("/users", require("./routes/users")(db));
 
 // resumes router
-const resumesRouter = require("./routes/resumes");
-app.use("/resumes", resumesRouter);
+app.use("/resumes", require("./routes/resumes")(db));
 
 // categories router
-const categoriesRouter = require("./routes/categories");
-app.use("/categories", categoriesRouter);
+app.use("/categories", require("./routes/categories")(db));
 
 // company logos router
-const companyLogosRouter = require("./routes/company_logos");
-app.use("/upload-logo", companyLogosRouter);
+app.use("/upload-logo", require("./routes/company_logos")(db));
 
 // send cv router
-const sendCvRouter = require("./routes/sendCv");
-app.use("/send-cv", sendCvRouter);
+app.use("/send-cv", require("./routes/sendCv")(db));
 
 // Job form submission (alternative to CV)
-const jobFormSubmitRouter = require("./routes/jobFormSubmit")(db);
-app.use("/submit-job-form", jobFormSubmitRouter);
+app.use("/submit-job-form", require("./routes/jobFormSubmit")(db));
 
 // User without CV banner: submit form (saves to DB, sets cookie)
 app.post("/api/user-without-cv", async (req, res) => {

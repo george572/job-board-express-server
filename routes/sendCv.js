@@ -1,5 +1,4 @@
 const express = require("express");
-const knex = require("knex");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
 const path = require("path");
@@ -7,13 +6,10 @@ const { slugify } = require("../utils/slugify");
 
 const SITE_BASE_URL = process.env.SITE_BASE_URL || "https://samushao.ge";
 
-// Load .env from project root (reliable when app is started from any cwd)
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
+let db;
 const router = express.Router();
-const knexConfig = require("../knexfile");
-const env = process.env.NODE_ENV || "development";
-const db = knex(knexConfig[env]);
 router.use(cors());
 
 const MAIL_USER = "info@samushao.ge";
@@ -411,4 +407,7 @@ Samushao.ge`;
 
 // Complaint endpoint removed – users no longer see refusal, so no appeal UI
 
-module.exports = router;
+module.exports = function (sharedDb) {
+  db = sharedDb;
+  return router;
+};

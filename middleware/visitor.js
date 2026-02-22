@@ -1,10 +1,14 @@
 const crypto = require("crypto");
+const NodeCache = require("node-cache");
+
 const VISITOR_COOKIE = "vid";
 const PENDING_CLICKS_COOKIE = "pclk";
-const PENDING_CLICKS_MAX_AGE = 24 * 60 * 60; // 24 hours
-const VISITOR_COOKIE_MAX_AGE = 365 * 24 * 60 * 60; // 1 year in seconds
-const NEW_VISIT_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+const PENDING_CLICKS_MAX_AGE = 24 * 60 * 60;
+const VISITOR_COOKIE_MAX_AGE = 365 * 24 * 60 * 60;
+const NEW_VISIT_THRESHOLD_MS = 30 * 60 * 1000;
 const MIN_JOBS_BEFORE_RECORD = 2;
+
+const visitorCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
 
 function generateVisitorUid() {
   return crypto.randomBytes(16).toString("hex");
@@ -39,10 +43,6 @@ function isVisitorCreationPath(path) {
   return isJobDetailPath(path);
 }
 
-/**
- * Middleware that assigns/identifies visitors. Only creates new visitors when
- * they have visited at least MIN_JOBS_BEFORE_RECORD job pages.
- */
 function visitorMiddleware(db, extractIdFromSlug) {
   return async (req, res, next) => {
     try {
@@ -50,7 +50,11 @@ function visitorMiddleware(db, extractIdFromSlug) {
       const now = new Date();
 
       if (uid) {
-        const visitor = await db("visitors").where("visitor_uid", uid).first();
+        let visitor = visitorCache.get(uid);
+        if (!visitor) {
+          visitor = await db("visitors").where("visitor_uid", uid).first();
+          if (visitor) visitorCache.set(uid, visitor);
+        }
         if (visitor) {
           if (isJobDetailPath(req.path)) {
             const lastSeen = visitor.last_seen ? new Date(visitor.last_seen) : null;
@@ -63,18 +67,20 @@ function visitorMiddleware(db, extractIdFromSlug) {
               req.session?.user?.uid && !visitor.user_id
                 ? { user_id: req.session.user.uid }
                 : {};
-            await db("visitors").where("id", visitor.id).update({
+            db("visitors").where("id", visitor.id).update({
               last_seen: now,
               visit_count: newVisitCount,
               ...userUpdate,
-            });
-            req.visitorId = visitor.id;
-            req.visitor = Object.assign({}, visitor, {
+            }).catch((e) => console.error("visitor update error:", e?.message));
+            const updated = Object.assign({}, visitor, {
               last_seen: now,
               visit_count: newVisitCount,
               user_id: userUpdate.user_id || visitor.user_id,
               isRegisteredUser: !!(userUpdate.user_id || visitor.user_id),
             });
+            visitorCache.set(uid, updated);
+            req.visitorId = visitor.id;
+            req.visitor = updated;
           } else {
             req.visitorId = visitor.id;
             req.visitor = Object.assign({}, visitor, {
@@ -123,31 +129,35 @@ function visitorMiddleware(db, extractIdFromSlug) {
         })
         .returning("*");
 
-      for (const p of pending) {
-        const j = parseInt(p.j, 10);
-        if (isNaN(j) || j === currentJobId) continue;
-        const job = await db("jobs").where({ id: j }).first();
-        if (!job) continue;
-        const cat = job.category_id
-          ? await db("categories").where("id", job.category_id).select("name").first()
-          : null;
-        await db("visitor_job_clicks").insert({
+      const pendingJobs = pending
+        .map((p) => parseInt(p.j, 10))
+        .filter((j) => !isNaN(j) && j !== currentJobId);
+      if (pendingJobs.length > 0) {
+        const jobs = await db("jobs").whereIn("id", pendingJobs).select("id", "jobSalary", "jobName", "category_id", "job_city", "job_experience", "job_type");
+        const catIds = [...new Set(jobs.map((j) => j.category_id).filter(Boolean))];
+        const cats = catIds.length > 0 ? await db("categories").whereIn("id", catIds).select("id", "name") : [];
+        const catMap = Object.fromEntries(cats.map((c) => [c.id, c.name]));
+        const inserts = jobs.map((job) => ({
           visitor_id: visitor.id,
-          job_id: j,
+          job_id: job.id,
           job_salary: job.jobSalary || null,
           job_title: job.jobName || null,
           category_id: job.category_id || null,
-          job_category_name: (cat && cat.name) || null,
+          job_category_name: catMap[job.category_id] || null,
           job_city: job.job_city || null,
           job_experience: job.job_experience || null,
           job_type: job.job_type || null,
-        });
+        }));
+        if (inserts.length > 0) {
+          await db("visitor_job_clicks").insert(inserts);
+        }
       }
 
       req.visitorId = visitor.id;
       req.visitor = Object.assign({}, visitor, {
         isRegisteredUser: !!visitor.user_id,
       });
+      visitorCache.set(visitorUid, visitor);
       res.cookie(VISITOR_COOKIE, visitorUid, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",

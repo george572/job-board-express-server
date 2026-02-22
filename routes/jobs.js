@@ -1,10 +1,9 @@
 const cors = require("cors");
 const express = require("express");
-const knex = require("knex");
 const nodemailer = require("nodemailer");
 const path = require("path");
 const router = express.Router();
-router.use(cors()); // Ensure CORS is applied to this router
+router.use(cors());
 const multer = require("multer");
 
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
@@ -14,10 +13,7 @@ const { upsertJob, deleteJob } = require("../services/pineconeJobs");
 const { invalidate: invalidateFilterCountsCache } = require("../services/filterCountsCache");
 const { parsePremiumUntil } = require("../utils/parsePremiumUntil");
 
-// Use the same environment-based Knex config as the main app
-const knexConfig = require("../knexfile");
-const environment = process.env.NODE_ENV || "development";
-const db = knex(knexConfig[environment]);
+let db;
 
 // Email for freshly uploaded jobs (to HR)
 const NEW_JOB_MAIL_USER = (process.env.PROPOSITIONAL_MAIL_USER || "").trim();
@@ -217,26 +213,27 @@ const RETRY_WHEN_NO_TRANSPORTER_MS = 5 * 60 * 1000; // 5 min
 const MAX_WAIT_BEFORE_RECHECK_MS = 60 * 1000; // Wake every 1 min when all items deferred
 const POLL_INTERVAL_MS = 60 * 1000; // Fallback: poll every 1 min no matter what
 
-(async () => {
-  const n = await getQueueCount();
-  const transportOk = !!newJobTransporter;
-  console.log(
-    `[Email queue] Startup: ${n} items in queue, transporter: ${transportOk ? "configured" : "NOT CONFIGURED (set PROPOSITIONAL_MAIL_USER/PASS)"}`,
-  );
-  if (n > 0) {
-    newJobEmailProcessorScheduled = true;
-    processNewJobEmailQueue();
-    // Fallback: poll every minute so we always catch due items
-    setInterval(() => {
-      getQueueCount().then((c) => {
-        if (c > 0) {
-          newJobEmailProcessorScheduled = true;
-          processNewJobEmailQueue();
-        }
-      });
-    }, POLL_INTERVAL_MS);
-  }
-})();
+function initEmailQueue() {
+  (async () => {
+    const n = await getQueueCount();
+    const transportOk = !!newJobTransporter;
+    console.log(
+      `[Email queue] Startup: ${n} items in queue, transporter: ${transportOk ? "configured" : "NOT CONFIGURED (set PROPOSITIONAL_MAIL_USER/PASS)"}`,
+    );
+    if (n > 0) {
+      newJobEmailProcessorScheduled = true;
+      processNewJobEmailQueue();
+      setInterval(() => {
+        getQueueCount().then((c) => {
+          if (c > 0) {
+            newJobEmailProcessorScheduled = true;
+            processNewJobEmailQueue();
+          }
+        });
+      }, POLL_INTERVAL_MS);
+    }
+  })();
+}
 
 function randomBetween(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -2529,4 +2526,9 @@ function triggerNewJobEmailQueue() {
 }
 
 router.triggerNewJobEmailQueue = triggerNewJobEmailQueue;
-module.exports = router;
+
+module.exports = function (sharedDb) {
+  db = sharedDb;
+  initEmailQueue();
+  return router;
+};
