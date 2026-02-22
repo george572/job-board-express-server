@@ -2191,7 +2191,11 @@ app.get("/api/home/section", async (req, res) => {
       return Array.isArray(v) ? v.length > 0 : true;
     });
 
-    if (section === "today" && !filtersActive) {
+    if (section === "today") {
+      if (filtersActive) {
+        // Today's section is hidden when filters are active – return empty hidden fragment
+        return res.type("text/html").send('<section id="today-jobs-section" class="hidden" style="display:none"></section>');
+      }
       let todayJobs = await db("jobs")
         .select(...JOBS_LIST_COLUMNS)
         .where("job_status", "approved")

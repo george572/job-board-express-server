@@ -1,224 +1,453 @@
-<div class="pb-4 py-2 px-4 sticky top-[60px] md:top-[113px] z-10 bg-[#f8f9fa] flex justify-between items-center gap-2 mt-4 flex-wrap">
-  <!-- filters -->
-  <div class="flex flex-wrap justify-start gap-1 w-full lg:w-auto">
-    <!-- categories -->
-    <select id="categoryFilter" name="category" class="text-xs p-2 border border-slate-200 bg-white h-[35px] rounded-lg cursor-pointer w-[49%] lg:w-[172px]">
-      <option value="">კატეგორიები</option>
-      <option value="1">საოფისე</option>
-      <option value="2">მომხმარებელთან ურთიერთობები</option>
-      <option value="3">გაყიდვები</option>
-      <option value="4">საბანკო-საფინანსო</option>
-      <option value="5">საწყობი და წარმოება</option>
-      <option value="6">საცალო ვაჭრობა</option>
-      <option value="7">მზარეული</option>
-      <option value="8">აზარტული</option>
-      <option value="9">მენეჯმენტი</option>
-      <option value="10">ფარმაცია</option>
-      <option value="11">მიმტანი</option>
-      <option value="12">ინჟინერია</option>
-      <option value="13">ლოჯისტიკა</option>
-      <option value="14">სამედიცინო</option>
-      <option value="15">უსაფრთხოება</option>
-      <option value="16">დისტრიბუცია</option>
-      <option value="17">ინფორმაციული ტექნოლოგიები</option>
-      <option value="18">დიასახლისი</option>
-      <option value="19">სხვა</option>
-      <option value="20">ბუღალტერია</option>
-      <option value="21">მძღოლი</option>
-      <option value="22">Web/Digital/Design</option>
-      <option value="23">ექთანი</option>
-      <option value="24">ექიმი</option>
-      <option value="25">ადმინისტრატორი</option>
-      <option value="26">HR</option>
-    </select>
-    <!-- salary (min) -->
-    <select id="salaryFilter" name="min_salary" class="text-xs p-2 bg-white border-slate-200 h-[35px] border rounded-lg cursor-pointer w-[49%] lg:w-[172px]">
-      <option value="">ანაზღაურება</option>
-      <option value="1000">1000 GEL +</option>
-      <option value="2000">2000 GEL +</option>
-      <option value="3000">3000 GEL +</option>
-      <option value="4000">4000 GEL +</option>
-      <option value="5000">5000 GEL +</option>
-      <option value="6000">6000 GEL +</option>
-    </select>
-    <!-- experience -->
-    <select id="experienceFilter" name="job_experience" class="text-xs p-2 border-slate-200 bg-white h-[35px] border rounded-lg cursor-pointer w-[49%] lg:w-[172px]">
-      <option value="">გამოცდილება</option>
-      <option value="intern">სტაჟირება</option>
-      <option value="0-1">0-1 წელი</option>
-      <option value="1-2">1-2 წელი</option>
-      <option value="3-5">3-5 წელი</option>
-      <option value="5+">5+ წელი</option>
-    </select>
-    <!-- job type -->
-    <select id="jobTypeFilter" name="job_type" class="text-xs p-2 bg-white border-slate-200 h-[35px] border rounded-lg cursor-pointer w-[49%] lg:w-[172px]">
-      <option value="">განაკვეთი</option>
-      <option value="full-time">სრული განაკვეთი</option>
-      <option value="part-time">ნახევარი განაკვეთი</option>
-    </select>
-    <!-- city -->
-    <select id="cityFilter" name="job_city" class="text-xs p-2 bg-white border-slate-200 h-[35px] border rounded-lg cursor-pointer w-[49%] lg:w-[172px]">
-      <option value="">ქალაქი</option>
-      <option value="თბილისი">თბილისი</option>
-      <option value="ქუთაისი">ქუთაისი</option>
-      <option value="ბათუმი">ბათუმი</option>
-      <option value="ზუგდიდი">ზუგდიდი</option>
-    </select>
-  </div>
-  <div class="w-full relative max-w-full lg:max-w-[200px] flex items-center">
-    <input id="searchInput" placeholder="ძებნა" type="text" class="border-slate-200 bg-white w-full h-[35px] outline-none rounded-lg max-w-full lg:max-w-[200px] border p-3 font-[300] pr-10" autocomplete="off">
-    <button type="button" id="searchSubmitBtn" class="absolute right-2 p-1 cursor-pointer text-gray-500 hover:text-[#315EFF]" aria-label="ძებნა">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"></path>
+<div
+  class="filters-sticky-wrapper py-2 px-4 sticky top-[60px] md:top-[113px] z-10 bg-[#f8f9fa] mt-4"
+>
+  <!-- Mobile: search bar + ფილტრი button only -->
+  <div class="flex md:hidden items-center gap-2">
+    <button
+      type="button"
+      id="filterToggleBtn"
+      class="md:hidden shrink-0 flex items-center gap-1.5 px-4 py-2 h-[44px] rounded-lg border border-slate-200 bg-white text-xs font-medium text-[#151515] cursor-pointer hover:bg-[#F5F8FF]"
+    >
+      ფილტრი
+      <svg
+        id="filterToggleIcon"
+        class="w-4 h-4 transition-transform duration-200"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke-width="1.5"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="m19.5 8.25-7.5 7.5-7.5-7.5"
+        ></path>
       </svg>
     </button>
+    <div class="flex-1 relative">
+      <input
+        id="searchInput"
+        placeholder="ძებნა"
+        type="text"
+        class="border-slate-200 bg-white w-full h-[44px] outline-none rounded-lg border p-3 font-[300] pr-10"
+        autocomplete="off"
+      />
+      <button
+        type="button"
+        id="searchSubmitBtn"
+        class="absolute right-2 top-1/2 -translate-y-1/2 p-2 cursor-pointer text-gray-500 hover:text-[#315EFF] min-h-[36px] min-w-[36px] flex items-center justify-center"
+        aria-label="ძებნა"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke-width="1.5"
+          stroke="currentColor"
+          class="size-5"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+          ></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Mobile: collapsible filters dropdown -->
+  <div
+    id="mobileFiltersDropdown"
+    class="px-4 md:hidden overflow-hidden transition-[max-height] duration-300 ease-in-out bg-[#f8f9fa]"
+    style="max-height: 0px"
+  >
+    <div class="flex flex-col gap-2 pt-2 pb-1">
+      <select
+        id="categoryFilter"
+        name="category"
+        class="text-xs p-2 border border-slate-200 bg-white h-[44px] rounded-lg cursor-pointer w-full"
+      >
+        <option value="">კატეგორიები</option>
+        <option value="1">საოფისე</option>
+        <option value="2">მომხმარებელთან ურთიერთობები</option>
+        <option value="3">გაყიდვები</option>
+        <option value="4">საბანკო-საფინანსო</option>
+        <option value="5">საწყობი და წარმოება</option>
+        <option value="6">საცალო ვაჭრობა</option>
+        <option value="7">მზარეული</option>
+        <option value="8">აზარტული</option>
+        <option value="9">მენეჯმენტი</option>
+        <option value="10">ფარმაცია</option>
+        <option value="11">მიმტანი</option>
+        <option value="12">ინჟინერია</option>
+        <option value="13">ლოჯისტიკა</option>
+        <option value="14">სამედიცინო</option>
+        <option value="15">უსაფრთხოება</option>
+        <option value="16">დისტრიბუცია</option>
+        <option value="17">ინფორმაციული ტექნოლოგიები</option>
+        <option value="18">დიასახლისი</option>
+        <option value="19">სხვა</option>
+        <option value="20">ბუღალტერია</option>
+        <option value="21">მძღოლი</option>
+        <option value="22">Web/Digital/Design</option>
+        <option value="23">ექთანი</option>
+        <option value="24">ექიმი</option>
+        <option value="25">ადმინისტრატორი</option>
+        <option value="26">HR</option>
+      </select>
+      <!-- salary (min) -->
+      <select
+        id="salaryFilter"
+        name="min_salary"
+        class="text-xs p-2 bg-white border-slate-200 h-[44px] border rounded-lg cursor-pointer w-full"
+      >
+        <option value="">ანაზღაურება</option>
+        <option value="1000">1000 GEL +</option>
+        <option value="2000">2000 GEL +</option>
+        <option value="3000">3000 GEL +</option>
+        <option value="4000">4000 GEL +</option>
+        <option value="5000">5000 GEL +</option>
+        <option value="6000">6000 GEL +</option>
+      </select>
+      <!-- experience -->
+      <select
+        id="experienceFilter"
+        name="job_experience"
+        class="text-xs p-2 border-slate-200 bg-white h-[44px] border rounded-lg cursor-pointer w-full"
+      >
+        <option value="">გამოცდილება</option>
+        <option value="intern">სტაჟირება</option>
+        <option value="0-1">0-1 წელი</option>
+        <option value="1-2">1-2 წელი</option>
+        <option value="3-5">3-5 წელი</option>
+        <option value="5+">5+ წელი</option>
+      </select>
+      <!-- job type -->
+      <select
+        id="jobTypeFilter"
+        name="job_type"
+        class="text-xs p-2 bg-white border-slate-200 h-[44px] border rounded-lg cursor-pointer w-full"
+      >
+        <option value="">განაკვეთი</option>
+        <option value="full-time">სრული განაკვეთი</option>
+        <option value="part-time">ნახევარი განაკვეთი</option>
+      </select>
+      <!-- city -->
+      <select
+        id="cityFilter"
+        name="job_city"
+        class="text-xs p-2 bg-white border-slate-200 h-[44px] border rounded-lg cursor-pointer w-full"
+      >
+        <option value="">ქალაქი</option>
+        <option value="თბილისი">თბილისი</option>
+        <option value="ქუთაისი">ქუთაისი</option>
+        <option value="ბათუმი">ბათუმი</option>
+        <option value="ზუგდიდი">ზუგდიდი</option>
+      </select>
+      <button
+        type="button"
+        id="submitFilterBtnMobile"
+        class="w-full h-[44px] rounded-lg bg-[#315EFF] text-white text-sm font-medium cursor-pointer hover:bg-[#2849d9]"
+      >
+        გაფილტრე
+      </button>
+    </div>
+  </div>
+
+  <!-- Desktop: filters + search -->
+  <div class="hidden md:flex pb-4 justify-between items-center gap-2 flex-wrap">
+    <div class="flex flex-wrap justify-start gap-1 flex-1 lg:flex-initial">
+      <select
+        id="categoryFilterDesktop"
+        name="category"
+        class="text-xs p-2 border border-slate-200 bg-white h-[44px] rounded-lg cursor-pointer w-[172px]"
+      >
+        <option value="">კატეგორიები</option>
+        <option value="1">საოფისე</option>
+        <option value="2">მომხმარებელთან ურთიერთობები</option>
+        <option value="3">გაყიდვები</option>
+        <option value="4">საბანკო-საფინანსო</option>
+        <option value="5">საწყობი და წარმოება</option>
+        <option value="6">საცალო ვაჭრობა</option>
+        <option value="7">მზარეული</option>
+        <option value="8">აზარტული</option>
+        <option value="9">მენეჯმენტი</option>
+        <option value="10">ფარმაცია</option>
+        <option value="11">მიმტანი</option>
+        <option value="12">ინჟინერია</option>
+        <option value="13">ლოჯისტიკა</option>
+        <option value="14">სამედიცინო</option>
+        <option value="15">უსაფრთხოება</option>
+        <option value="16">დისტრიბუცია</option>
+        <option value="17">ინფორმაციული ტექნოლოგიები</option>
+        <option value="18">დიასახლისი</option>
+        <option value="19">სხვა</option>
+        <option value="20">ბუღალტერია</option>
+        <option value="21">მძღოლი</option>
+        <option value="22">Web/Digital/Design</option>
+        <option value="23">ექთანი</option>
+        <option value="24">ექიმი</option>
+        <option value="25">ადმინისტრატორი</option>
+        <option value="26">HR</option>
+      </select>
+      <select
+        id="salaryFilterDesktop"
+        name="min_salary"
+        class="text-xs p-2 bg-white border-slate-200 h-[44px] border rounded-lg cursor-pointer w-[172px]"
+      >
+        <option value="">ანაზღაურება</option>
+        <option value="1000">1000 GEL +</option>
+        <option value="2000">2000 GEL +</option>
+        <option value="3000">3000 GEL +</option>
+        <option value="4000">4000 GEL +</option>
+        <option value="5000">5000 GEL +</option>
+        <option value="6000">6000 GEL +</option>
+      </select>
+      <select
+        id="experienceFilterDesktop"
+        name="job_experience"
+        class="text-xs p-2 border-slate-200 bg-white h-[44px] border rounded-lg cursor-pointer w-[172px]"
+      >
+        <option value="">გამოცდილება</option>
+        <option value="intern">სტაჟირება</option>
+        <option value="0-1">0-1 წელი</option>
+        <option value="1-2">1-2 წელი</option>
+        <option value="3-5">3-5 წელი</option>
+        <option value="5+">5+ წელი</option>
+      </select>
+      <select
+        id="jobTypeFilterDesktop"
+        name="job_type"
+        class="text-xs p-2 bg-white border-slate-200 h-[44px] border rounded-lg cursor-pointer w-[172px]"
+      >
+        <option value="">განაკვეთი</option>
+        <option value="full-time">სრული განაკვეთი</option>
+        <option value="part-time">ნახევარი განაკვეთი</option>
+      </select>
+      <select
+        id="cityFilterDesktop"
+        name="job_city"
+        class="text-xs p-2 bg-white border-slate-200 h-[44px] border rounded-lg cursor-pointer w-[172px]"
+      >
+        <option value="">ქალაქი</option>
+        <option value="თბილისი">თბილისი</option>
+        <option value="ქუთაისი">ქუთაისი</option>
+        <option value="ბათუმი">ბათუმი</option>
+        <option value="ზუგდიდი">ზუგდიდი</option>
+      </select>
+      <button
+        type="button"
+        id="submitFilterBtnDesktop"
+        class="h-[44px] px-4 rounded-lg bg-[#315EFF] text-white text-sm font-medium cursor-pointer hover:bg-[#2849d9] shrink-0"
+      >
+        გაფილტრე
+      </button>
+    </div>
+    <div class="relative max-w-[200px] flex items-center">
+      <input
+        id="searchInputDesktop"
+        placeholder="ძებნა"
+        type="text"
+        class="border-slate-200 bg-white w-full h-[44px] outline-none rounded-lg border p-3 font-[300] pr-10"
+        autocomplete="off"
+      />
+      <button
+        type="button"
+        id="searchSubmitBtnDesktop"
+        class="absolute right-2 top-1/2 -translate-y-1/2 p-2 cursor-pointer text-gray-500 hover:text-[#315EFF] min-h-[36px] min-w-[36px] flex items-center justify-center"
+        aria-label="ძებნა"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke-width="1.5"
+          stroke="currentColor"
+          class="size-5"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+          ></path>
+        </svg>
+      </button>
+    </div>
   </div>
 </div>
 
 <!-- Active Filter Tags -->
-<div id="activeFiltersContainer" class="px-4 pb-2 flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center" style="display: none;">
+<div
+  id="activeFiltersContainer"
+  class="px-4 pb-2 flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center"
+  style="display: none"
+>
   <div id="activeFiltersList" class="flex flex-wrap gap-2 md:flex-1"></div>
-  <button id="clearAllFiltersBtn" type="button" class="text-xs text-gray-600 underline cursor-pointer whitespace-nowrap w-full md:w-auto text-left md:text-left">
+  <button
+    id="clearAllFiltersBtn"
+    type="button"
+    class="text-xs text-gray-600 underline cursor-pointer whitespace-nowrap w-full md:w-auto text-left md:text-left"
+  >
     ყველა ფილტრის წაშლა
   </button>
 </div>
 
 <script>
-  (function() {
+  (function () {
     // Category ID to name mapping
     const categoryNames = {
-      '1': 'საოფისე',
-      '2': 'მომხმარებელთან ურთიერთობები',
-      '3': 'გაყიდვები',
-      '4': 'საბანკო-საფინანსო',
-      '5': 'საწყობი და წარმოება',
-      '6': 'საცალო ვაჭრობა',
-      '7': 'მზარეული',
-      '8': 'აზარტული',
-      '9': 'მენეჯმენტი',
-      '10': 'ფარმაცია',
-      '11': 'მიმტანი',
-      '12': 'ინჟინერია',
-      '13': 'ლოჯისტიკა',
-      '14': 'სამედიცინო',
-      '15': 'უსაფრთხოება',
-      '16': 'დისტრიბუცია',
-      '17': 'ინფორმაციული ტექნოლოგიები',
-      '18': 'დიასახლისი',
-      '19': 'სხვა',
-      '20': 'ბუღალტერია',
-      '21': 'მძღოლი',
-      '22': 'Web/Digital/Design',
-      '23': 'ექთანი',
-      '24': 'ექიმი',
-      '25': 'ადმინისტრატორი',
-      '26': 'HR'
+      1: "საოფისე",
+      2: "მომხმარებელთან ურთიერთობები",
+      3: "გაყიდვები",
+      4: "საბანკო-საფინანსო",
+      5: "საწყობი და წარმოება",
+      6: "საცალო ვაჭრობა",
+      7: "მზარეული",
+      8: "აზარტული",
+      9: "მენეჯმენტი",
+      10: "ფარმაცია",
+      11: "მიმტანი",
+      12: "ინჟინერია",
+      13: "ლოჯისტიკა",
+      14: "სამედიცინო",
+      15: "უსაფრთხოება",
+      16: "დისტრიბუცია",
+      17: "ინფორმაციული ტექნოლოგიები",
+      18: "დიასახლისი",
+      19: "სხვა",
+      20: "ბუღალტერია",
+      21: "მძღოლი",
+      22: "Web/Digital/Design",
+      23: "ექთანი",
+      24: "ექიმი",
+      25: "ადმინისტრატორი",
+      26: "HR",
     };
 
     const experienceNames = {
-      'intern': 'სტაჟირება',
-      '0-1': '0-1 წელი',
-      '1-2': '1-2 წელი',
-      '3-5': '3-5 წელი',
-      '5+': '5+ წელი'
+      intern: "სტაჟირება",
+      "0-1": "0-1 წელი",
+      "1-2": "1-2 წელი",
+      "3-5": "3-5 წელი",
+      "5+": "5+ წელი",
     };
 
     const jobTypeNames = {
-      'full-time': 'სრული განაკვეთი',
-      'part-time': 'ნახევარი განაკვეთი'
+      "full-time": "სრული განაკვეთი",
+      "part-time": "ნახევარი განაკვეთი",
     };
 
     const cityNames = {
-      'თბილისი': 'თბილისი',
-      'ქუთაისი': 'ქუთაისი',
-      'ბათუმი': 'ბათუმი',
-      'ზუგდიდი': 'ზუგდიდი'
+      თბილისი: "თბილისი",
+      ქუთაისი: "ქუთაისი",
+      ბათუმი: "ბათუმი",
+      ზუგდიდი: "ზუგდიდი",
     };
 
     const salaryNames = {
-      '1000': '1000 GEL +',
-      '2000': '2000 GEL +',
-      '3000': '3000 GEL +',
-      '4000': '4000 GEL +',
-      '5000': '5000 GEL +',
-      '6000': '6000 GEL +'
+      1000: "1000 GEL +",
+      2000: "2000 GEL +",
+      3000: "3000 GEL +",
+      4000: "4000 GEL +",
+      5000: "5000 GEL +",
+      6000: "6000 GEL +",
     };
 
-    const categoryFilter = document.getElementById('categoryFilter');
-    const salaryFilter = document.getElementById('salaryFilter');
-    const experienceFilter = document.getElementById('experienceFilter');
-    const jobTypeFilter = document.getElementById('jobTypeFilter');
-    const cityFilter = document.getElementById('cityFilter');
-    const searchInput = document.getElementById('searchInput');
-    const searchSubmitBtn = document.getElementById('searchSubmitBtn');
-    const activeFiltersContainer = document.getElementById('activeFiltersContainer');
-    const activeFiltersList = document.getElementById('activeFiltersList');
-    const clearAllFiltersBtn = document.getElementById('clearAllFiltersBtn');
+    const categoryFilter = document.getElementById("categoryFilter");
+    const salaryFilter = document.getElementById("salaryFilter");
+    const experienceFilter = document.getElementById("experienceFilter");
+    const jobTypeFilter = document.getElementById("jobTypeFilter");
+    const cityFilter = document.getElementById("cityFilter");
+    const categoryFilterDesktop = document.getElementById(
+      "categoryFilterDesktop",
+    );
+    const salaryFilterDesktop = document.getElementById("salaryFilterDesktop");
+    const experienceFilterDesktop = document.getElementById(
+      "experienceFilterDesktop",
+    );
+    const jobTypeFilterDesktop = document.getElementById(
+      "jobTypeFilterDesktop",
+    );
+    const cityFilterDesktop = document.getElementById("cityFilterDesktop");
+    const searchInput = document.getElementById("searchInput");
+    const searchInputDesktop = document.getElementById("searchInputDesktop");
+    const searchSubmitBtn = document.getElementById("searchSubmitBtn");
+    const searchSubmitBtnDesktop = document.getElementById(
+      "searchSubmitBtnDesktop",
+    );
+    const activeFiltersContainer = document.getElementById(
+      "activeFiltersContainer",
+    );
+    const activeFiltersList = document.getElementById("activeFiltersList");
+    const clearAllFiltersBtn = document.getElementById("clearAllFiltersBtn");
 
     // Client-side cache for filter counts (keyed by current URL params). Loaded only when a filter is opened.
     var filterCountsCache = {};
 
+    function applyToSelect(sel, names, defaultLabel, dataKey, dataObj) {
+      if (!sel) return;
+      for (var i = 0; i < sel.options.length; i++) {
+        var opt = sel.options[i];
+        var val = opt.value;
+        var suffix =
+          dataObj && dataObj[val] !== undefined
+            ? " (" + dataObj[val] + ")"
+            : "";
+        opt.text = val ? (names[val] || val) + suffix : defaultLabel;
+      }
+    }
     function applyFilterCountsToDropdowns(data) {
       const cat = (data && data.category) || {};
       const sal = (data && data.min_salary) || {};
       const exp = (data && data.job_experience) || {};
       const typ = (data && data.job_type) || {};
       const cityData = (data && data.job_city) || {};
-      if (categoryFilter) {
-        for (var i = 0; i < categoryFilter.options.length; i++) {
-          var opt = categoryFilter.options[i];
-          var val = opt.value;
-          opt.text = val ? (categoryNames[val] || val) + (cat[val] !== undefined ? ' (' + cat[val] + ')' : '') : 'კატეგორიები';
-        }
-      }
-      if (salaryFilter) {
-        for (var i = 0; i < salaryFilter.options.length; i++) {
-          var opt = salaryFilter.options[i];
-          var val = opt.value;
-          opt.text = val ? (salaryNames[val] || val) + (sal[val] !== undefined ? ' (' + sal[val] + ')' : '') : 'ანაზღაურება';
-        }
-      }
-      if (experienceFilter) {
-        for (var i = 0; i < experienceFilter.options.length; i++) {
-          var opt = experienceFilter.options[i];
-          var val = opt.value;
-          opt.text = val ? (experienceNames[val] || val) + (exp[val] !== undefined ? ' (' + exp[val] + ')' : '') : 'გამოცდილება';
-        }
-      }
-      if (jobTypeFilter) {
-        for (var i = 0; i < jobTypeFilter.options.length; i++) {
-          var opt = jobTypeFilter.options[i];
-          var val = opt.value;
-          opt.text = val ? (jobTypeNames[val] || val) + (typ[val] !== undefined ? ' (' + typ[val] + ')' : '') : 'განაკვეთი';
-        }
-      }
-      if (cityFilter) {
-        for (var i = 0; i < cityFilter.options.length; i++) {
-          var opt = cityFilter.options[i];
-          var val = opt.value;
-          opt.text = val ? (cityNames[val] || val) + (cityData[val] !== undefined ? ' (' + cityData[val] + ')' : '') : 'ქალაქი';
-        }
-      }
+      [categoryFilter, categoryFilterDesktop].forEach(function (s) {
+        if (s) applyToSelect(s, categoryNames, "კატეგორიები", "cat", cat);
+      });
+      [salaryFilter, salaryFilterDesktop].forEach(function (s) {
+        if (s) applyToSelect(s, salaryNames, "ანაზღაურება", "sal", sal);
+      });
+      [experienceFilter, experienceFilterDesktop].forEach(function (s) {
+        if (s) applyToSelect(s, experienceNames, "გამოცდილება", "exp", exp);
+      });
+      [jobTypeFilter, jobTypeFilterDesktop].forEach(function (s) {
+        if (s) applyToSelect(s, jobTypeNames, "განაკვეთი", "typ", typ);
+      });
+      [cityFilter, cityFilterDesktop].forEach(function (s) {
+        if (s) applyToSelect(s, cityNames, "ქალაქი", "city", cityData);
+      });
     }
 
-    // Load filter counts when a filter is opened (focus/click). Uses client and server cache.
+    // Load filter counts when a filter is opened (focus/click) or when selections change. Uses current select values (pending state).
     function ensureFilterCountsLoaded() {
-      const params = getUrlParams();
+      const params = getFiltersFromSelects();
       const qs = new URLSearchParams();
-      if (params.category && params.category.length > 0) params.category.forEach(c => qs.append('category', c));
-      if (params.min_salary && params.min_salary.length > 0) qs.set('min_salary', params.min_salary[0]);
-      if (params.job_experience && params.job_experience.length > 0) params.job_experience.forEach(e => qs.append('job_experience', e));
-      if (params.job_type && params.job_type.length > 0) params.job_type.forEach(t => qs.append('job_type', t));
-      if (params.job_city && params.job_city.length > 0) params.job_city.forEach(c => qs.append('job_city', c));
-      if (params.q && params.q.trim()) qs.set('q', params.q.trim());
-      var cacheKey = qs.toString() || 'base';
+      if (params.category && params.category.length > 0)
+        params.category.forEach((c) => qs.append("category", c));
+      if (params.min_salary && params.min_salary.length > 0)
+        qs.set("min_salary", params.min_salary[0]);
+      if (params.job_experience && params.job_experience.length > 0)
+        params.job_experience.forEach((e) => qs.append("job_experience", e));
+      if (params.job_type && params.job_type.length > 0)
+        params.job_type.forEach((t) => qs.append("job_type", t));
+      if (params.job_city && params.job_city.length > 0)
+        params.job_city.forEach((c) => qs.append("job_city", c));
+      if (params.q && params.q.trim()) qs.set("q", params.q.trim());
+      var cacheKey = qs.toString() || "base";
       if (filterCountsCache[cacheKey]) {
         applyFilterCountsToDropdowns(filterCountsCache[cacheKey]);
         return;
       }
-      var fetchUrl = qs.toString() ? '/api/filter-counts?' + qs.toString() : '/api/filter-counts';
+      var fetchUrl = qs.toString()
+        ? "/api/filter-counts?" + qs.toString()
+        : "/api/filter-counts";
       fetch(fetchUrl)
-        .then(function (res) { return res.json(); })
+        .then(function (res) {
+          return res.json();
+        })
         .then(function (data) {
           filterCountsCache[cacheKey] = data;
           applyFilterCountsToDropdowns(data);
@@ -230,75 +459,88 @@
     function getUrlParams() {
       const params = new URLSearchParams(window.location.search);
       return {
-        category: params.getAll('category'),
-        min_salary: params.get('min_salary') ? [params.get('min_salary')] : [],
-        job_experience: params.getAll('job_experience'),
-        job_type: params.getAll('job_type'),
-        job_city: params.getAll('job_city'),
-        q: params.get('q') || ''
+        category: params.getAll("category"),
+        min_salary: params.get("min_salary") ? [params.get("min_salary")] : [],
+        job_experience: params.getAll("job_experience"),
+        job_type: params.getAll("job_type"),
+        job_city: params.getAll("job_city"),
+        q: params.get("q") || "",
       };
     }
 
     // Whether current URL has any filter params (used to show/hide top-salary slider)
     function hasActiveFilters() {
       const p = getUrlParams();
-      return (p.category && p.category.length > 0) ||
+      return (
+        (p.category && p.category.length > 0) ||
         (p.min_salary && p.min_salary.length > 0) ||
         (p.job_experience && p.job_experience.length > 0) ||
         (p.job_type && p.job_type.length > 0) ||
         (p.job_city && p.job_city.length > 0) ||
-        (p.q && typeof p.q === 'string' && p.q.trim() !== '');
+        (p.q && typeof p.q === "string" && p.q.trim() !== "")
+      );
     }
 
     function updateTopSalarySliderVisibility() {
       var hide = hasActiveFilters();
-      var recommendedSection = document.getElementById('recommended-jobs-section');
-      var facebookPromoMain = document.getElementById('facebook-promo-main');
-      var slider = document.getElementById('top-salary-slider-section');
-      var topPopularSlider = document.getElementById('top-popular-slider-section');
-      var formSubmissionSlider = document.getElementById('form-submission-slider-section');
-      var topCvFitSlider = document.getElementById('top-cv-fit-slider-section');
-      var todaySection = document.getElementById('today-jobs-section');
-      var heading = document.getElementById('all-vacancies-heading');
-      if (recommendedSection) recommendedSection.style.display = hide ? 'none' : '';
-      if (facebookPromoMain) facebookPromoMain.style.display = hide ? 'none' : '';
-      if (slider) slider.style.display = hide ? 'none' : '';
-      if (topPopularSlider) topPopularSlider.style.display = hide ? 'none' : '';
-      if (formSubmissionSlider) formSubmissionSlider.style.display = hide ? 'none' : '';
-      if (topCvFitSlider) topCvFitSlider.style.display = hide ? 'none' : '';
-      if (todaySection) todaySection.style.display = hide ? 'none' : '';
-      if (heading) heading.style.display = hide ? 'none' : '';
+      var recommendedSection = document.getElementById(
+        "recommended-jobs-section",
+      );
+      var facebookPromoMain = document.getElementById("facebook-promo-main");
+      var slider = document.getElementById("top-salary-slider-section");
+      var topPopularSlider = document.getElementById(
+        "top-popular-slider-section",
+      );
+      var formSubmissionSlider = document.getElementById(
+        "form-submission-slider-section",
+      );
+      var topCvFitSlider = document.getElementById("top-cv-fit-slider-section");
+      var todaySection = document.getElementById("today-jobs-section");
+      var heading = document.getElementById("all-vacancies-heading");
+      if (recommendedSection)
+        recommendedSection.style.display = hide ? "none" : "";
+      if (facebookPromoMain)
+        facebookPromoMain.style.display = hide ? "none" : "";
+      if (slider) slider.style.display = hide ? "none" : "";
+      if (topPopularSlider) topPopularSlider.style.display = hide ? "none" : "";
+      if (formSubmissionSlider)
+        formSubmissionSlider.style.display = hide ? "none" : "";
+      if (topCvFitSlider) topCvFitSlider.style.display = hide ? "none" : "";
+      if (todaySection) todaySection.style.display = hide ? "none" : "";
+      if (heading) heading.style.display = hide ? "none" : "";
     }
 
     // Show/hide loading indicator inside jobs area
     function setJobsLoading(isLoading) {
-      var loadingEl = document.getElementById('loading-indicator');
+      var loadingEl = document.getElementById("loading-indicator");
       if (!loadingEl) return;
-      loadingEl.style.display = isLoading ? 'block' : 'none';
+      loadingEl.style.display = isLoading ? "block" : "none";
     }
 
     // Build URL string from filters (no page jump – used for fetch + pushState)
     function buildUrlFromFilters(filters) {
       const params = new URLSearchParams();
       if (filters.category && filters.category.length > 0) {
-        filters.category.forEach(cat => params.append('category', cat));
+        filters.category.forEach((cat) => params.append("category", cat));
       }
       if (filters.min_salary && filters.min_salary.length > 0) {
-        params.set('min_salary', filters.min_salary[0]);
+        params.set("min_salary", filters.min_salary[0]);
       }
       if (filters.job_experience && filters.job_experience.length > 0) {
-        filters.job_experience.forEach(exp => params.append('job_experience', exp));
+        filters.job_experience.forEach((exp) =>
+          params.append("job_experience", exp),
+        );
       }
       if (filters.job_type && filters.job_type.length > 0) {
-        filters.job_type.forEach(type => params.append('job_type', type));
+        filters.job_type.forEach((type) => params.append("job_type", type));
       }
       if (filters.job_city && filters.job_city.length > 0) {
-        filters.job_city.forEach(city => params.append('job_city', city));
+        filters.job_city.forEach((city) => params.append("job_city", city));
       }
       if (filters.q && filters.q.trim()) {
-        params.set('q', filters.q.trim());
+        params.set("q", filters.q.trim());
       }
-      return params.toString() ? '/?' + params.toString() : '/';
+      return params.toString() ? "/?" + params.toString() : "/";
     }
 
     // Update content without full reload (fetch + replace + pushState)
@@ -307,22 +549,30 @@
 
       setJobsLoading(true);
 
-      fetch(newUrl, { headers: { 'Accept': 'text/html' } })
-        .then(function (res) { return res.text(); })
+      fetch(newUrl, { headers: { Accept: "text/html" } })
+        .then(function (res) {
+          return res.text();
+        })
         .then(function (html) {
           var parser = new DOMParser();
-          var doc = parser.parseFromString(html, 'text/html');
-          var fetchedJobsArea = doc.getElementById('jobs-area');
-          var currentJobsArea = document.getElementById('jobs-area');
+          var doc = parser.parseFromString(html, "text/html");
+          var fetchedJobsArea = doc.getElementById("jobs-area");
+          var currentJobsArea = document.getElementById("jobs-area");
           if (fetchedJobsArea && currentJobsArea) {
             currentJobsArea.innerHTML = fetchedJobsArea.innerHTML;
-            currentJobsArea.dataset.currentPage = fetchedJobsArea.dataset.currentPage || '1';
-            currentJobsArea.dataset.totalPages = fetchedJobsArea.dataset.totalPages || '1';
-            if (localStorage.getItem('enlisted_fb')) {
-              currentJobsArea.querySelectorAll('[data-fb-promo]').forEach(function(el) { el.style.display = 'none'; });
+            currentJobsArea.dataset.currentPage =
+              fetchedJobsArea.dataset.currentPage || "1";
+            currentJobsArea.dataset.totalPages =
+              fetchedJobsArea.dataset.totalPages || "1";
+            if (localStorage.getItem("enlisted_fb")) {
+              currentJobsArea
+                .querySelectorAll("[data-fb-promo]")
+                .forEach(function (el) {
+                  el.style.display = "none";
+                });
             }
           }
-          history.pushState({ filters: filters }, '', newUrl);
+          history.pushState({ filters: filters }, "", newUrl);
           setFiltersFromUrl();
           renderActiveFilters();
           ensureFilterCountsLoaded();
@@ -331,7 +581,7 @@
           setJobsLoading(false);
         })
         .catch(function (err) {
-          console.error('Filter fetch error:', err);
+          console.error("Filter fetch error:", err);
           setJobsLoading(false);
           window.location.href = newUrl;
         });
@@ -339,19 +589,19 @@
 
     // Get display name for a filter
     function getFilterDisplayName(type, value) {
-      if (type === 'category') return categoryNames[value] || value;
-      if (type === 'min_salary') return salaryNames[value] || value + ' GEL +';
-      if (type === 'job_experience') return experienceNames[value] || value;
-      if (type === 'job_type') return jobTypeNames[value] || value;
-      if (type === 'job_city') return cityNames[value] || value;
-      if (type === 'q') return 'ძებნა: ' + value;
+      if (type === "category") return categoryNames[value] || value;
+      if (type === "min_salary") return salaryNames[value] || value + " GEL +";
+      if (type === "job_experience") return experienceNames[value] || value;
+      if (type === "job_type") return jobTypeNames[value] || value;
+      if (type === "job_city") return cityNames[value] || value;
+      if (type === "q") return "ძებნა: " + value;
       return value;
     }
 
     // Render active filter tags
     function renderActiveFilters() {
       const params = getUrlParams();
-      activeFiltersList.innerHTML = '';
+      activeFiltersList.innerHTML = "";
 
       let hasFilters = false;
 
@@ -359,7 +609,11 @@
       if (params.category && params.category.length > 0) {
         hasFilters = true;
         const cat = params.category[0];
-        const tag = createFilterTag('category', cat, getFilterDisplayName('category', cat));
+        const tag = createFilterTag(
+          "category",
+          cat,
+          getFilterDisplayName("category", cat),
+        );
         activeFiltersList.appendChild(tag);
       }
 
@@ -367,7 +621,11 @@
       if (params.min_salary && params.min_salary.length > 0) {
         hasFilters = true;
         const sal = params.min_salary[0];
-        const tag = createFilterTag('min_salary', sal, getFilterDisplayName('min_salary', sal));
+        const tag = createFilterTag(
+          "min_salary",
+          sal,
+          getFilterDisplayName("min_salary", sal),
+        );
         activeFiltersList.appendChild(tag);
       }
 
@@ -375,7 +633,11 @@
       if (params.job_experience && params.job_experience.length > 0) {
         hasFilters = true;
         const exp = params.job_experience[0];
-        const tag = createFilterTag('job_experience', exp, getFilterDisplayName('job_experience', exp));
+        const tag = createFilterTag(
+          "job_experience",
+          exp,
+          getFilterDisplayName("job_experience", exp),
+        );
         activeFiltersList.appendChild(tag);
       }
 
@@ -383,7 +645,11 @@
       if (params.job_type && params.job_type.length > 0) {
         hasFilters = true;
         const type = params.job_type[0];
-        const tag = createFilterTag('job_type', type, getFilterDisplayName('job_type', type));
+        const tag = createFilterTag(
+          "job_type",
+          type,
+          getFilterDisplayName("job_type", type),
+        );
         activeFiltersList.appendChild(tag);
       }
 
@@ -391,26 +657,41 @@
       if (params.job_city && params.job_city.length > 0) {
         hasFilters = true;
         const city = params.job_city[0];
-        const tag = createFilterTag('job_city', city, getFilterDisplayName('job_city', city));
+        const tag = createFilterTag(
+          "job_city",
+          city,
+          getFilterDisplayName("job_city", city),
+        );
         activeFiltersList.appendChild(tag);
       }
 
       // Search term
       if (params.q && params.q.trim()) {
         hasFilters = true;
-        const tag = createFilterTag('q', params.q.trim(), getFilterDisplayName('q', params.q.trim()));
+        const tag = createFilterTag(
+          "q",
+          params.q.trim(),
+          getFilterDisplayName("q", params.q.trim()),
+        );
         activeFiltersList.appendChild(tag);
       }
 
-      activeFiltersContainer.style.display = hasFilters ? 'flex' : 'none';
+      activeFiltersContainer.style.display = hasFilters ? "flex" : "none";
     }
 
     // Create a filter tag element
     function createFilterTag(type, value, displayName) {
-      const tag = document.createElement('div');
-      tag.className = 'flex items-center gap-1 bg-[#315EFF] text-white text-xs px-3 py-1 rounded-full';
-      const escapedDisplay = displayName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-      const escapedValue = (value + '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+      const tag = document.createElement("div");
+      tag.className =
+        "flex items-center gap-1 bg-[#315EFF] text-white text-xs px-3 py-1 rounded-full";
+      const escapedDisplay = displayName
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/"/g, "&quot;");
+      const escapedValue = (value + "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/"/g, "&quot;");
       tag.innerHTML = `
         <span>${escapedDisplay}</span>
         <button type="button" class="ml-1 cursor-pointer hover:opacity-80" data-filter-type="${type}" data-filter-value="${escapedValue}">
@@ -419,9 +700,9 @@
           </svg>
         </button>
       `;
-      
-      const removeBtn = tag.querySelector('button');
-      removeBtn.addEventListener('click', function() {
+
+      const removeBtn = tag.querySelector("button");
+      removeBtn.addEventListener("click", function () {
         removeFilter(type, value);
       });
 
@@ -431,148 +712,285 @@
     // Remove a specific filter
     function removeFilter(type, value) {
       const params = getUrlParams();
-      
-      // Clear the specific filter type
-      if (type === 'category') {
+      if (type === "category") {
         params.category = [];
-        categoryFilter.value = '';
-      } else if (type === 'min_salary') {
+        [categoryFilter, categoryFilterDesktop].forEach(function (s) {
+          if (s) s.value = "";
+        });
+      } else if (type === "min_salary") {
         params.min_salary = [];
-        salaryFilter.value = '';
-      } else if (type === 'job_experience') {
+        [salaryFilter, salaryFilterDesktop].forEach(function (s) {
+          if (s) s.value = "";
+        });
+      } else if (type === "job_experience") {
         params.job_experience = [];
-        experienceFilter.value = '';
-      } else if (type === 'job_type') {
+        [experienceFilter, experienceFilterDesktop].forEach(function (s) {
+          if (s) s.value = "";
+        });
+      } else if (type === "job_type") {
         params.job_type = [];
-        jobTypeFilter.value = '';
-      } else if (type === 'job_city') {
+        [jobTypeFilter, jobTypeFilterDesktop].forEach(function (s) {
+          if (s) s.value = "";
+        });
+      } else if (type === "job_city") {
         params.job_city = [];
-        cityFilter.value = '';
-      } else if (type === 'q') {
-        params.q = '';
-        if (searchInput) searchInput.value = '';
+        [cityFilter, cityFilterDesktop].forEach(function (s) {
+          if (s) s.value = "";
+        });
+      } else if (type === "q") {
+        params.q = "";
+        [searchInput, searchInputDesktop].forEach(function (s) {
+          if (s) s.value = "";
+        });
       }
-
       updateUrl(params);
     }
 
     // Clear all filters
     function clearAllFilters() {
-      categoryFilter.value = '';
-      salaryFilter.value = '';
-      experienceFilter.value = '';
-      jobTypeFilter.value = '';
-      if (cityFilter) cityFilter.value = '';
-      if (searchInput) searchInput.value = '';
-      updateUrl({ category: [], min_salary: [], job_experience: [], job_type: [], job_city: [], q: '' });
-    }
-
-    // Set filter dropdowns from URL params
-    function setFiltersFromUrl() {
-      const params = getUrlParams();
-      
-      // Set category (take first if multiple)
-      if (params.category && params.category.length > 0) {
-        categoryFilter.value = params.category[0];
-      }
-      
-      // Set salary (take first if multiple)
-      if (params.min_salary && params.min_salary.length > 0) {
-        salaryFilter.value = params.min_salary[0];
-      }
-      
-      // Set experience (take first if multiple)
-      if (params.job_experience && params.job_experience.length > 0) {
-        experienceFilter.value = params.job_experience[0];
-      }
-      
-      // Set job type (take first if multiple)
-      if (params.job_type && params.job_type.length > 0) {
-        jobTypeFilter.value = params.job_type[0];
-      }
-
-      // Set city (take first if multiple)
-      if (cityFilter && params.job_city && params.job_city.length > 0) {
-        cityFilter.value = params.job_city[0];
-      }
-
-      // Set search
-      if (searchInput && params.q) {
-        searchInput.value = params.q;
-      }
-    }
-
-    // Handle filter changes (replace the value for that filter type)
-    categoryFilter.addEventListener('change', function() {
-      const params = getUrlParams();
-      params.category = this.value ? [this.value] : [];
-      updateUrl(params);
-    });
-
-    salaryFilter.addEventListener('change', function() {
-      const params = getUrlParams();
-      params.min_salary = this.value ? [this.value] : [];
-      updateUrl(params);
-    });
-
-    experienceFilter.addEventListener('change', function() {
-      const params = getUrlParams();
-      params.job_experience = this.value ? [this.value] : [];
-      updateUrl(params);
-    });
-
-    jobTypeFilter.addEventListener('change', function() {
-      const params = getUrlParams();
-      params.job_type = this.value ? [this.value] : [];
-      updateUrl(params);
-    });
-
-    if (cityFilter) {
-      cityFilter.addEventListener('change', function() {
-        const params = getUrlParams();
-        params.job_city = this.value ? [this.value] : [];
-        updateUrl(params);
+      [categoryFilter, categoryFilterDesktop].forEach(function (s) {
+        if (s) s.value = "";
+      });
+      [salaryFilter, salaryFilterDesktop].forEach(function (s) {
+        if (s) s.value = "";
+      });
+      [experienceFilter, experienceFilterDesktop].forEach(function (s) {
+        if (s) s.value = "";
+      });
+      [jobTypeFilter, jobTypeFilterDesktop].forEach(function (s) {
+        if (s) s.value = "";
+      });
+      [cityFilter, cityFilterDesktop].forEach(function (s) {
+        if (s) s.value = "";
+      });
+      [searchInput, searchInputDesktop].forEach(function (s) {
+        if (s) s.value = "";
+      });
+      updateUrl({
+        category: [],
+        min_salary: [],
+        job_experience: [],
+        job_type: [],
+        job_city: [],
+        q: "",
       });
     }
 
-    // Search: apply on Enter or click search icon
-    function applySearch() {
+    // Set filter dropdowns from URL params (mobile + desktop)
+    function setFiltersFromUrl() {
       const params = getUrlParams();
-      params.q = searchInput ? searchInput.value.trim() : '';
-      updateUrl(params);
+      var cv =
+        params.category && params.category.length > 0 ? params.category[0] : "";
+      var sv =
+        params.min_salary && params.min_salary.length > 0
+          ? params.min_salary[0]
+          : "";
+      var ev =
+        params.job_experience && params.job_experience.length > 0
+          ? params.job_experience[0]
+          : "";
+      var tv =
+        params.job_type && params.job_type.length > 0 ? params.job_type[0] : "";
+      var civ =
+        params.job_city && params.job_city.length > 0 ? params.job_city[0] : "";
+      var qv = params.q || "";
+      [categoryFilter, categoryFilterDesktop].forEach(function (s) {
+        if (s) s.value = cv;
+      });
+      [salaryFilter, salaryFilterDesktop].forEach(function (s) {
+        if (s) s.value = sv;
+      });
+      [experienceFilter, experienceFilterDesktop].forEach(function (s) {
+        if (s) s.value = ev;
+      });
+      [jobTypeFilter, jobTypeFilterDesktop].forEach(function (s) {
+        if (s) s.value = tv;
+      });
+      [cityFilter, cityFilterDesktop].forEach(function (s) {
+        if (s) s.value = civ;
+      });
+      [searchInput, searchInputDesktop].forEach(function (s) {
+        if (s) s.value = qv;
+      });
     }
 
+    // Get filter params from current select values (pending, not yet applied)
+    function getFiltersFromSelects() {
+      var catEl = categoryFilter || categoryFilterDesktop;
+      var salEl = salaryFilter || salaryFilterDesktop;
+      var expEl = experienceFilter || experienceFilterDesktop;
+      var typEl = jobTypeFilter || jobTypeFilterDesktop;
+      var cityEl = cityFilter || cityFilterDesktop;
+      var qEl = window.innerWidth < 768 ? searchInput : (searchInputDesktop || searchInput);
+      return {
+        category: catEl && catEl.value ? [catEl.value] : [],
+        min_salary: salEl && salEl.value ? [salEl.value] : [],
+        job_experience: expEl && expEl.value ? [expEl.value] : [],
+        job_type: typEl && typEl.value ? [typEl.value] : [],
+        job_city: cityEl && cityEl.value ? [cityEl.value] : [],
+        q: qEl && qEl.value ? qEl.value.trim() : "",
+      };
+    }
+
+    // Apply filters from current select values (called by გაფილტრე button)
+    function applyFiltersFromButton() {
+      var params = getFiltersFromSelects();
+      updateUrl(params);
+      // Close mobile filter dropdown
+      var mobileFiltersDropdown = document.getElementById("mobileFiltersDropdown");
+      var filterToggleIcon = document.getElementById("filterToggleIcon");
+      if (mobileFiltersDropdown && mobileFiltersDropdown.dataset.open === "true") {
+        mobileFiltersDropdown.style.maxHeight = "0px";
+        mobileFiltersDropdown.dataset.open = "false";
+        if (filterToggleIcon) filterToggleIcon.style.transform = "rotate(0deg)";
+      }
+    }
+
+    var filterCountsDebounce = null;
+    function debouncedEnsureFilterCounts() {
+      if (filterCountsDebounce) clearTimeout(filterCountsDebounce);
+      filterCountsDebounce = setTimeout(function () {
+        filterCountsDebounce = null;
+        ensureFilterCountsLoaded();
+      }, 200);
+    }
+
+    // Handle filter changes (mobile + desktop, sync both) – no apply until გაფილტრე
+    function onFilterChange(setParam, mEl, dEl) {
+      return function () {
+        var v = this.value;
+        if (mEl && mEl !== this) mEl.value = v;
+        if (dEl && dEl !== this) dEl.value = v;
+        debouncedEnsureFilterCounts();
+      };
+    }
+    [categoryFilter, categoryFilterDesktop].forEach(function (el) {
+      if (el)
+        el.addEventListener(
+          "change",
+          onFilterChange(
+            function (p, v) {
+              p.category = v ? [v] : [];
+            },
+            categoryFilter,
+            categoryFilterDesktop,
+          ),
+        );
+    });
+    [salaryFilter, salaryFilterDesktop].forEach(function (el) {
+      if (el)
+        el.addEventListener(
+          "change",
+          onFilterChange(
+            function (p, v) {
+              p.min_salary = v ? [v] : [];
+            },
+            salaryFilter,
+            salaryFilterDesktop,
+          ),
+        );
+    });
+    [experienceFilter, experienceFilterDesktop].forEach(function (el) {
+      if (el)
+        el.addEventListener(
+          "change",
+          onFilterChange(
+            function (p, v) {
+              p.job_experience = v ? [v] : [];
+            },
+            experienceFilter,
+            experienceFilterDesktop,
+          ),
+        );
+    });
+    [jobTypeFilter, jobTypeFilterDesktop].forEach(function (el) {
+      if (el)
+        el.addEventListener(
+          "change",
+          onFilterChange(
+            function (p, v) {
+              p.job_type = v ? [v] : [];
+            },
+            jobTypeFilter,
+            jobTypeFilterDesktop,
+          ),
+        );
+    });
+    [cityFilter, cityFilterDesktop].forEach(function (el) {
+      if (el)
+        el.addEventListener(
+          "change",
+          onFilterChange(
+            function (p, v) {
+              p.job_city = v ? [v] : [];
+            },
+            cityFilter,
+            cityFilterDesktop,
+          ),
+        );
+    });
+
+    // Search: apply on Enter or click search icon – applies all filters (same as გაფილტრე)
+    function applySearch() {
+      if (searchInput && searchInputDesktop) {
+        searchInputDesktop.value = searchInput.value;
+        searchInput.value = searchInputDesktop.value;
+      }
+      applyFiltersFromButton();
+    }
     if (searchInput) {
-      searchInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
+      searchInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
           e.preventDefault();
           applySearch();
         }
       });
+      searchInput.addEventListener("input", function () {
+        if (searchInputDesktop) searchInputDesktop.value = this.value;
+      });
     }
-    if (searchSubmitBtn) {
-      searchSubmitBtn.addEventListener('click', applySearch);
+    if (searchInputDesktop) {
+      searchInputDesktop.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          applySearch();
+        }
+      });
+      searchInputDesktop.addEventListener("input", function () {
+        if (searchInput) searchInput.value = this.value;
+      });
     }
+    if (searchSubmitBtn) searchSubmitBtn.addEventListener("click", applySearch);
+    if (searchSubmitBtnDesktop)
+      searchSubmitBtnDesktop.addEventListener("click", applySearch);
 
-    clearAllFiltersBtn.addEventListener('click', clearAllFilters);
+    clearAllFiltersBtn.addEventListener("click", clearAllFilters);
 
     // Back/forward: update content from current URL without full reload
-    window.addEventListener('popstate', function () {
-      if (sessionStorage.getItem('jobListScrollPosition')) return;
-      var url = window.location.pathname + (window.location.search || '');
-      fetch(url, { headers: { 'Accept': 'text/html' } })
-        .then(function (res) { return res.text(); })
+    window.addEventListener("popstate", function () {
+      if (sessionStorage.getItem("jobListScrollPosition")) return;
+      var url = window.location.pathname + (window.location.search || "");
+      fetch(url, { headers: { Accept: "text/html" } })
+        .then(function (res) {
+          return res.text();
+        })
         .then(function (html) {
           var parser = new DOMParser();
-          var doc = parser.parseFromString(html, 'text/html');
-          var fetchedJobsArea = doc.getElementById('jobs-area');
-          var currentJobsArea = document.getElementById('jobs-area');
+          var doc = parser.parseFromString(html, "text/html");
+          var fetchedJobsArea = doc.getElementById("jobs-area");
+          var currentJobsArea = document.getElementById("jobs-area");
           if (fetchedJobsArea && currentJobsArea) {
             currentJobsArea.innerHTML = fetchedJobsArea.innerHTML;
-            currentJobsArea.dataset.currentPage = fetchedJobsArea.dataset.currentPage || '1';
-            currentJobsArea.dataset.totalPages = fetchedJobsArea.dataset.totalPages || '1';
-            if (localStorage.getItem('enlisted_fb')) {
-              currentJobsArea.querySelectorAll('[data-fb-promo]').forEach(function(el) { el.style.display = 'none'; });
+            currentJobsArea.dataset.currentPage =
+              fetchedJobsArea.dataset.currentPage || "1";
+            currentJobsArea.dataset.totalPages =
+              fetchedJobsArea.dataset.totalPages || "1";
+            if (localStorage.getItem("enlisted_fb")) {
+              currentJobsArea
+                .querySelectorAll("[data-fb-promo]")
+                .forEach(function (el) {
+                  el.style.display = "none";
+                });
             }
           }
           setFiltersFromUrl();
@@ -581,19 +999,70 @@
           updateTopSalarySliderVisibility();
           window.scrollTo(0, 0);
         })
-        .catch(function () { window.location.reload(); });
+        .catch(function () {
+          window.location.reload();
+        });
     });
 
-    // Initialize: set dropdowns from URL, render active filters. Filter counts load only when a filter is opened.
+    // Initialize: set dropdowns from URL, render active filters, load counts for dropdown labels
     setFiltersFromUrl();
     renderActiveFilters();
     updateTopSalarySliderVisibility();
+    ensureFilterCountsLoaded();
 
-    [categoryFilter, salaryFilter, experienceFilter, jobTypeFilter, cityFilter].forEach(function (el) {
+    [
+      categoryFilter,
+      salaryFilter,
+      experienceFilter,
+      jobTypeFilter,
+      cityFilter,
+      categoryFilterDesktop,
+      salaryFilterDesktop,
+      experienceFilterDesktop,
+      jobTypeFilterDesktop,
+      cityFilterDesktop,
+    ].forEach(function (el) {
       if (el) {
-        el.addEventListener('focus', ensureFilterCountsLoaded, { passive: true });
-        el.addEventListener('pointerdown', ensureFilterCountsLoaded, { passive: true });
+        el.addEventListener("focus", ensureFilterCountsLoaded, {
+          passive: true,
+        });
+        el.addEventListener("pointerdown", ensureFilterCountsLoaded, {
+          passive: true,
+        });
       }
     });
+
+    // Mobile filter toggle
+    var filterToggleBtn = document.getElementById("filterToggleBtn");
+    var mobileFiltersDropdown = document.getElementById(
+      "mobileFiltersDropdown",
+    );
+    var filterToggleIcon = document.getElementById("filterToggleIcon");
+    if (filterToggleBtn && mobileFiltersDropdown) {
+      filterToggleBtn.addEventListener("click", function () {
+        var isOpen = mobileFiltersDropdown.dataset.open === "true";
+        if (isOpen) {
+          mobileFiltersDropdown.style.maxHeight = "0px";
+          mobileFiltersDropdown.dataset.open = "false";
+          if (filterToggleIcon)
+            filterToggleIcon.style.transform = "rotate(0deg)";
+        } else {
+          mobileFiltersDropdown.style.maxHeight = "9999px";
+          var h = mobileFiltersDropdown.scrollHeight;
+          mobileFiltersDropdown.style.maxHeight = "0px";
+          mobileFiltersDropdown.offsetHeight;
+          mobileFiltersDropdown.style.maxHeight = h + "px";
+          mobileFiltersDropdown.dataset.open = "true";
+          if (filterToggleIcon)
+            filterToggleIcon.style.transform = "rotate(180deg)";
+          ensureFilterCountsLoaded();
+        }
+      });
+    }
+
+    var submitFilterBtnMobile = document.getElementById("submitFilterBtnMobile");
+    var submitFilterBtnDesktop = document.getElementById("submitFilterBtnDesktop");
+    if (submitFilterBtnMobile) submitFilterBtnMobile.addEventListener("click", applyFiltersFromButton);
+    if (submitFilterBtnDesktop) submitFilterBtnDesktop.addEventListener("click", applyFiltersFromButton);
   })();
 </script>
