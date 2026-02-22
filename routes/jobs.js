@@ -526,6 +526,7 @@ async function evaluateJobForNewJobEmail(job) {
     job_city: job.job_city,
     jobDescription:
       job.jobDescription || job.job_description || "",
+    requireRoleMatch: true,
   };
   const matches = await getTopCandidatesForJob(jobInput, VECTOR_TOP_K);
   const qualified = matches
@@ -682,6 +683,7 @@ async function getTopGoodCandidatesForJob(job, limit = 4) {
     job_city: job.job_city,
     jobDescription:
       job.jobDescription || job.job_description || "",
+    requireRoleMatch: true,
   };
   const matches = await getTopCandidatesForJob(jobInput, VECTOR_TOP_K);
   const qualified = matches
@@ -1278,7 +1280,10 @@ router.get("/:id/top-candidates", async (req, res) => {
       });
       existingIds.add(pid);
     }
-    qualifiedMatches = [...qualifiedMatches, ...metadataMatchedNoCv];
+    qualifiedMatches = [...qualifiedMatches, ...metadataMatchedNoCv].slice(
+      0,
+      topK,
+    );
 
     const userIds = qualifiedMatches.map((m) => m.id).filter(Boolean);
     if (userIds.length === 0) {

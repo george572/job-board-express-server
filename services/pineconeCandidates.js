@@ -72,12 +72,101 @@ function candidateHasRoleExperience(candidateText, role) {
   const { phrase, tokens } = buildRoleTokens(role);
   if (!phrase) return true; // no role to enforce
 
-  // Strong signal: full phrase appears.
+  // Strong signal: full phrase appears (e.g. "office administrator").
   if (phrase.length >= 6 && cand.includes(phrase)) return true;
 
-  // Fallback: require at least one meaningful token to appear.
-  // (This is intentionally strict-ish; you can tune later.)
-  return tokens.some((t) => cand.includes(t));
+  // Require ALL meaningful tokens so we don't match accountant for "Office Administrator"
+  // just because CV has "office". Each profession-defining word must appear.
+  if (tokens.length === 0) return true;
+  return tokens.every((t) => cand.includes(t));
+}
+
+/** Basic/entry-level roles that can be done by any profession. Skip strict role match for these. */
+const BASIC_ROLE_KEYWORDS = [
+  // Hospitality_Food_Service
+  "waitress",
+  "waiter",
+  "ოფიციანტი",
+  "hostess",
+  "ჰოსტესი",
+  "barista",
+  "ბარისტა",
+  "kitchen helper",
+  "მზარეულის დამხმარე",
+  // Retail_Sales
+  "consultant",
+  "კონსულტანტი",
+  "sales assistant",
+  "გაყიდვების კონსულტანტი",
+  "cashier",
+  "მოლარე",
+  "promoter",
+  "პრომოუტერი",
+  "merchandiser",
+  "მერჩენდაიზერი",
+  // Office_Admin
+  "administrator",
+  "ადმინისტრატორი",
+  "receptionist",
+  "რეცეპციონისტი",
+  "office assistant",
+  "ოფისის ასისტენტი",
+  "front desk",
+  "მისაღების თანამშრომელი",
+  "data entry",
+  "მონაცემთა ბაზების ოპერატორი",
+  // Customer_Support
+  "customer service",
+  "მომხმარებელთა მხარდაჭერა",
+  "call center operator",
+  "ქოლ-ცენტრის ოპერატორი",
+  "courier",
+  "კურიერი",
+];
+function isBasicRole(role) {
+  const r = normalizeForMatch(role);
+  if (!r) return false;
+  return BASIC_ROLE_KEYWORDS.some((kw) => r.includes(kw));
+}
+
+/** Specialist/senior roles we must NOT suggest for basic jobs (e.g. waitress, receptionist). */
+const SPECIALIST_OR_SENIOR_KEYWORDS = [
+  "accountant",
+  "ბუღალტერი",
+  "ceo",
+  "chief executive",
+  "გენერალური დირექტორი",
+  "director",
+  "დირექტორი",
+  "manager",
+  "მენეჯერი",
+  "sales manager",
+  "hr manager",
+  "project manager",
+  "მარკეტოლოგი",
+  "marketing",
+  "developer",
+  "პროგრამისტი",
+  "engineer",
+  "ინჟინერი",
+  "lawyer",
+  "ადვოკატი",
+  "architect",
+  "არქიტექტორი",
+  "doctor",
+  "ექიმი",
+  "distributor",
+  "დისტრიბუტორი",
+  "security officer",
+  "security guard",
+  "სამედიცინო დამხმარე",
+  "დაცვის თანამშრომელი",
+  "დაცვა",
+];
+function candidateIsSpecialistOrSenior(candidateText) {
+  const cand = normalizeForMatch(candidateText);
+  if (!cand) return false;
+  return SPECIALIST_OR_SENIOR_KEYWORDS.some((kw) => cand.includes(kw));
 }
 
 function getPinecone() {
@@ -152,9 +241,10 @@ async function upsertCandidate(userId, cvText) {
 }
 
 /**
- * Build a search query string with structured metadata for better matching.
- * Leads with full job description (richest signal), then adds role/experience/location
- * so semantic search aligns with candidates by profession and experience.
+ * Build a search query string. Matching priority:
+ * 1) Candidate profession/job title match
+ * 2) Past work experience match
+ * 3) For basic roles (waitress, consultant, admin etc.) – allow any profession
  *
  * @param {object} opts - { job_role (or jobName), job_experience, job_type, job_city, jobDescription }
  */
@@ -166,9 +256,15 @@ function buildJobSearchText(opts) {
   const desc = (opts.jobDescription || "").trim();
 
   const parts = [];
-  // Lead with full description so embeddings capture real requirements
+  // 1) Profession/title match – strongest signal (aligns with CV "Candidate profession and work experience")
+  if (role) {
+    parts.push(
+      `Seeking candidates whose profession or job title is ${role}, or who have worked as ${role} or very similar position, or on positions one step above or one step below.`,
+    );
+  }
+  // 2) Past work experience – secondary signal
+  if (role) parts.push(`Relevant past work experience: ${role}.`);
   if (desc) parts.push(desc);
-  if (role) parts.push(`Position: ${role}.`);
   if (exp) parts.push(`Required experience: ${exp}.`);
   if (type) parts.push(`Employment type: ${type}.`);
   if (city) parts.push(`Location: ${city}.`);
@@ -205,8 +301,18 @@ async function getTopCandidatesForJob(jobInput, topK = 100) {
   });
 
   let matches = response?.matches || [];
-  if (opts?.requireRoleMatch && opts?.job_role) {
-    matches = matches.filter((hit) => candidateHasRoleExperience(hit?.metadata?.text, opts.job_role));
+  const role = opts?.job_role || opts?.jobName;
+  const jobIsBasic = role && isBasicRole(role);
+  if (jobIsBasic) {
+    // For basic roles: only suggest basic candidates. Exclude accountants, CEOs, managers, etc.
+    matches = matches.filter(
+      (hit) => !candidateIsSpecialistOrSenior(hit?.metadata?.text),
+    );
+  } else if (opts?.requireRoleMatch && role) {
+    // Non-basic roles: require CV to mention the job role
+    matches = matches.filter((hit) =>
+      candidateHasRoleExperience(hit?.metadata?.text, role),
+    );
   }
 
   const limited = matches.slice(0, actualTopK);

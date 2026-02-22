@@ -9,7 +9,7 @@ Use this in the admin app (e.g. samushao-admin) so that when you click **"Reques
 - **`:id`** — Job ID (integer).
 - **`topK`** (optional) — Number of candidates to request from Pinecone (default `100`, max `100`).
   - We request this many from Pinecone, then filter by minScore. You get back only those that pass (0 to topK).
-- **`minScore`** (optional) — Minimum relevance score threshold (default `0.4`).
+- **`minScore`** (optional) — Minimum relevance score threshold (default `0.5`). Admin-controlled; only candidates with `score >= minScore` are returned.
   - Only candidates with `score >= minScore` are returned.
   - **Score calibration for CV–job matching:** Reranker scores rarely reach 0.9; 0.4–0.7 = decent match, 0.7+ = strong. Use `minScore=0` to include all requested candidates.
 - **`requireRoleMatch`** (optional) — If `1` / `true`, filters out candidates whose CV text does **not** explicitly mention the job title (or at least one meaningful word from it).
