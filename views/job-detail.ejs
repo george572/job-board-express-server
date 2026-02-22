@@ -187,7 +187,7 @@
           <% if (job.job_premium_status === 'premiumPlus' || job.job_premium_status === 'premium') { %><div class="mb-3"><span class="text-[11px] px-2 py-0.5 rounded bg-[#315EFF] text-white font-[400]"><%= job.job_premium_status === 'premiumPlus' ? 'პრემიუმ+' : 'პრემიუმი' %></span></div><% } %>
           <header>
             <h1 class="mb-0 lg:mb-6 flex items-center gap-2 flex-wrap">
-            <span class="text-[16px] text-[#151515] font-bold"><%= 'ვაკანსია' + ' - ' + job.jobName %></span>
+            <span class="text-[16px] text-[#151515] font-bold pb-2"><%= 'ვაკანსია' + ' - ' + job.jobName %></span>
             <% if (typeof isExpired !== 'undefined' && isExpired) { %>
             <span class="text-[11px] px-2 py-0.5 rounded bg-gray-200 text-gray-600 font-[400]">არქივი</span>
             <% } %>
@@ -282,9 +282,8 @@
 
     <%- include('partials/facebookPromo') %>
 
-    <!-- Related jobs slider (same category) -->
-    <% if (typeof relatedJobs !== 'undefined' && relatedJobs && relatedJobs.length > 0) { %>
-    <section class="w-full mx-auto px-4 mt-8 mb-8">
+    <!-- Related jobs slider (loaded on 60% scroll) -->
+    <section id="related-jobs-section" class="w-full mx-auto px-4 mt-8 mb-8">
       <div class="max-w-[1400px] mx-auto">
         <div class="flex items-center justify-between mb-4 gap-3">
           <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1">
@@ -296,15 +295,10 @@
           </div>
         </div>
         <div id="related-jobs-scroll" class="related-jobs-scroll flex w-full items-stretch gap-3 sm:gap-4 overflow-x-auto pb-4 pr-4 snap-x snap-mandatory" style="scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;">
-          <% relatedJobs.forEach(function(relJob) { %>
-          <div class="related-jobs-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col<%= (relJob.job_premium_status === 'premium' || relJob.job_premium_status === 'premiumPlus') ? ' premium-job-mobile-first' : '' %>"<%= (relJob.job_premium_status === 'premium' || relJob.job_premium_status === 'premiumPlus') ? ' data-premium="true"' : '' %>>
-            <%- include('partials/jobItemCompact.ejs', { job: relJob, slugify, inSlider: true }) %>
-          </div>
-          <% }); %>
+          <!-- Cards injected when user scrolls 60% -->
         </div>
       </div>
     </section>
-    <% } %>
 
     <% if (isHelioJob && helioApplyUrl) { %>
     <footer class="fixed bg-white bottom-0 left-0 right-0 w-full px-2 pb-1 flex lg:hidden flex-col items-between justify-between border border-[#E5E5E5] z-40">
@@ -519,33 +513,30 @@
       } catch (e) {}
     }
 
-    // Similar job clicks (inside job detail)
+    // Similar job clicks (delegated for dynamically loaded cards)
     document.addEventListener('DOMContentLoaded', function () {
-      try {
-        var relatedContainer = document.getElementById('related-jobs-scroll');
-        if (!relatedContainer) return;
-        var links = relatedContainer.querySelectorAll('a[data-job-id]');
-        links.forEach(function (link) {
-          link.addEventListener('click', function () {
-            try {
-              if (window.amplitude) {
-                const categoryId = this.getAttribute('data-job-category');
-                window.amplitude.track('Similar Job Clicked', {
-                  job_id: this.getAttribute('data-job-id'),
-                  job_category: categoryNames[categoryId] || categoryId,
-                  job_title: this.getAttribute('data-job-title'),
-                  salary_range: this.getAttribute('data-salary-range'),
-                  title: this.getAttribute('data-job-title'),
-                  company: this.getAttribute('data-job-company'),
-                  location: this.getAttribute('data-job-location'),
-                  referrer_job_id: document.body.getAttribute('data-job-id')
-                });
-                trackPremiumPrioritizedClicks(this, 'similar');
-              }
-            } catch (e) {}
-          });
-        });
-      } catch (e) {}
+      var relatedContainer = document.getElementById('related-jobs-scroll');
+      if (!relatedContainer) return;
+      relatedContainer.addEventListener('click', function (e) {
+        var link = e.target && e.target.closest ? e.target.closest('a[data-job-id]') : null;
+        if (!link) return;
+        try {
+          if (window.amplitude) {
+            var categoryId = link.getAttribute('data-job-category');
+            window.amplitude.track('Similar Job Clicked', {
+              job_id: link.getAttribute('data-job-id'),
+              job_category: categoryNames[categoryId] || categoryId,
+              job_title: link.getAttribute('data-job-title'),
+              salary_range: link.getAttribute('data-salary-range'),
+              title: link.getAttribute('data-job-title'),
+              company: link.getAttribute('data-job-company'),
+              location: link.getAttribute('data-job-location'),
+              referrer_job_id: document.body.getAttribute('data-job-id')
+            });
+            trackPremiumPrioritizedClicks(link, 'similar');
+          }
+        } catch (err) {}
+      });
     });
   </script>
   <% if (!job.isHelio) { %>
@@ -1107,19 +1098,50 @@
     })();
   </script>
 
-  <!-- Related jobs scroll (prev/next buttons) -->
+  <!-- Related jobs: fetch on 60% scroll, then prev/next buttons -->
   <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      var scrollEl = document.getElementById('related-jobs-scroll');
-      var prevBtn = document.querySelector('.related-jobs-prev');
-      var nextBtn = document.querySelector('.related-jobs-next');
-      if (scrollEl && prevBtn) prevBtn.addEventListener('click', function () {
-        scrollEl.scrollBy({ left: -320, behavior: 'smooth' });
+    (function () {
+      var jobId = parseInt(document.body.getAttribute('data-job-id') || '0', 10);
+      if (!jobId) return;
+      var fetched = false;
+      function loadRelatedJobs() {
+        if (fetched) return;
+        fetched = true;
+        fetch('/api/jobs/' + jobId + '/related')
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (data) {
+            if (!data || !data.cards || !data.cards.length) return;
+            var scrollEl = document.getElementById('related-jobs-scroll');
+            if (!scrollEl) return;
+            data.cards.forEach(function (c) {
+              var wrap = document.createElement('div');
+              wrap.className = 'related-jobs-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col' + (c.premium ? ' premium-job-mobile-first' : '');
+              if (c.premium) wrap.setAttribute('data-premium', 'true');
+              wrap.innerHTML = c.html;
+              scrollEl.appendChild(wrap);
+            });
+          })
+          .catch(function () { fetched = false; });
+      }
+      function checkScroll() {
+        var h = document.documentElement.scrollHeight - window.innerHeight;
+        if (h <= 0) return;
+        if (window.scrollY >= h * 0.6) loadRelatedJobs();
+      }
+      window.addEventListener('scroll', checkScroll, { passive: true });
+      document.addEventListener('DOMContentLoaded', function () {
+        checkScroll();
+        var scrollEl = document.getElementById('related-jobs-scroll');
+        var prevBtn = document.querySelector('.related-jobs-prev');
+        var nextBtn = document.querySelector('.related-jobs-next');
+        if (scrollEl && prevBtn) prevBtn.addEventListener('click', function () {
+          scrollEl.scrollBy({ left: -320, behavior: 'smooth' });
+        });
+        if (scrollEl && nextBtn) nextBtn.addEventListener('click', function () {
+          scrollEl.scrollBy({ left: 320, behavior: 'smooth' });
+        });
       });
-      if (scrollEl && nextBtn) nextBtn.addEventListener('click', function () {
-        scrollEl.scrollBy({ left: 320, behavior: 'smooth' });
-      });
-    });
+    })();
   </script>
 </body>
 
