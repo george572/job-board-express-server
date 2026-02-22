@@ -564,8 +564,8 @@ app.get("/sitemap.xml", async (req, res) => {
 // Home route
 app.get("/", async (req, res) => {
   try {
-    await runPremiumExpiryCleanup();
-    await runExpiredJobsPineconeCleanup();
+    runPremiumExpiryCleanup().catch(() => {});
+    runExpiredJobsPineconeCleanup().catch(() => {});
 
     const {
       category,
@@ -1584,8 +1584,8 @@ app.post("/my-applications/auto-send-toggle", async (req, res) => {
 // get vacancy inner page
 app.get("/vakansia/:slug", async (req, res) => {
   try {
-    await runPremiumExpiryCleanup();
-    await runExpiredJobsPineconeCleanup();
+    runPremiumExpiryCleanup().catch(() => {});
+    runExpiredJobsPineconeCleanup().catch(() => {});
 
     const slug = req.params.slug;
     const jobIdRaw = extractIdFromSlug(slug);
@@ -1607,34 +1607,6 @@ app.get("/vakansia/:slug", async (req, res) => {
     res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
     res.set("Pragma", "no-cache");
 
-    // Use raw SQL for reliable increment (avoids Knex .increment() quirks)
-    try {
-      await db.raw(
-        "UPDATE jobs SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?",
-        [jobId]
-      );
-    } catch (incErr) {
-      console.error("view_count increment error:", incErr);
-    }
-
-    if (req.visitorId) {
-      const cat = job.category_id
-        ? await db("categories").where("id", job.category_id).select("name").first()
-        : null;
-      await db("visitor_job_clicks").insert({
-        visitor_id: req.visitorId,
-        job_id: jobId,
-        job_salary: job.jobSalary || null,
-        job_title: job.jobName || null,
-        category_id: job.category_id || null,
-        job_category_name: (cat && cat.name) || null,
-        job_city: job.job_city || null,
-        job_experience: job.job_experience || null,
-        job_type: job.job_type || null,
-        from_recommended: req.query.from === "recommended",
-      });
-    }
-
     // Generate correct slug and redirect if URL doesn't match (always to clean URL for SEO)
     const correctSlug = slugify(job.jobName) + "-" + job.id;
     if (slug !== correctSlug) {
@@ -1646,8 +1618,32 @@ app.get("/vakansia/:slug", async (req, res) => {
       return res.redirect(301, `/vakansia/${correctSlug}`);
     }
 
-    // Related jobs: same category OR prioritized/premium (from any category); premium in slot 2
-    let relatedJobsRaw = await db("jobs")
+    // Fire-and-forget: view_count and visitor tracking (don't block response)
+    db.raw("UPDATE jobs SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?", [jobId]).catch((e) =>
+      console.error("view_count increment error:", e?.message)
+    );
+    if (req.visitorId) {
+      const catPromise = job.category_id
+        ? db("categories").where("id", job.category_id).select("name").first()
+        : Promise.resolve(null);
+      catPromise.then((cat) =>
+        db("visitor_job_clicks").insert({
+          visitor_id: req.visitorId,
+          job_id: jobId,
+          job_salary: job.jobSalary || null,
+          job_title: job.jobName || null,
+          category_id: job.category_id || null,
+          job_category_name: (cat && cat.name) || null,
+          job_city: job.job_city || null,
+          job_experience: job.job_experience || null,
+          job_type: job.job_type || null,
+          from_recommended: req.query.from === "recommended",
+        })
+      ).catch((e) => console.error("visitor_job_clicks insert error:", e?.message));
+    }
+
+    // Parallelize: related jobs, job_applications, job_form_submissions
+    const relatedJobsPromise = db("jobs")
       .select("*")
       .where("job_status", "approved")
       .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
@@ -1661,6 +1657,29 @@ app.get("/vakansia/:slug", async (req, res) => {
       .orderByRaw("(CASE WHEN category_id = ? THEN 1 ELSE 0 END) DESC", [job.category_id])
       .orderBy("created_at", "desc")
       .limit(10);
+
+    const applicationPromise =
+      req.session?.user?.uid
+        ? db("job_applications")
+            .where({ user_id: req.session.user.uid, job_id: jobId })
+            .first()
+        : Promise.resolve(null);
+
+    const formSubmissionPromise =
+      parseJobIdsFromCookie(req).has(jobId)
+        ? Promise.resolve(null)
+        : req.session?.user?.uid
+          ? db("job_form_submissions").where("job_id", jobId).where("user_id", req.session.user.uid).first()
+          : req.visitorId
+            ? db("job_form_submissions").where("job_id", jobId).where("visitor_id", req.visitorId).first()
+            : Promise.resolve(null);
+
+    const [relatedJobsRaw, application, formSubmission] = await Promise.all([
+      relatedJobsPromise,
+      applicationPromise,
+      formSubmissionPromise,
+    ]);
+
     const isPremium = (j) => ["premium", "premiumPlus"].includes(j.job_premium_status);
     const premiumIdx = relatedJobsRaw.findIndex((j) => isPremium(j));
     let relatedJobs;
@@ -1674,26 +1693,8 @@ app.get("/vakansia/:slug", async (req, res) => {
     }
 
     const isExpired = job.expires_at && new Date(job.expires_at) <= new Date();
-
-    // Has this user already sent CV to this job? (accepted only – refused users see success but aren't in job_applications)
-    let userAlreadyApplied = false;
-    if (req.session?.user?.uid) {
-      const application = await db("job_applications")
-        .where({ user_id: req.session.user.uid, job_id: jobId })
-        .first();
-      userAlreadyApplied = !!application;
-    }
-
-    // Has this user/visitor already submitted the simple form? (DB + cookie)
-    let userAlreadySubmittedForm = parseJobIdsFromCookie(req).has(jobId);
-    if (!userAlreadySubmittedForm) {
-      const formSubQ = db("job_form_submissions").where("job_id", jobId);
-      if (req.session?.user?.uid) {
-        userAlreadySubmittedForm = !!(await formSubQ.clone().where("user_id", req.session.user.uid).first());
-      } else if (req.visitorId) {
-        userAlreadySubmittedForm = !!(await formSubQ.clone().where("visitor_id", req.visitorId).first());
-      }
-    }
+    const userAlreadyApplied = !!application;
+    const userAlreadySubmittedForm = !!formSubmission;
 
     const jobDescription =
       job.job_description && job.job_description.length > 0
