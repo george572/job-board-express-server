@@ -194,20 +194,25 @@
   }
   if (!isTouch) {
     document.addEventListener('mouseenter', function(e) {
-      var link = e.target.closest('a.js-job-link[data-job-id]');
+      var t = e.target;
+      if (!t || typeof t.closest !== 'function') return;
+      var link = t.closest('a.js-job-link[data-job-id]');
       if (link) prefetchDesc(link.getAttribute('data-job-id'));
     }, true);
   } else {
     document.addEventListener('touchstart', function(e) {
-      var link = e.target.closest('a.js-job-link[data-job-id]');
+      var t = e.target;
+      if (!t || typeof t.closest !== 'function') return;
+      var link = t.closest('a.js-job-link[data-job-id]');
       if (link) prefetchDesc(link.getAttribute('data-job-id'));
     }, { passive: true, capture: true });
     fetch('/api/ping', { credentials: 'same-origin' }).catch(function(){});
   }
 
   document.addEventListener('click', function(e) {
-    if (isTouch) return;
-    var link = e.target.closest('a.js-job-link[href^="/vakansia/"][data-job-b64]');
+    var t = e.target;
+    if (!t || typeof t.closest !== 'function') return;
+    var link = t.closest('a.js-job-link[href^="/vakansia/"][data-job-b64]');
     if (!link || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
     e.preventDefault();
     var href = link.getAttribute('href');

@@ -28,6 +28,8 @@
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
     const SCROLL_KEY = 'scrollPos';
     const PAGE_KEY = 'currentPage';
+    const JOBS_HTML_KEY = 'jobsContainerHTML';
+    (function(){ var p=sessionStorage.getItem('currentPage'); if(p&&parseInt(p,10)>1&&!sessionStorage.getItem('jobsContainerHTML')){ var pageNum=parseInt(p,10); var params=new URLSearchParams(window.location.search); params.set('section','main'); params.set('page','1'); params.set('limit',String(pageNum*5)); window.__restoreFetch=fetch('/api/home/section?'+params.toString(),{cache:'no-store'}).then(function(r){return r.text();});}})();
   </script>
   <% if (currentPage > 1) { %>
   <link rel="prev" href="https://samushao.ge/<%= currentPage === 2 ? '' : '?page=' + (currentPage - 1) %>">
@@ -38,9 +40,6 @@
 </head>
 
 <body class="font-markgeo text-secondary bg-[#F8F9FA]">
-  <script>
-    (function(){ var p=sessionStorage.getItem('currentPage'); if(p&&parseInt(p,10)>1){ var params=new URLSearchParams(window.location.search); params.set('page',p); var url=(window.location.pathname||'/').replace(/\/$/,'')||'/'; url+=params.toString()?'?'+params.toString():''; window.__restoreFetch=fetch(url,{cache:'no-store'}).then(function(r){return r.text();});}})();
-  </script>
   <%- include('partials/gtm-noscript') %>
   <%- include('partials/header') %>
   <%- include('partials/filters') %>
@@ -566,16 +565,16 @@
       return promise.then(function (html) {
           var parser = new DOMParser();
           var doc = parser.parseFromString(html, 'text/html');
-          var fetchedJobsArea = doc.getElementById('jobs-area');
+          var fetchedContainer = doc.getElementById('jobs-container');
+          var currentContainer = document.getElementById('jobs-container');
           var currentJobsArea = document.getElementById('jobs-area');
-          if (fetchedJobsArea && currentJobsArea) {
-            var fetchedContainer = doc.getElementById('jobs-container');
-            var currentContainer = document.getElementById('jobs-container');
-            if (fetchedContainer && currentContainer) {
-              currentContainer.innerHTML = fetchedContainer.innerHTML;
-            }
-            currentJobsArea.dataset.currentPage = fetchedJobsArea.dataset.currentPage || '1';
-            currentJobsArea.dataset.totalPages = fetchedJobsArea.dataset.totalPages || '1';
+          var meta = doc.getElementById('jobs-area-meta') || doc.getElementById('jobs-area');
+          if (fetchedContainer && currentContainer) {
+            currentContainer.innerHTML = fetchedContainer.innerHTML;
+          }
+          if (meta && currentJobsArea) {
+            currentJobsArea.dataset.currentPage = meta.getAttribute('data-current-page') || meta.dataset.currentPage || '1';
+            currentJobsArea.dataset.totalPages = meta.getAttribute('data-total-pages') || meta.dataset.totalPages || '1';
           }
           if (window.removeDuplicateJobs) window.removeDuplicateJobs();
           if (window.reinitLoadMore) window.reinitLoadMore();
@@ -587,15 +586,32 @@
     (function restoreScroll() {
       var savedY = sessionStorage.getItem(SCROLL_KEY);
       var savedPage = sessionStorage.getItem(PAGE_KEY);
+      var savedHtml = sessionStorage.getItem(JOBS_HTML_KEY);
       if (savedY === null || savedPage === null) return;
       var page = parseInt(savedPage, 10);
       var y = parseInt(savedY, 10);
       sessionStorage.removeItem(SCROLL_KEY);
       sessionStorage.removeItem(PAGE_KEY);
+      sessionStorage.removeItem(JOBS_HTML_KEY);
       if (page === 1) {
         window.scrollTo(0, y);
+      } else if (savedHtml) {
+        var jc = document.getElementById('jobs-container');
+        var ja = document.getElementById('jobs-area');
+        if (jc && ja) {
+          jc.innerHTML = savedHtml;
+          ja.dataset.currentPage = String(page);
+          if (window.removeDuplicateJobs) window.removeDuplicateJobs();
+          if (window.reinitLoadMore) window.reinitLoadMore();
+          bindNormalJobClicks(container);
+          requestAnimationFrame(function () { window.scrollTo(0, y); });
+        } else {
+          loadPage(page).then(function () { requestAnimationFrame(function () { window.scrollTo(0, y); }); });
+        }
       } else {
         loadPage(page, window.__restoreFetch).then(function () {
+          var ja = document.getElementById('jobs-area');
+          if (ja) ja.dataset.currentPage = String(page);
           requestAnimationFrame(function () { window.scrollTo(0, y); });
         });
       }
@@ -625,11 +641,15 @@
     }, { passive: true });
 
     document.addEventListener('click', function (e) {
-      if (e.target.closest('a') || e.target.closest('form')) {
+      var t = e.target;
+      if (!t || typeof t.closest !== 'function') return;
+      if (t.closest('a') || t.closest('form')) {
         var ja = document.getElementById('jobs-area');
+        var jc = document.getElementById('jobs-container');
         if (ja) {
           sessionStorage.setItem(SCROLL_KEY, String(window.scrollY));
           sessionStorage.setItem(PAGE_KEY, ja.dataset.currentPage || '1');
+          if (jc) try { sessionStorage.setItem(JOBS_HTML_KEY, jc.innerHTML); } catch(err) {}
         }
       }
     }, true);
