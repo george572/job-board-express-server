@@ -1,0 +1,12 @@
+<!-- instant.page – preload on touch start (mobile only) -->
+<script>
+(function(){
+  var isMobile = 'ontouchstart' in window || window.matchMedia('(max-width: 768px)').matches;
+  if (!isMobile) return;
+  var s = document.createElement('script');
+  s.src = '//instant.page/5.2.0';
+  s.type = 'module';
+  s.integrity = 'sha384-jnZyxPjiipYXnSU0ygqeac2q7CVYMbh84q0uHVRRxEtvFPiQYbXWUorga2aqZJ0z';
+  document.body.appendChild(s);
+})();
+</script>
