@@ -1728,7 +1728,6 @@ app.get("/vakansia/:slug", async (req, res) => {
       ).catch((e) => console.error("visitor_job_clicks insert error:", e?.message));
     }
 
-    // job_applications, job_form_submissions (related jobs load on 60% scroll via /api/jobs/:id/related)
     const applicationPromise =
       req.session?.user?.uid
         ? db("job_applications")
@@ -1745,9 +1744,36 @@ app.get("/vakansia/:slug", async (req, res) => {
             ? db("job_form_submissions").where("job_id", jobId).where("visitor_id", req.visitorId).first()
             : Promise.resolve(null);
 
-    const [application, formSubmission] = await Promise.all([
+    const relatedJobsPromise = (async () => {
+      const relatedJobsRaw = await db("jobs")
+        .select(...JOBS_LIST_COLUMNS)
+        .where("job_status", "approved")
+        .whereRaw("(expires_at IS NULL OR expires_at > NOW())")
+        .where((qb) => {
+          qb.where("category_id", job.category_id)
+            .orWhere("prioritize", true)
+            .orWhereIn("job_premium_status", ["premium", "premiumPlus"]);
+        })
+        .whereNot("id", jobId)
+        .orderByRaw(`CASE WHEN "job_premium_status" IN ('premium','premiumPlus') AND prioritize IS TRUE THEN CASE "job_premium_status" WHEN 'premiumPlus' THEN 0 WHEN 'premium' THEN 1 END WHEN "job_premium_status" = 'premiumPlus' THEN 2 WHEN "job_premium_status" = 'premium' THEN 3 WHEN prioritize IS TRUE THEN 4 ELSE 5 END`)
+        .orderByRaw("(CASE WHEN category_id = ? THEN 1 ELSE 0 END) DESC", [job.category_id])
+        .orderBy("created_at", "desc")
+        .limit(10);
+      const isPremium = (j) => ["premium", "premiumPlus"].includes(j.job_premium_status);
+      const premiumIdx = relatedJobsRaw.findIndex((j) => isPremium(j));
+      if (relatedJobsRaw.length >= 2 && premiumIdx > 1) {
+        const [first, , ...rest] = relatedJobsRaw;
+        const premium = relatedJobsRaw[premiumIdx];
+        const restWithoutPremium = relatedJobsRaw.filter((_, i) => i !== 0 && i !== premiumIdx);
+        return [first, premium, ...restWithoutPremium].slice(0, 5);
+      }
+      return relatedJobsRaw.slice(0, 5);
+    })();
+
+    const [application, formSubmission, relatedJobs] = await Promise.all([
       applicationPromise,
       formSubmissionPromise,
+      relatedJobsPromise,
     ]);
 
     const isExpired = job.expires_at && new Date(job.expires_at) <= new Date();
@@ -1767,7 +1793,7 @@ app.get("/vakansia/:slug", async (req, res) => {
     res.render("job-detail", {
       job: { ...job, accept_form_submissions: acceptFormSubmissions, isHelio: !!isHelio, helio_url: helioUrl },
       acceptFormSubmissions,
-      relatedJobs: [], // loaded on 60% scroll via /api/jobs/:id/related
+      relatedJobs,
       slugify,
       userAlreadyApplied,
       userAlreadySubmittedForm,

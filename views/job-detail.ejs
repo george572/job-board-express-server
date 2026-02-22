@@ -282,7 +282,7 @@
 
     <%- include('partials/facebookPromo') %>
 
-    <!-- Related jobs slider (loaded on 60% scroll) -->
+    <!-- Related jobs slider -->
     <section id="related-jobs-section" class="w-full mx-auto px-4 mt-8 mb-8">
       <div class="max-w-[1400px] mx-auto">
         <div class="flex items-center justify-between mb-4 gap-3">
@@ -295,7 +295,13 @@
           </div>
         </div>
         <div id="related-jobs-scroll" class="related-jobs-scroll flex w-full items-stretch gap-3 sm:gap-4 overflow-x-auto pb-4 pr-4 snap-x snap-mandatory" style="scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;">
-          <!-- Cards injected when user scrolls 60% -->
+          <% if (relatedJobs && relatedJobs.length) { %>
+            <% relatedJobs.forEach(function(rj) { %>
+              <div class="related-jobs-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col<%= (rj.job_premium_status === 'premium' || rj.job_premium_status === 'premiumPlus') ? ' premium-job-mobile-first' : '' %>"<%= (rj.job_premium_status === 'premium' || rj.job_premium_status === 'premiumPlus') ? ' data-premium="true"' : '' %>>
+                <%- include('partials/jobItemCompact', { job: rj, slugify, inSlider: true }) %>
+              </div>
+            <% }); %>
+          <% } %>
         </div>
       </div>
     </section>
@@ -1098,39 +1104,10 @@
     })();
   </script>
 
-  <!-- Related jobs: fetch on 60% scroll, then prev/next buttons -->
+  <!-- Related jobs: prev/next buttons -->
   <script>
     (function () {
-      var jobId = parseInt(document.body.getAttribute('data-job-id') || '0', 10);
-      if (!jobId) return;
-      var fetched = false;
-      function loadRelatedJobs() {
-        if (fetched) return;
-        fetched = true;
-        fetch('/api/jobs/' + jobId + '/related')
-          .then(function (r) { return r.ok ? r.json() : null; })
-          .then(function (data) {
-            if (!data || !data.cards || !data.cards.length) return;
-            var scrollEl = document.getElementById('related-jobs-scroll');
-            if (!scrollEl) return;
-            data.cards.forEach(function (c) {
-              var wrap = document.createElement('div');
-              wrap.className = 'related-jobs-card flex flex-shrink-0 max-w-[300px] md:max-w-[400px] w-full snap-start flex-col [&>article]:flex-1 [&>article]:flex [&>article]:flex-col' + (c.premium ? ' premium-job-mobile-first' : '');
-              if (c.premium) wrap.setAttribute('data-premium', 'true');
-              wrap.innerHTML = c.html;
-              scrollEl.appendChild(wrap);
-            });
-          })
-          .catch(function () { fetched = false; });
-      }
-      function checkScroll() {
-        var h = document.documentElement.scrollHeight - window.innerHeight;
-        if (h <= 0) return;
-        if (window.scrollY >= h * 0.6) loadRelatedJobs();
-      }
-      window.addEventListener('scroll', checkScroll, { passive: true });
       document.addEventListener('DOMContentLoaded', function () {
-        checkScroll();
         var scrollEl = document.getElementById('related-jobs-scroll');
         var prevBtn = document.querySelector('.related-jobs-prev');
         var nextBtn = document.querySelector('.related-jobs-next');
