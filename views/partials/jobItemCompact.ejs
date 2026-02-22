@@ -1,7 +1,8 @@
 <article class="h-full">
   <a 
     href="/vakansia/<%= slugify(job.jobName) %>-<%= job.id %><%= (typeof fromTopCvFit !== 'undefined' && fromTopCvFit) ? '?from=top-cv-fit' : ((typeof fromRecommended !== 'undefined' && fromRecommended) ? '?from=recommended' : '') %>" 
-    class="block min-w-0 w-full h-full rounded-lg cursor-pointer text-sm text-secondary bg-white hover:shadow-sm transition-shadow flex flex-col <%= (job.job_premium_status === 'premium' || job.job_premium_status === 'premiumPlus') ? 'pt-2 px-4 pb-4 border-2 border-[#315EFF]' : 'p-4 border border-[#EBEBEB]' %>"
+    class="js-job-link block min-w-0 w-full h-full rounded-lg cursor-pointer text-sm text-secondary bg-white hover:shadow-sm transition-shadow flex flex-col <%= (job.job_premium_status === 'premium' || job.job_premium_status === 'premiumPlus') ? 'pt-2 px-4 pb-4 border-2 border-[#315EFF]' : 'p-4 border border-[#EBEBEB]' %>"
+    data-job-b64="<%= Buffer.from(JSON.stringify(job)).toString('base64') %>"
     data-job-id="<%= job.id %>"
     data-job-title="<%- job.jobName.replace(/\"/g, '&quot;') %>"
     data-job-company="<%- job.companyName.replace(/\"/g, '&quot;') %>"

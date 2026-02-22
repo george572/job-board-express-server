@@ -179,4 +179,31 @@
     }
   });
 
+  // Job link interceptor: use cached job + fetch only description (no full reload)
+  document.addEventListener('click', function(e) {
+    var link = e.target.closest('a.js-job-link[href^="/vakansia/"][data-job-b64]');
+    if (!link || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    var href = link.getAttribute('href');
+    var pathOnly = href.split('?')[0];
+    var jobB64 = link.getAttribute('data-job-b64');
+    if (!jobB64) { window.location.href = href; return; }
+    var job;
+    try { job = JSON.parse(atob(jobB64)); } catch (err) { window.location.href = href; return; }
+    if (!job || !job.id) { window.location.href = href; return; }
+    fetch(pathOnly, {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: { 'X-Cached-Job': jobB64 }
+    }).then(function(r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.text();
+    }).then(function(html) {
+      document.open();
+      document.write(html);
+      document.close();
+      window.history.pushState({}, '', pathOnly);
+    }).catch(function() { window.location.href = href; });
+  }, true);
+
 </script>

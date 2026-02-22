@@ -1662,9 +1662,31 @@ app.get("/vakansia/:slug", async (req, res) => {
       return res.status(404).render("404", { message: "Job not found" });
     }
 
-    const job = await db("jobs")
-      .where({ id: jobId, job_status: "approved" })
-      .first();
+    let job;
+    const cachedJobB64 = req.get("X-Cached-Job");
+    if (cachedJobB64) {
+      let cached;
+      try {
+        cached = JSON.parse(Buffer.from(cachedJobB64, "base64").toString("utf8"));
+      } catch (e) {
+        cached = null;
+      }
+      if (cached && cached.id === jobId && cached.jobName && cached.companyName) {
+        const row = await db("jobs")
+          .where({ id: jobId, job_status: "approved" })
+          .select("jobDescription", "job_description")
+          .first();
+        if (row) {
+          const desc = row.jobDescription || row.job_description;
+          job = { ...cached, jobDescription: desc, job_description: desc };
+        }
+      }
+    }
+    if (!job) {
+      job = await db("jobs")
+        .where({ id: jobId, job_status: "approved" })
+        .first();
+    }
 
     if (!job) {
       return res.status(404).render("404", { message: "Job not found" });
@@ -1675,14 +1697,11 @@ app.get("/vakansia/:slug", async (req, res) => {
     res.set("Pragma", "no-cache");
 
     // Generate correct slug and redirect if URL doesn't match (always to clean URL for SEO)
+    // Skip redirect when X-Cached-Job – fetch would lose the header
     const correctSlug = slugify(job.jobName) + "-" + job.id;
-    if (slug !== correctSlug) {
-      return res.redirect(301, `/vakansia/${correctSlug}`);
-    }
-
-    // Redirect ?from=recommended etc. to clean URL – prevents "Duplicate, Google chose different canonical"
-    if (Object.keys(req.query).length > 0) {
-      return res.redirect(301, `/vakansia/${correctSlug}`);
+    if (!cachedJobB64) {
+      if (slug !== correctSlug) return res.redirect(301, `/vakansia/${correctSlug}`);
+      if (Object.keys(req.query).length > 0) return res.redirect(301, `/vakansia/${correctSlug}`);
     }
 
     // Fire-and-forget: view_count and visitor tracking (don't block response)
