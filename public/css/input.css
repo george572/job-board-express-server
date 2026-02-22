@@ -5,7 +5,7 @@
     src: url("/fonts/MarkGEO-Medium.ttf") format("truetype");
     font-weight: 400;
     font-style: normal;
-    font-display: swap;
+    font-display: optional;
 }
 
 @font-face {
@@ -13,7 +13,7 @@
     src: url("/fonts/MarkGEO-SemiBold.ttf") format("truetype");
     font-weight: 600;
     font-style: normal;
-    font-display: swap;
+    font-display: optional;
 }
 
 @font-face {
@@ -21,7 +21,7 @@
     src: url("/fonts/bpg_mrgvlovani_caps_2010.ttf") format("truetype");
     font-weight: 400;
     font-style: normal;
-    font-display: swap;
+    font-display: optional;
 }
 
 @layer base {
