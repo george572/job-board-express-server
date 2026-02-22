@@ -1472,7 +1472,7 @@
 }
 @font-face {
   font-family: "Mrgvlovani";
-  src: url("/fonts/bpg_mrgvlovani_caps_2010.ttf") format("truetype");
+  src: url("/fonts/bpg_mrgvlovani_caps_2010.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: optional;
