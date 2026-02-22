@@ -180,7 +180,10 @@
   });
 
   // Job link interceptor: use cached job + fetch only description (no full reload)
+  // Skip on touch devices – fetch+document.write+pushState breaks clicks after bfcache restore on mobile
+  var isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   document.addEventListener('click', function(e) {
+    if (isTouch) return;
     var link = e.target.closest('a.js-job-link[href^="/vakansia/"][data-job-b64]');
     if (!link || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
     e.preventDefault();
