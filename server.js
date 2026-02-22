@@ -1879,7 +1879,7 @@ app.get("/vakansia/:slug", async (req, res) => {
 });
 
 // Lightweight description-only endpoint for shell-mode async loading
-const jobDescCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
+const jobDescCache = new NodeCache({ stdTTL: 1800, checkperiod: 120 });
 app.get("/api/jobs/:id/description", async (req, res) => {
   try {
     const jobId = parseInt(req.params.id, 10);

@@ -183,19 +183,25 @@
   // Skip on touch devices – fetch+document.write+pushState breaks clicks after bfcache restore on mobile
   var isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-  // Hover prefetch: start fetching description before user clicks
+  // Prefetch description: hover on desktop, touchstart on mobile (warms server cache)
+  window.__descPrefetch = window.__descPrefetch || {};
+  function prefetchDesc(jobId) {
+    if (!jobId || window.__descPrefetch[jobId]) return;
+    window.__descPrefetch[jobId] = fetch('/api/jobs/' + jobId + '/description', { credentials: 'same-origin' })
+      .then(function(r) { return r.json(); })
+      .then(function(d) { window.__descPrefetch[jobId] = d; return d; })
+      .catch(function() { delete window.__descPrefetch[jobId]; });
+  }
   if (!isTouch) {
-    window.__descPrefetch = window.__descPrefetch || {};
     document.addEventListener('mouseenter', function(e) {
       var link = e.target.closest('a.js-job-link[data-job-id]');
-      if (!link) return;
-      var jobId = link.getAttribute('data-job-id');
-      if (!jobId || window.__descPrefetch[jobId]) return;
-      window.__descPrefetch[jobId] = fetch('/api/jobs/' + jobId + '/description', { credentials: 'same-origin' })
-        .then(function(r) { return r.json(); })
-        .then(function(d) { window.__descPrefetch[jobId] = d; return d; })
-        .catch(function() { delete window.__descPrefetch[jobId]; });
+      if (link) prefetchDesc(link.getAttribute('data-job-id'));
     }, true);
+  } else {
+    document.addEventListener('touchstart', function(e) {
+      var link = e.target.closest('a.js-job-link[data-job-id]');
+      if (link) prefetchDesc(link.getAttribute('data-job-id'));
+    }, { passive: true, capture: true });
   }
 
   document.addEventListener('click', function(e) {
