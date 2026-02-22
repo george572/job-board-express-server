@@ -1999,6 +1999,15 @@ app.get("/jobs/email-queue-details", async (req, res) => {
   const details = await jobsRouter.getEmailQueueDetails();
   res.json(details);
 });
+app.get("/jobs/premium-low-cv-candidates", async (req, res) => {
+  try {
+    const data = await jobsRouter.getPremiumLowCvCandidatesData();
+    res.json(data);
+  } catch (err) {
+    console.error("premium-low-cv-candidates error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 app.post("/jobs/email-queue-kick", async (req, res) => {
   jobsRouter.kickEmailQueue();
   const status = await jobsRouter.getEmailQueueStatus();

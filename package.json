@@ -31,6 +31,8 @@
     "create-pinecone-index": "node scripts/create-pinecone-index-e5.js",
     "create-pinecone-jobs-index": "node scripts/create-pinecone-jobs-index.js",
     "backfill-pinecone-jobs": "node scripts/backfill-pinecone-jobs.js",
+    "premium-low-cv-candidates": "node scripts/premium-low-cv-candidates.js",
+    "auto-send-low-cv-candidates": "node scripts/auto-send-low-cv-candidates.js",
     "remove-expired-jobs-pinecone": "node scripts/remove-expired-jobs-from-pinecone.js"
   },
   "dependencies": {

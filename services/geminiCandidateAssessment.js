@@ -25,6 +25,7 @@ async function assessCandidateAlignment(job, cvText) {
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
+  const jobDesc = (job.jobDescription || job.job_description || "").trim();
   const jobDetails = [
     `Job title: ${job.jobName || "N/A"}`,
     `Company: ${job.companyName || "N/A"}`,
@@ -33,11 +34,11 @@ async function assessCandidateAlignment(job, cvText) {
     `Job type: ${job.job_type || "N/A"}`,
     `Salary: ${job.jobSalary || "N/A"}`,
     "",
-    "Job description:",
-    (job.jobDescription || job.job_description || "").trim() || "N/A",
+    "Job description (full text – use it; do not claim it is missing or lacks detail):",
+    jobDesc || "N/A",
   ].join("\n");
 
-  const prompt = `You are an elite recruiter. Analyze how well the candidate's CV aligns with the job below. when assesing the candidate, ignore their personal soft skill claims like being able to work under stress and etc.
+  const prompt = `You are an elite recruiter. Analyze how well the candidate's CV aligns with the job below. The job description is complete – do NOT say the job post lacked a detailed description. When assessing, ignore candidates' personal soft skill claims like being able to work under stress.
 Summary output must be in Georgian (ქართული ენა).
 
 Job details:
@@ -121,14 +122,15 @@ async function assessNoCvAlignment(job, noCvRow) {
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
+  const jobDesc = (job.jobDescription || job.job_description || "").trim();
   const jobDetails = [
     `Job title: ${job.jobName || "N/A"}`,
     `City: ${job.job_city || "N/A"}`,
     `Experience required: ${job.job_experience || "N/A"}`,
     `Job type: ${job.job_type || "N/A"}`,
     "",
-    "Job description:",
-    (job.jobDescription || job.job_description || "").trim() || "N/A",
+    "Job description (full – use it; do not claim it lacks detail):",
+    jobDesc || "N/A",
   ].join("\n");
 
   const desc = (noCvRow.short_description || "").toString().trim();
@@ -150,6 +152,7 @@ async function assessNoCvAlignment(job, noCvRow) {
 2) The categories they chose (these indicate their interests/skills area)
 
 Summary output must be in Georgian (ქართული ენა). Be concise – 2-3 sentences max.
+Do NOT say things like "I could not see more categories" or that information is limited. Base your assessment only on what is provided.
 
 Job details:
 ${jobDetails}

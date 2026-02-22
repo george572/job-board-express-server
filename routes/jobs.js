@@ -464,8 +464,8 @@ const NEW_JOB_HTML_TEMPLATE_BEST_CANDIDATE = (job, candidate) => {
 
 <p>ვხედავ, რომ <b>"${job.jobName}"</b>-ს პოზიციაზე ვაკანსია გაქვთ აქტიური.</p>
 
-<p>Samushao.ge-ს AI-მ ბაზაში უკვე იპოვა 1 კანდიდატი, რომელიც თქვენს მოთხოვნებს ემთხვევა.</p>
-<p>აი მისი მოკლე დახასიათება (გენერირებულია ჩვენი AI-ს მიერ):</p>
+<p>Samushao.ge-ს AI-მ ბაზაში უკვე იპოვა რამდენიმე კანდიდატი, რომლებიც თქვენს მოთხოვნებს ემთხვევა.</p>
+<p>აი ერთ-ერთის მოკლე დახასიათება (გენერირებულია ჩვენი AI-ს მიერ):</p>
 "<i>${aiDescription}</i>"
 
 <p>მაინტერესებდა, ჯერ კიდევ ეძებთ კადრს?</p>
@@ -486,8 +486,8 @@ const NEW_JOB_HTML_TEMPLATE_PARTIAL_MATCH = (job, candidate) => {
 
 <p>ვხედავ, რომ <b>"${job.jobName}"</b>-ს პოზიციაზე ვაკანსია გაქვთ აქტიური.</p>
 <p>ცოტა რთულია ამ პოზიციაზე კანდიდატების პოვნა...</p>
-<p>Samushao.ge-ს AI-მ ბაზაში უკვე იპოვა 1 კანდიდატი, რომელიც თქვენს მოთხოვნებს მეტნაკლებად ემთხვევა.</p>
-<p>აი მისი მოკლე დახასიათება (გენერირებულია ჩვენი AI-ს მიერ):</p>
+<p>Samushao.ge-ს AI-მ ბაზაში უკვე იპოვა რამდენიმე კანდიდატი, რომლებიც თქვენს მოთხოვნებს მეტნაკლებად ემთხვევა.</p>
+<p>აი ერთ-ერთის მოკლე დახასიათება (გენერირებულია ჩვენი AI-ს მიერ):</p>
 "<i>${aiDescription}</i>"
 
 <p>მაინტერესებდა, ჯერ კიდევ ეძებთ კადრს?</p>
@@ -664,6 +664,119 @@ async function evaluateJobForNewJobEmail(job) {
       cv_file_name: best.cv_file_name,
     },
   };
+}
+
+/** Top N good/strong candidates for a job (for premium-low-cv report). */
+async function getTopGoodCandidatesForJob(job, limit = 4) {
+  const { getTopCandidatesForJob } = require("../services/pineconeCandidates");
+  const {
+    assessCandidateAlignment,
+    assessNoCvAlignment,
+  } = require("../services/geminiCandidateAssessment");
+  const { extractTextFromCv } = require("../services/cvTextExtractor");
+
+  const jobInput = {
+    job_role: job.jobName || job.job_role,
+    job_experience: job.job_experience,
+    job_type: job.job_type,
+    job_city: job.job_city,
+    jobDescription:
+      job.jobDescription || job.job_description || "",
+  };
+  const matches = await getTopCandidatesForJob(jobInput, VECTOR_TOP_K);
+  const qualified = matches
+    .filter((m) => (m.score || 0) >= VECTOR_MIN_SCORE)
+    .slice(0, 10);
+
+  if (qualified.length === 0) return [];
+
+  const realUserIds = qualified
+    .filter((m) => !String(m.id).startsWith("no_cv_"))
+    .map((m) => m.id);
+  const noCvIds = qualified
+    .filter((m) => String(m.id).startsWith("no_cv_"))
+    .map((m) => parseInt(String(m.id).replace("no_cv_", ""), 10))
+    .filter((n) => !isNaN(n) && n > 0);
+
+  const users =
+    realUserIds.length > 0
+      ? await db("users")
+          .whereIn("user_uid", realUserIds)
+          .select("user_uid", "user_name", "user_email")
+      : [];
+  const userMap = Object.fromEntries(users.map((u) => [u.user_uid, u]));
+
+  const resumeRows =
+    realUserIds.length > 0
+      ? await db("resumes")
+          .whereIn("user_id", realUserIds)
+          .orderBy("updated_at", "desc")
+          .select("user_id", "file_url", "file_name")
+      : [];
+  const resumeMap = {};
+  resumeRows.forEach((r) => {
+    if (!resumeMap[r.user_id]) resumeMap[r.user_id] = r;
+  });
+
+  const noCvRows =
+    noCvIds.length > 0
+      ? await db("user_without_cv").whereIn("id", noCvIds).select("*")
+      : [];
+  const noCvMap = Object.fromEntries(noCvRows.map((r) => [r.id, r]));
+
+  const assessed = [];
+  for (const m of qualified) {
+    const isNoCv = String(m.id).startsWith("no_cv_");
+    if (isNoCv) {
+      const nid = parseInt(String(m.id).replace("no_cv_", ""), 10);
+      const row = noCvMap[nid];
+      if (!row) continue;
+      try {
+        const result = await assessNoCvAlignment(job, row);
+        assessed.push({
+          id: m.id,
+          verdict: result.verdict,
+          ai_description: result.summary,
+          name: row.name,
+          email: row.email,
+          phone: row.phone,
+          cv_url: null,
+          cv_file_name: null,
+        });
+      } catch (e) {
+        // skip
+      }
+    } else {
+      const r = resumeMap[m.id];
+      const cvText =
+        m.metadata?.text ||
+        (r?.file_url
+          ? await extractTextFromCv(r.file_url, r.file_name).catch(() => "")
+          : "");
+      if (!cvText || cvText.length < 50) continue;
+      try {
+        const result = await assessCandidateAlignment(job, cvText);
+        const u = userMap[m.id];
+        assessed.push({
+          id: m.id,
+          verdict: result.verdict,
+          ai_description: result.summary,
+          name: u?.user_name || null,
+          email: u?.user_email || null,
+          phone: null,
+          cv_url: r?.file_url || null,
+          cv_file_name: r?.file_name || null,
+        });
+      } catch (e) {
+        // skip
+      }
+    }
+  }
+
+  const goodOrStrong = assessed.filter(
+    (a) => a.verdict === "GOOD_MATCH" || a.verdict === "STRONG_MATCH",
+  );
+  return goodOrStrong.slice(0, limit);
 }
 
 /**
@@ -2230,6 +2343,69 @@ router.getEmailQueueDetails = async () => {
 router.kickEmailQueue = () => {
   newJobEmailProcessorScheduled = true;
   processNewJobEmailQueue();
+};
+
+router.getPremiumLowCvCandidatesData = async () => {
+  const jobs = await db("jobs")
+    .whereIn("job_premium_status", ["premium", "premiumPlus"])
+    .where("job_status", "approved")
+    .where((qb) => {
+      qb.where("cvs_sent", 0)
+        .orWhere("cvs_sent", 1)
+        .orWhereNull("cvs_sent");
+    })
+    .select(
+      "id",
+      "jobName",
+      "companyName",
+      "company_email",
+      "cvs_sent",
+      "jobDescription",
+      "job_experience",
+      "job_type",
+      "job_city",
+    )
+    .orderBy("cvs_sent", "asc")
+    .orderBy("id", "asc");
+
+  const results = [];
+  for (const job of jobs) {
+    const candidates = await getTopGoodCandidatesForJob(job, 4);
+    const jobLink = `${SITE_BASE_URL}/vakansia/${slugify(job.jobName)}-${job.id}`;
+    const usersList = candidates.map((c) => ({
+      user_name: c.name,
+      user_email: c.email,
+      phone: c.phone,
+      userSummary: c.ai_description,
+      cv_url: c.cv_url,
+    }));
+    results.push({
+      job: {
+        ...job,
+        job_link: jobLink,
+        cvs_sent: job.cvs_sent || 0,
+      },
+      candidates,
+      sendPayload: {
+        hr_email: job.company_email,
+        job_name: job.jobName,
+        job_id: job.id,
+        company_name: job.companyName,
+        job_link: jobLink,
+        users_list: usersList,
+      },
+    });
+    // Log to server console for visibility
+    console.log(
+      `[premium-low-cv] Job #${job.id} ${job.jobName} @ ${job.companyName}: ${candidates.length} candidates`,
+    );
+    candidates.forEach((c, i) => {
+      console.log(
+        `  ${i + 1}. ${c.name || "—"} (${c.verdict}): ${(c.ai_description || "").slice(0, 80)}...`,
+      );
+    });
+  }
+  return { jobs: results };
 };
 
 // Blacklisted company emails (DB)

@@ -296,10 +296,13 @@ router.post("/hr-email", async (req, res) => {
           .map((u) => {
             const name = u.user_name ?? u.userName ?? u.name ?? "—";
             const email = u.user_email ?? u.userEmail ?? u.email ?? "—";
+            const phone = u.phone ?? "";
             const url = u.cv_url ?? u.cvUrl ?? u.resume_url ?? u.file_url ?? "";
             const summary =
               u.user_summary ?? u.userSummary ?? u.summary ?? "";
             const lines = [`სახელი : ${name}`, `იმეილი : ${email}`];
+            if (phone && phone.trim() && phone !== "—")
+              lines.push(`ტელეფონი : ${phone}`);
             if (url && url.trim() && url !== "—")
               lines.push(`CV ლინკი : ${url}`);
             if (summary && summary.trim() && summary !== "—")
@@ -323,12 +326,12 @@ ${countLine}
 
 გაითვალისწინეთ, საუკეთესო კანდიდატები გამოიგზავნა ავტომატურად,
 ჩვენ არ ვიცით ეს კანდიდატები დათანხმდებიან თუ არა თქვენთან მუშაობას.
-თქვენ თავად უნდა შეეხმიანოთ კანდიდატებს.
+თქვენ თავად უნდა შეეხმიანოთ მათ.
 
 ${candidatesBlock}
 
 პატივისცემით,
-გიორგი Samushao.ge`;
+გიორგი | Samushao.ge`;
 
   const fromAddr = MARKETING_MAIL_USER || "giorgi@samushao.ge";
   const mailOptions = {
