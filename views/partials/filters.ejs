@@ -325,6 +325,7 @@
           history.pushState({ filters: filters }, '', newUrl);
           setFiltersFromUrl();
           renderActiveFilters();
+          ensureFilterCountsLoaded();
           updateTopSalarySliderVisibility();
           window.scrollTo(0, 0);
           setJobsLoading(false);
@@ -576,6 +577,7 @@
           }
           setFiltersFromUrl();
           renderActiveFilters();
+          ensureFilterCountsLoaded();
           updateTopSalarySliderVisibility();
           window.scrollTo(0, 0);
         })
