@@ -590,7 +590,14 @@
     updateTopSalarySliderVisibility();
 
     [categoryFilter, salaryFilter, experienceFilter, jobTypeFilter, cityFilter].forEach(function (el) {
-      if (el) el.addEventListener('focus', ensureFilterCountsLoaded, { passive: true });
+      if (el) {
+        el.addEventListener('focus', ensureFilterCountsLoaded, { passive: true });
+        el.addEventListener('pointerdown', ensureFilterCountsLoaded, { passive: true });
+      }
     });
+
+    // Prefetch counts shortly after load – on mobile, focus often fires only after picker closes,
+    // so counts arrive too late for first open. This ensures they're ready when user first taps.
+    setTimeout(ensureFilterCountsLoaded, 800);
   })();
 </script>
