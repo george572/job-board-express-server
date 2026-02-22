@@ -1,4 +1,4 @@
-<div id="noCvBanner" class="fixed inset-x-0 bottom-0 z-40 px-4 pb-4">
+<div id="noCvBanner" class="fixed inset-x-0 bottom-0 z-40 px-4 pb-4" style="display:none;">
   <div class="mx-auto max-w-2xl rounded-2xl bg-white shadow-lg border border-gray-200 px-4 py-4 sm:px-6 sm:py-5">
     <div class="flex justify-between items-start gap-2 mb-3">
       <p class="text-sm sm:text-base font-medium text-[#151515] flex-1">
@@ -53,6 +53,7 @@
 (function() {
   var banner = document.getElementById('noCvBanner');
   if (!banner) return;
+  if (!document.cookie.match(/\bno_cv_banner_dismissed=/)) banner.style.display = 'block';
   var closeBtn = document.getElementById('noCvBannerClose');
   var cancelBtn = document.getElementById('noCvBannerCancel');
   var form = document.getElementById('noCvBannerForm');

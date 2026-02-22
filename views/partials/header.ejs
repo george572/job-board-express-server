@@ -79,7 +79,7 @@
   </header>
 </div>
 
-<% if (typeof showNoCvBanner !== 'undefined' && showNoCvBanner) { %>
+<% if (typeof user === 'undefined' || !user) { %>
   <%- include('noCvBanner') %>
 <% } %>
 <style>
