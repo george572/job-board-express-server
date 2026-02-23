@@ -69,16 +69,24 @@ function candidateHasRoleExperience(candidateText, role) {
   const cand = normalizeForMatch(candidateText);
   if (!cand) return false;
 
-  const { phrase, tokens } = buildRoleTokens(role);
-  if (!phrase) return true; // no role to enforce
+  // Check both the original role AND its synonyms
+  const rolesToCheck = [role];
+  const norm = normalizeForMatch(role);
+  for (const group of SYNONYM_GROUPS) {
+    const normGroup = group.map((t) => normalizeForMatch(t));
+    if (normGroup.some((t) => norm.includes(t))) {
+      rolesToCheck.push(...group);
+      break;
+    }
+  }
 
-  // Strong signal: full phrase appears (e.g. "office administrator").
-  if (phrase.length >= 6 && cand.includes(phrase)) return true;
-
-  // Require ALL meaningful tokens so we don't match accountant for "Office Administrator"
-  // just because CV has "office". Each profession-defining word must appear.
-  if (tokens.length === 0) return true;
-  return tokens.every((t) => cand.includes(t));
+  for (const r of rolesToCheck) {
+    const { phrase, tokens } = buildRoleTokens(r);
+    if (!phrase) return true;
+    if (phrase.length >= 6 && cand.includes(phrase)) return true;
+    if (tokens.length > 0 && tokens.every((t) => cand.includes(t))) return true;
+  }
+  return false;
 }
 
 /** Basic/entry-level roles that can be done by any profession. Skip strict role match for these. */
@@ -187,6 +195,27 @@ function getIndex() {
   return pc.index({ name: getIndexName() });
 }
 
+/**
+ * Synonym groups: terms within the same group are treated as equivalent for search.
+ * When a job role matches any term in a group, ALL terms in that group are included in the query.
+ */
+const SYNONYM_GROUPS = [
+  ["დიასახლისი", "სანიტარი", "დამლაგებელი", "cleaner", "housekeeper", "sanitary worker"],
+];
+
+function expandWithSynonyms(role) {
+  const norm = normalizeForMatch(role);
+  if (!norm) return "";
+  for (const group of SYNONYM_GROUPS) {
+    const normGroup = group.map((t) => normalizeForMatch(t));
+    if (normGroup.some((t) => norm.includes(t))) {
+      const extras = group.filter((t) => !norm.includes(normalizeForMatch(t)));
+      if (extras.length > 0) return extras.join(", ");
+    }
+  }
+  return "";
+}
+
 /** Max chars for the "profession/experience" lead block (title and past roles usually appear here). */
 const CANDIDATE_LEAD_CHARS = 12000;
 
@@ -255,15 +284,16 @@ function buildJobSearchText(opts) {
   const city = (opts.job_city || "").trim();
   const desc = (opts.jobDescription || "").trim();
 
+  const synonyms = role ? expandWithSynonyms(role) : "";
+  const roleWithSynonyms = synonyms ? `${role} (ან ${synonyms})` : role;
+
   const parts = [];
-  // 1) Profession/title match – strongest signal (aligns with CV "Candidate profession and work experience")
   if (role) {
     parts.push(
-      `Seeking candidates whose profession or job title is ${role}, or who have worked as ${role} or very similar position, or on positions one step above or one step below.`,
+      `Seeking candidates whose profession or job title is ${roleWithSynonyms}, or who have worked as ${roleWithSynonyms} or very similar position, or on positions one step above or one step below.`,
     );
   }
-  // 2) Past work experience – secondary signal
-  if (role) parts.push(`Relevant past work experience: ${role}.`);
+  if (role) parts.push(`Relevant past work experience: ${roleWithSynonyms}.`);
   if (desc) parts.push(desc);
   if (exp) parts.push(`Required experience: ${exp}.`);
   if (type) parts.push(`Employment type: ${type}.`);
