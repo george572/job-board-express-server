@@ -219,19 +219,19 @@
           <div class="w-full h-[1px] bg-[#F0F0F0] my-6"></div>
           <section class="flex gap-2 flex-col h-auto items-start justify-start">
             <dl class="text-[14px] flex flex-col">
-              <dt class="font-[mrgvlovani] font-[300] text-[#3F3F3F]"> ანაზღაურება </dt>
+              <dt class="font-[300] text-[#3F3F3F]"> ანაზღაურება </dt>
               <dd class="mt-1 font-[400]"> <%= job.jobSalary ? '₾' + job.jobSalary : 'შეთანხმებით' %></dd>
             </dl>
             <dl class="text-[14px] flex flex-col">
-              <dt class="font-[mrgvlovani] font-[300] text-[#3F3F3F]"> ლოკაცია </dt>
+              <dt class="font-[300] text-[#3F3F3F]"> ლოკაცია </dt>
               <dd class="mt-1 font-[400]"><%= job.job_address || job.job_city || '-' %></dd>
             </dl>
             <dl class="text-[14px] flex flex-col">
-              <dt class="font-[mrgvlovani] font-[300] text-[#3F3F3F]"> განაკვეთი </dt>
+              <dt class="font-[300] text-[#3F3F3F]"> განაკვეთი </dt>
               <dd class="mt-1 font-[400]"><%= job.job_type === 'full-time' ? 'სრული' : 'ნახევარი' %></dd>
             </dl>
             <dl class="text-[14px] flex flex-col">
-              <dt class="font-[mrgvlovani] font-[300] text-[#3F3F3F]"> გამოცდილება </dt>
+              <dt class="font-[300] text-[#3F3F3F]"> გამოცდილება </dt>
               <dd class="mt-1 font-[400]"><%= job.job_experience ? job.job_experience + ' წელი' : '-' %></dd>
             </dl>
           </section>
@@ -286,7 +286,7 @@
     <section id="related-jobs-section" class="w-full mx-auto px-4 mt-8 mb-8" <% if (typeof shellMode !== 'undefined' && shellMode) { %>style="display:none"<% } %>>
       <div class="max-w-[1400px] mx-auto">
         <div class="flex items-center justify-between mb-4 gap-3">
-          <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1">
+          <h2 class="text-[18px] sm:text-[22px] text-[#151515] flex-1">
             მსგავსი ვაკანსიები
           </h2>
           <div class="flex items-center gap-2 flex-shrink-0">

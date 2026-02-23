@@ -32,7 +32,7 @@
   <% } %>
 </head>
 
-<body class="font-markgeo text-secondary bg-[#F8F9FA]">
+<body class="text-secondary bg-[#F8F9FA]">
   <%- include('partials/gtm-noscript') %>
   <%- include('partials/header') %>
   <%- include('partials/filters') %>
@@ -42,7 +42,7 @@
   <section id="form-submission-slider-section" class="w-full mx-auto px-4 mt-6 mb-4" style="<%= filtersActive ? 'display:none' : '' %>">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
       <div class="flex flex-col gap-1 flex-1">
-        <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515]">ვაკანსიები სადაც CV გარეშე მიგიღებენ</h2>
+        <h2 class="text-[18px] sm:text-[22px] text-[#151515]">ვაკანსიები სადაც CV გარეშე მიგიღებენ</h2>
         <% if (typeof formSubmissionTotalCount !== 'undefined' && formSubmissionTotalCount > 0) { %>
         <a href="/vakansiebi-cv-gareshe" class="text-sm text-[#315EFF] hover:underline hidden sm:inline-block">ყველას ნახვა (<%= formSubmissionTotalCount %>)</a>
         <% } %>
@@ -72,7 +72,7 @@
   <section id="top-cv-fit-slider-section" class="w-full mx-auto px-4 mt-6 mb-4" style="<%= filtersActive ? 'display:none' : '' %>">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
       <div class="flex flex-col gap-1 flex-1">
-        <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515]">
+        <h2 class="text-[18px] sm:text-[22px] text-[#151515]">
           ვაკანსიები სადაც შენი CV ერგება
         </h2>
         <% if (typeof topCvFitTotalCount !== 'undefined' && topCvFitTotalCount > 0) { %>
@@ -109,7 +109,7 @@
   <section id="form-submission-slider-section" class="w-full mx-auto px-4 mt-6 mb-4" style="<%= filtersActive ? 'display:none' : '' %>">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
       <div class="flex flex-col gap-1 flex-1">
-        <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515]">ვაკანსიები სადაც CV გარეშე მიგიღებენ</h2>
+        <h2 class="text-[18px] sm:text-[22px] text-[#151515]">ვაკანსიები სადაც CV გარეშე მიგიღებენ</h2>
         <% if (typeof formSubmissionTotalCount !== 'undefined' && formSubmissionTotalCount > 0) { %>
         <a href="/vakansiebi-cv-gareshe" class="text-sm text-[#315EFF] hover:underline hidden sm:inline-block">ყველას ნახვა (<%= formSubmissionTotalCount %>)</a>
         <% } %>
@@ -139,7 +139,7 @@
   <section id="recommended-jobs-section" class="w-full mx-auto px-4 mt-6 mb-4">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
       <div class="flex flex-col gap-1 flex-1">
-        <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515]">
+        <h2 class="text-[18px] sm:text-[22px] text-[#151515]">
           მსგავს ვაკანსიებს ხშირად სტუმრობ
         </h2>
         <a id="recommended-see-all-link" href="/rekomendebuli-vakansiebi" class="text-sm text-[#315EFF] hover:underline">
@@ -167,7 +167,7 @@
   <section id="top-salary-slider-section" class="w-full mx-auto px-4 mt-6 mb-4" style="<%= filtersActive ? 'display:none' : '' %>">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
       <div class="flex flex-col gap-1 flex-1">
-        <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515]">
+        <h2 class="text-[18px] sm:text-[22px] text-[#151515]">
           ყველაზე მაღალანაზღაურებადი ვაკანსიები
         </h2>
         <% if (typeof topSalaryTotalCount !== 'undefined' && topSalaryTotalCount > 0) { %>
@@ -204,7 +204,7 @@
   <section id="top-popular-slider-section" class="w-full mx-auto px-4 mt-6 mb-4" style="<%= filtersActive ? 'display:none' : '' %>">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
       <div class="flex flex-col gap-1 flex-1">
-        <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515]">
+        <h2 class="text-[18px] sm:text-[22px] text-[#151515]">
           ყველაზე ნახვადი ვაკანსიები
         </h2>
         <% if (typeof topPopularTotalCount !== 'undefined' && topPopularTotalCount > 0) { %>
@@ -247,7 +247,7 @@
   <section id="today-jobs-section" class="w-full mx-auto px-4 mt-6 mb-4">
     <div class="flex items-center justify-between mb-4 gap-3">
       <div class="flex flex-col gap-1 flex-1">
-        <h2 class="font-kolkha text-[18px] sm:text-[22px] text-[#151515]">
+        <h2 class="text-[18px] sm:text-[22px] text-[#151515]">
           დღევანდელი ვაკანსიები
         </h2>
         <% if (typeof todayJobsCount !== 'undefined' && todayJobsCount > 0) { %>
@@ -268,7 +268,7 @@
   <!-- Jobs area (replaced without reload when filters change) -->
   <div id="jobs-area" data-current-page="<%= currentPage || 1 %>" data-total-pages="<%= totalPages || 1 %>">
   <% if (filtersActive) { %><%- include('partials/facebookPromo') %><% } %>
-  <h1 id="all-vacancies-heading" class="font-kolkha text-[18px] sm:text-[22px] text-[#151515] flex-1 pb-4 w-full mx-auto px-4" style="<%= filtersActive ? 'display:none' : '' %>">
+  <h1 id="all-vacancies-heading" class="text-[18px] sm:text-[22px] text-[#151515] flex-1 pb-4 w-full mx-auto px-4" style="<%= filtersActive ? 'display:none' : '' %>">
     <%= typeof pageType === 'string' && pageType === 'top-salary' ? 'ყველაზე მაღალანაზღაურებადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'top-views' ? 'ყველაზე ნახვადი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'today' ? 'დღევანდელი ვაკანსიები' : (typeof pageType === 'string' && pageType === 'recommended' ? 'შენთვის რეკომენდებული ვაკანსიები' : (typeof pageType === 'string' && pageType === 'top-cv-fit' ? 'ვაკანსიები სადაც შენი CV ერგება' : (typeof pageType === 'string' && pageType === 'form-submission' ? 'ვაკანსიები სადაც CV გარეშე მიგიღებენ' : 'ყველა ვაკანსია'))))) %>
   </h1>
   <div class="w-full relative mx-auto px-4" id="jobs-container">

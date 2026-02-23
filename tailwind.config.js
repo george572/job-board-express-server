@@ -8,11 +8,6 @@ module.exports = {
   ],
   theme: {
     extend: {
-      fontFamily: {
-        markgeo: ["MarkGeo", "sans-serif"],
-        mrgvlovani: ["Mrgvlovani", "sans-serif"],
-        kolkha: ["MarkGeo", "sans-serif"],
-      },
       colors: {
         primary: "#315EFF", // Custom blue
         secondary: "#36454F", // Custom red
