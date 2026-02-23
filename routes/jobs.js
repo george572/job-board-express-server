@@ -369,6 +369,39 @@ async function processNewJobEmailQueue() {
       return;
     }
 
+    const isBestCandidateFollowup = row.email_type === "best_candidate_followup";
+    if (isBestCandidateFollowup) {
+      if (!marketingTransporter || !companyEmail || !row.subject || !row.html) {
+        await db("new_job_email_queue").where("id", row.queue_id).del();
+        processNewJobEmailQueue();
+        return;
+      }
+      const mailOptions = {
+        from: MARKETING_MAIL_USER,
+        to: companyEmail,
+        subject: row.subject,
+        html: row.html,
+      };
+      marketingTransporter.sendMail(mailOptions, async (err) => {
+        if (err) {
+          console.error("Best candidate follow-up email error:", err);
+        } else {
+          console.log(
+            `📧 Sent best-candidate follow-up to ${companyEmail} (job #${row.job_id})`,
+          );
+        }
+        await db("new_job_email_queue").where("id", row.queue_id).del();
+        newJobEmailLastSentAt = Date.now();
+        const nextDelay = randomBetween(
+          MIN_DELAY_BETWEEN_SENDS_MS,
+          MAX_DELAY_BETWEEN_SENDS_MS,
+        );
+        newJobEmailProcessorScheduled = true;
+        setTimeout(processNewJobEmailQueue, nextDelay);
+      });
+      return;
+    }
+
     if (companyEmail && (await hasRecentlySentToCompany(companyEmail))) {
       console.log(
         `[Email queue] Skip job #${row.job_id} → ${companyEmail}: already sent in last 7 days`,
@@ -2220,14 +2253,31 @@ router.getEmailQueueStatus = async () => {
 
 router.getEmailQueueDetails = async () => {
   try {
+    // Raw counts from queue table (no join) so we see best_candidate_followup etc. even if join drops rows
+    const queueCounts =
+      await db("new_job_email_queue")
+        .select("email_type")
+        .count("id as n")
+        .groupBy("email_type");
+    const pendingByType = {};
+    let queueTableTotal = 0;
+    for (const row of queueCounts || []) {
+      const type = row.email_type || "new_job";
+      const n = parseInt(row.n || 0, 10);
+      pendingByType[type] = n;
+      queueTableTotal += n;
+    }
+
     const hasBestCandidateId = await db.schema.hasColumn(
       "new_job_email_queue",
       "best_candidate_id",
     );
     const pendingRows = await db("new_job_email_queue as q")
-      .join("jobs as j", "j.id", "q.job_id")
+      .leftJoin("jobs as j", "j.id", "q.job_id")
       .select(
+        "q.id as queue_id",
         "q.job_id",
+        "q.email_type",
         "q.best_candidate_id",
         db.raw('j."jobName" as job_name'),
         db.raw('j."companyName" as company_name'),
@@ -2310,7 +2360,9 @@ router.getEmailQueueDetails = async () => {
 
     const pending = pendingRows.map((r) => {
       const item = {
+        queue_id: r.queue_id,
         job_id: r.job_id,
+        email_type: r.email_type || "new_job",
         job_name: r.job_name,
         company_name: r.company_name,
         company_email: r.company_email,
@@ -2364,11 +2416,20 @@ router.getEmailQueueDetails = async () => {
     return {
       pending,
       sent,
-      summary: { queued: pending.length, sent: sent.length },
+      summary: {
+        queued: pending.length,
+        sent: sent.length,
+        queue_table_total: queueTableTotal,
+        pending_by_type: pendingByType,
+      },
     };
   } catch (e) {
     if (e.code === "42P01")
-      return { pending: [], sent: [], summary: { queued: 0, sent: 0 } };
+      return {
+        pending: [],
+        sent: [],
+        summary: { queued: 0, sent: 0, queue_table_total: 0, pending_by_type: {} },
+      };
     throw e;
   }
 };

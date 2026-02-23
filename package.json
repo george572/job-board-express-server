@@ -33,6 +33,8 @@
     "backfill-pinecone-jobs": "node scripts/backfill-pinecone-jobs.js",
     "premium-low-cv-candidates": "node scripts/premium-low-cv-candidates.js",
     "auto-send-low-cv-candidates": "node scripts/auto-send-low-cv-candidates.js",
+    "send-best-candidate-followup": "node scripts/send-best-candidate-followup-emails.js",
+    "send-best-candidate-followup:dry-run": "node scripts/send-best-candidate-followup-emails.js --dry-run",
     "remove-expired-jobs-pinecone": "node scripts/remove-expired-jobs-from-pinecone.js"
   },
   "dependencies": {
