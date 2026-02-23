@@ -1824,7 +1824,7 @@ app.get("/vakansia/:slug", async (req, res) => {
       ).catch((e) => console.error("visitor_job_clicks insert error:", e?.message));
     }
 
-    // In shell mode, skip related jobs (below the fold, loaded lazily by client)
+    // Always fetch related jobs so "Similar jobs" section is visible on job detail page
     const [application, formSubmission, relatedJobs] = await Promise.all([
       req.session?.user?.uid
         ? db("job_applications")
@@ -1838,7 +1838,7 @@ app.get("/vakansia/:slug", async (req, res) => {
           : req.visitorId
             ? db("job_form_submissions").where("job_id", jobId).where("visitor_id", req.visitorId).first()
             : null,
-      shellMode ? [] : getRelatedJobsCached(job.category_id, jobId),
+      getRelatedJobsCached(job.category_id, jobId),
     ]);
 
     const isExpired = job.expires_at && new Date(job.expires_at) <= new Date();
