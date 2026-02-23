@@ -124,6 +124,29 @@ async function getOneGoodOrStrongCandidate(job, db) {
   return bestPartial;
 }
 
+/** Resolve candidate cv_url, email, phone from best_candidate_id for storing in queue. */
+async function resolveCandidateContact(candidateId, db) {
+  if (!candidateId) return { cv_url: null, email: null, phone: null };
+  const id = String(candidateId);
+  if (id.startsWith("no_cv_")) {
+    const nid = parseInt(id.replace("no_cv_", ""), 10);
+    if (isNaN(nid) || nid < 1) return { cv_url: null, email: null, phone: null };
+    const row = await db("user_without_cv").where("id", nid).select("email", "phone").first();
+    return {
+      cv_url: null,
+      email: (row?.email || "").trim().slice(0, 255) || null,
+      phone: (row?.phone || "").trim().slice(0, 80) || null,
+    };
+  }
+  const [user] = await db("users").where("user_uid", id).select("user_email");
+  const [resume] = await db("resumes").where("user_id", id).orderBy("updated_at", "desc").select("file_url").limit(1);
+  return {
+    cv_url: (resume?.file_url || "").trim().slice(0, 2048) || null,
+    email: (user?.user_email || "").trim().slice(0, 255) || null,
+    phone: null,
+  };
+}
+
 /**
  * Run bulk best-candidate follow-up from last 7 days sent.
  * @param {object} db - Knex instance
@@ -185,6 +208,7 @@ async function runBulkBestCandidateFollowupFromLast7Days(db, opts = {}) {
     if (!companyEmail) continue;
     const candidate = await getOneGoodOrStrongCandidate(job, db);
     if (!candidate) continue;
+    const contact = await resolveCandidateContact(candidate.id, db);
     const subject = `კანდიდატი ვაკანსიისთვის "${job.jobName}" - Samushao.ge`;
     const html = BEST_CANDIDATE_HTML(job, candidate.ai_description);
     toQueue.push({
@@ -194,6 +218,9 @@ async function runBulkBestCandidateFollowupFromLast7Days(db, opts = {}) {
       subject,
       html,
       best_candidate_id: candidate.id,
+      best_candidate_cv_url: contact.cv_url,
+      best_candidate_email: contact.email,
+      best_candidate_phone: contact.phone,
     });
   }
 
@@ -245,6 +272,9 @@ async function runBulkBestCandidateFollowupFromLast7Days(db, opts = {}) {
       subject: toInsert[i].subject,
       html: toInsert[i].html,
       best_candidate_id: toInsert[i].best_candidate_id ?? null,
+      best_candidate_cv_url: toInsert[i].best_candidate_cv_url ?? null,
+      best_candidate_email: toInsert[i].best_candidate_email ?? null,
+      best_candidate_phone: toInsert[i].best_candidate_phone ?? null,
     });
   }
 

@@ -895,6 +895,9 @@ async function sendNewJobEmail(job, opts = {}) {
         : NEW_JOB_HTML_TEMPLATE_BEST_CANDIDATE;
     const html = htmlTemplate({ ...job, jobLink }, candidateData);
     insertPayload.best_candidate_id = bestCandidate.id;
+    insertPayload.best_candidate_cv_url = (bestCandidate.cv_url || "").trim().slice(0, 2048) || null;
+    insertPayload.best_candidate_email = (bestCandidate.email || "").trim().slice(0, 255) || null;
+    insertPayload.best_candidate_phone = (bestCandidate.phone || "").trim().slice(0, 80) || null;
     insertPayload.subject = `თქვენი ვაკანსია "${job.jobName}" - Samushao.ge`;
     insertPayload.html = html;
   }
@@ -2370,6 +2373,7 @@ router.getEmailQueueDetails = async () => {
     }
 
     const getJob = (id) => jobMap[id] || {};
+    const hasStoredContactCols = await db.schema.hasColumn("new_job_email_queue", "best_candidate_cv_url").catch(() => false);
     const candidateCvUrlOrContact = (bc) => {
       if (!bc) return null;
       if (bc.cv_url) return bc.cv_url;
@@ -2377,8 +2381,15 @@ router.getEmailQueueDetails = async () => {
       if (bc.email) return `email: ${bc.email}`;
       return null;
     };
+    const cvUrlOrContactFromStored = (r) => {
+      if (!r) return null;
+      if (r.best_candidate_cv_url) return r.best_candidate_cv_url;
+      if (r.best_candidate_phone) return `phone: ${r.best_candidate_phone}`;
+      if (r.best_candidate_email) return `email: ${r.best_candidate_email}`;
+      return null;
+    };
 
-    // Build queue item with candidate info
+    // Build queue item with candidate info (prefer stored cv_url/email/phone for tracing)
     const buildItem = (r, status) => {
       const item = {
         queue_id: r.id,
@@ -2395,8 +2406,20 @@ router.getEmailQueueDetails = async () => {
       }
       if (hasBestCandidateId && r.best_candidate_id) {
         const bc = bestCandidateMap[r.best_candidate_id] || null;
-        item.best_candidate = bc;
-        item.candidate_cv_url_or_contact = candidateCvUrlOrContact(bc);
+        const useStored = hasStoredContactCols && (r.best_candidate_cv_url || r.best_candidate_email || r.best_candidate_phone);
+        item.best_candidate = useStored
+          ? {
+              id: r.best_candidate_id,
+              cv_url: r.best_candidate_cv_url ?? bc?.cv_url ?? null,
+              cv_file_name: bc?.cv_file_name ?? null,
+              name: bc?.name ?? null,
+              email: r.best_candidate_email ?? bc?.email ?? null,
+              phone: r.best_candidate_phone ?? bc?.phone ?? null,
+            }
+          : bc;
+        item.candidate_cv_url_or_contact = useStored
+          ? cvUrlOrContactFromStored(r)
+          : candidateCvUrlOrContact(bc);
       }
       return item;
     };
