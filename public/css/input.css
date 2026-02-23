@@ -1,12 +1,11 @@
 @import "tailwindcss";
 
-/* Custom fonts disabled – using system font
 @font-face {
     font-family: "MarkGeo";
     src: url("/fonts/MarkGEO-Medium.woff2") format("woff2");
     font-weight: 400;
     font-style: normal;
-    font-display: block;
+    font-display: swap;
 }
 
 @font-face {
@@ -14,7 +13,7 @@
     src: url("/fonts/MarkGEO-SemiBold.woff2") format("woff2");
     font-weight: 600;
     font-style: normal;
-    font-display: block;
+    font-display: swap;
 }
 
 @font-face {
@@ -24,17 +23,17 @@
     font-style: normal;
     font-display: block;
 }
-*/
 
 @layer base {
-    body, body * {
-        font-family: sans-serif !important;
+    body {
+        font-family: "MarkGeo", ui-sans-serif, system-ui, sans-serif;
     }
 }
 
 @theme {
-    --font-family-markgeo: sans-serif;
-    --font-family-mrgvlovani: sans-serif;
+    --font-sans: "MarkGeo", ui-sans-serif, system-ui, sans-serif;
+    --font-family-markgeo: "MarkGeo", sans-serif;
+    --font-family-mrgvlovani: "Mrgvlovani", sans-serif;
     --color-primary: #315eff;
     --color-secondary: #36454f;
 }

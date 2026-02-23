@@ -3,8 +3,7 @@
 @layer theme, base, components, utilities;
 @layer theme {
   :root, :host {
-    --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
-      "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-sans: "MarkGeo", ui-sans-serif, system-ui, sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
       "Liberation Mono", "Courier New", monospace;
     --color-red-400: oklch(0.704 0.191 22.216);
@@ -1475,9 +1474,30 @@
     }
   }
 }
+@font-face {
+  font-family: "MarkGeo";
+  src: url("/fonts/MarkGEO-Medium.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "MarkGeo";
+  src: url("/fonts/MarkGEO-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Mrgvlovani";
+  src: url("/fonts/bpg_mrgvlovani_caps_2010.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
 @layer base {
-  body, body * {
-    font-family: sans-serif !important;
+  body {
+    font-family: "MarkGeo", ui-sans-serif, system-ui, sans-serif;
   }
 }
 @property --tw-translate-x {
