@@ -2272,24 +2272,20 @@ router.getEmailQueueDetails = async () => {
       "new_job_email_queue",
       "best_candidate_id",
     );
-    const pendingRows = await db("new_job_email_queue as q")
-      .leftJoin("jobs as j", "j.id", "q.job_id")
-      .select(
-        "q.id as queue_id",
-        "q.job_id",
-        "q.email_type",
-        "q.best_candidate_id",
-        db.raw('j."jobName" as job_name'),
-        db.raw('j."companyName" as company_name'),
-        "j.company_email",
-        "q.send_after",
-      )
-      .orderBy("q.send_after", "asc");
-    const bestCandidateIds = hasBestCandidateId
-      ? pendingRows
-          .map((r) => r.best_candidate_id)
-          .filter(Boolean)
-      : [];
+    // Pending = every row in new_job_email_queue. One row in table = one item in pending with status "queued". No filter.
+    const pendingRows = await db("new_job_email_queue")
+      .orderBy("send_after", "asc");
+    const rows = Array.isArray(pendingRows) ? pendingRows : [];
+    const jobIds = [...new Set(rows.map((r) => r.job_id).filter(Boolean))];
+    const jobRows =
+      jobIds.length > 0
+        ? await db("jobs")
+            .whereIn("id", jobIds)
+            .select("id", "jobName", "companyName", "company_email")
+        : [];
+    const jobMap = Object.fromEntries((jobRows || []).map((j) => [j.id, j]));
+    const bestCandidateIds =
+      hasBestCandidateId ? rows.map((r) => r.best_candidate_id).filter(Boolean) : [];
     const realUserIds = bestCandidateIds.filter(
       (id) => !String(id).startsWith("no_cv_"),
     );
@@ -2315,7 +2311,7 @@ router.getEmailQueueDetails = async () => {
         realUserIds.length > 0
           ? await db("users")
               .whereIn("user_uid", realUserIds)
-              .select("user_uid", "user_name")
+              .select("user_uid", "user_name", "user_email")
           : [];
       const userMap = Object.fromEntries(
         userRows.map((u) => [u.user_uid, u]),
@@ -2351,27 +2347,37 @@ router.getEmailQueueDetails = async () => {
             cv_url: r?.file_url || null,
             cv_file_name: r?.file_name || null,
             name: u?.user_name || null,
-            email: null,
+            email: u?.user_email || null,
             phone: null,
           };
         }
       }
     }
 
-    const pending = pendingRows.map((r) => {
+    const job = (id) => jobMap[id] || {};
+    // Helper: ensure each queue item exposes candidate cv_url or phone/email for admin
+    const candidateCvUrlOrContact = (bc) => {
+      if (!bc) return null;
+      if (bc.cv_url) return bc.cv_url;
+      if (bc.phone) return `phone: ${bc.phone}`;
+      if (bc.email) return `email: ${bc.email}`;
+      return null;
+    };
+    const pending = rows.map((r) => {
       const item = {
-        queue_id: r.queue_id,
+        queue_id: r.id,
         job_id: r.job_id,
         email_type: r.email_type || "new_job",
-        job_name: r.job_name,
-        company_name: r.company_name,
-        company_email: r.company_email,
+        job_name: job(r.job_id).jobName ?? null,
+        company_name: job(r.job_id).companyName ?? null,
+        company_email: job(r.job_id).company_email ?? r.company_email_lower ?? null,
         send_after: r.send_after,
         status: "queued",
       };
       if (hasBestCandidateId && r.best_candidate_id) {
-        item.best_candidate =
-          bestCandidateMap[r.best_candidate_id] || null;
+        const bc = bestCandidateMap[r.best_candidate_id] || null;
+        item.best_candidate = bc;
+        item.candidate_cv_url_or_contact = candidateCvUrlOrContact(bc);
       }
       return item;
     });
@@ -2585,6 +2591,32 @@ router.requeueJobsByIds = async (jobIds) => {
   }
   return { added, pending: await getQueueCount() };
 };
+
+/**
+ * Bulk best-candidate follow-up: sent emails last 7 days → jobs → vector + Gemini → queue
+ * follow-ups spread over 5–6 hours. Same process as send-best-candidate-followup-emails.js.
+ */
+router.post("/bulk-best-candidate-followup", async (req, res) => {
+  try {
+    const dryRun = !!(req.body && (req.body.dryRun === true || req.body.dry_run === true));
+    const { runBulkBestCandidateFollowupFromLast7Days } = require("../services/bulkBestCandidateFollowup");
+    const result = await runBulkBestCandidateFollowupFromLast7Days(db, { dryRun });
+    if (result.inserted > 0 || (dryRun && (result.wouldInsert || 0) > 0)) {
+      triggerNewJobEmailQueue();
+    }
+    res.json({
+      ok: true,
+      dryRun,
+      ...result,
+      message: dryRun
+        ? `Would queue ${result.wouldInsert ?? 0} follow-up(s) over ${result.spreadHours ?? 6}h.`
+        : `Queued ${result.inserted} best-candidate follow-up(s). Spread over ${result.spreadHours ?? 6}h. Check /jobs/email-queue-details.`,
+    });
+  } catch (err) {
+    console.error("bulk-best-candidate-followup error:", err);
+    res.status(500).json({ error: err.message || "Bulk follow-up failed" });
+  }
+});
 
 function triggerNewJobEmailQueue() {
   if (!newJobEmailProcessorScheduled) {
