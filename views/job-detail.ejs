@@ -538,7 +538,7 @@
     }
 
     // Similar job clicks (delegated for dynamically loaded cards)
-    document.addEventListener('turbo:load', function () {
+    document.addEventListener('DOMContentLoaded', function () {
       var relatedContainer = document.getElementById('related-jobs-scroll');
       if (!relatedContainer) return;
       relatedContainer.addEventListener('click', function (e) {
@@ -1100,8 +1100,7 @@
           alert(err.message || 'გაგზავნა ვერ მოხერხდა');
         });
       }
-      document.addEventListener('turbo:load', function() {
-
+      function initFormDialog() {
         var openFormBtn = document.getElementById('openFormBtn');
         var openFormBtnDesktop = document.getElementById('openFormBtnDesktop');
         var closeFormBtn = document.getElementById('closeFormDialogBtn');
@@ -1119,14 +1118,15 @@
             submitForm(formDialogForm, document.getElementById('formSuccessDialog'));
           });
         }
-      });
+      }
+      document.addEventListener('DOMContentLoaded', initFormDialog);
     })();
   </script>
 
   <!-- Related jobs: prev/next buttons -->
   <script>
 (function () {
-  document.addEventListener('turbo:load', function () {
+  document.addEventListener('DOMContentLoaded', function () {
     var scrollEl = document.getElementById('related-jobs-scroll');
     var prevBtn = document.querySelector('.related-jobs-prev');
     var nextBtn = document.querySelector('.related-jobs-next');
