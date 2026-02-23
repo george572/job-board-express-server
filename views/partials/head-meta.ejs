@@ -19,6 +19,15 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 @font-face{font-family:"Mrgvlovani";src:url("/fonts/bpg_mrgvlovani_caps_2010.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap}
 </style>
 <link rel="preload" href="/css/style.css" as="style">
+<!-- Turbo Drive – instant SPA-like navigation -->
+<script type="module" src="https://unpkg.com/@hotwired/turbo@8"></script>
+<script>
+  document.addEventListener('turbo:render', function() {
+    if (window._paq) window._paq.push(['setCustomUrl', location.href]);
+    if (window._paq) window._paq.push(['trackPageView']);
+    if (window.amplitude) window.amplitude.track('Page View');
+  });
+</script>
 <% 
   var siteName = 'Samushao.ge';
   var title = (seo && seo.title) ? seo.title : (siteName + ' - ვაკანსიები');

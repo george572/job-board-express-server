@@ -14,7 +14,7 @@
   <div class="w-full mx-auto flex flex-col gap-0">
     <% if (todayJobs && todayJobs.length > 0) { %>
     <% todayJobs.slice(0, 5).forEach(job => { %>
-    <%- include('partials/jobItem.ejs', { job, slugify }) %>
+    <%- include('jobItem.ejs', { job, slugify }) %>
     <% }) %>
     <% } else { %>
     <p class="text-sm text-gray-500 py-4">დღევანდელი ვაკანსიები არ მოიძებნა.</p>
