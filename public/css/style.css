@@ -733,9 +733,6 @@
     --tw-border-style: dotted;
     border-style: dotted;
   }
-  .border-\[\#315EFF\] {
-    border-color: #315EFF;
-  }
   .border-\[\#E5E5E5\] {
     border-color: #E5E5E5;
   }
@@ -1008,9 +1005,9 @@
     --tw-font-weight: 500;
     font-weight: 500;
   }
-  .font-\[600\] {
-    --tw-font-weight: 600;
-    font-weight: 600;
+  .font-\[550\] {
+    --tw-font-weight: 550;
+    font-weight: 550;
   }
   .font-bold {
     --tw-font-weight: var(--font-weight-bold);
@@ -1255,11 +1252,6 @@
       display: block;
     }
   }
-  .sm\:flex {
-    @media (width >= 40rem) {
-      display: flex;
-    }
-  }
   .sm\:hidden {
     @media (width >= 40rem) {
       display: none;
@@ -1487,30 +1479,9 @@
     }
   }
 }
-@font-face {
-  font-family: "MarkGeo";
-  src: url("/fonts/MarkGEO-Medium.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "MarkGeo";
-  src: url("/fonts/MarkGEO-SemiBold.woff2") format("woff2");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Mrgvlovani";
-  src: url("/fonts/bpg_mrgvlovani_caps_2010.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
 @layer base {
-  body {
-    font-family: "MarkGeo", sans-serif;
+  body, body * {
+    font-family: sans-serif !important;
   }
 }
 @property --tw-translate-x {
