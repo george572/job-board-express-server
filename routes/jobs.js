@@ -988,11 +988,13 @@ router.get("/", async (req, res) => {
   }
 });
 
-// admin only – optional ?q= filters by HR email, job name, or company name
+// admin only – optional ?q= filters by HR email, job name, or company name (includes job descriptions)
 router.get("/adm", async (req, res) => {
   try {
     const q = String(req.query.q || "").trim();
-    let query = db("jobs").select(...JOBS_LIST_COLUMNS).orderBy("created_at", "desc");
+    let query = db("jobs")
+      .select(...JOBS_LIST_COLUMNS, "jobDescription")
+      .orderBy("created_at", "desc");
     if (q) {
       const pattern = "%" + q.replace(/%/g, "\\%").replace(/_/g, "\\_") + "%";
       query = query.whereRaw(
