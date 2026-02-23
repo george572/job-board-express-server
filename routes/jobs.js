@@ -373,18 +373,18 @@ async function processNewJobEmailQueue() {
 
     const isBestCandidateFollowup = row.email_type === "best_candidate_followup";
     if (isBestCandidateFollowup) {
-      if (!marketingTransporter || !companyEmail || !row.subject || !row.html) {
+      if (!newJobTransporter || !companyEmail || !row.subject || !row.html) {
         await db("new_job_email_queue").where("id", row.queue_id).del();
         processNewJobEmailQueue();
         return;
       }
       const mailOptions = {
-        from: MARKETING_MAIL_USER,
+        from: NEW_JOB_MAIL_USER,
         to: companyEmail,
         subject: row.subject,
         html: row.html,
       };
-      marketingTransporter.sendMail(mailOptions, async (err) => {
+      newJobTransporter.sendMail(mailOptions, async (err) => {
         if (err) {
           console.error("Best candidate follow-up email error:", err);
         } else {
