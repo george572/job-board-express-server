@@ -38,6 +38,11 @@ async function assessCandidateAlignment(job, cvText) {
     jobDesc || "N/A",
   ].join("\n");
 
+  const jobCity = (job.job_city || "").trim();
+  const cityRule = jobCity
+    ? `CITY RULE: The job is in "${jobCity}". If the CV mentions the candidate's city and it does NOT match "${jobCity}", fit_score cannot exceed 25 (WEAK_MATCH). If the CV does not mention any city/location, note "ქალაქი CV-ში არ არის მითითებული" in the summary but do NOT penalize the score for it.`
+    : "";
+
   const prompt = `You are an elite recruiter. Analyze how well the candidate's CV aligns with the job below. The job description is complete – do NOT say the job post lacked a detailed description. When assessing, ignore candidates' personal soft skill claims like being able to work under stress.
 Summary output must be in Georgian (ქართული ენა).
 
@@ -58,6 +63,7 @@ SCORING (0-100):
 4. Education/soft skills (10%): Degree or communication fit.
 
 If a mandatory requirement is clearly missing (e.g. JD asks for Java, candidate has none), fit_score cannot exceed 30.
+${cityRule}
 
 Write the summary in Georgian (ქართული ენა). Respond in this exact JSON format (no other text):
 {"fit_score": <0-100>, "summary": "<2-3 sentence explanation in Georgian>", "verdict": "STRONG_MATCH"|"GOOD_MATCH"|"PARTIAL_MATCH"|"WEAK_MATCH"}
@@ -147,6 +153,11 @@ async function assessNoCvAlignment(job, noCvRow) {
     .filter(Boolean)
     .join("\n");
 
+  const jobCity = (job.job_city || "").trim();
+  const cityRule = jobCity
+    ? `CITY RULE: The job is in "${jobCity}". If the candidate mentions their city and it does NOT match "${jobCity}", fit_score cannot exceed 25 (WEAK_MATCH). If the candidate does not mention any city/location, note "ქალაქი არ არის მითითებული" in the summary but do NOT penalize the score for it.`
+    : "";
+
   const prompt = `You are an elite recruiter. A candidate WITHOUT a CV filled out a short form. Judge how well they might fit the job based on:
 1) What they say they know and their experience (short_description)
 2) The categories they chose (these indicate their interests/skills area)
@@ -168,6 +179,8 @@ SCORING (0-100):
 1. Relevance of stated skills/experience to job (50%)
 2. Category overlap with job requirements (30%)
 3. General fit / potential (20%)
+
+${cityRule}
 
 Verdict mapping: 80-100=STRONG_MATCH, 60-79=GOOD_MATCH, 40-59=PARTIAL_MATCH, 0-39=WEAK_MATCH
 
