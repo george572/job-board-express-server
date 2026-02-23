@@ -410,7 +410,9 @@ async function processNewJobEmailQueue() {
       return;
     }
 
-    if (companyEmail && (await hasRecentlySentToCompany(companyEmail))) {
+    const isNewJobType =
+      row.email_type === "new_job" || row.email_type == null;
+    if (!isNewJobType && companyEmail && (await hasRecentlySentToCompany(companyEmail))) {
       console.log(
         `[Email queue] Skip job #${row.job_id} → ${companyEmail}: already sent in last 7 days`,
       );
@@ -418,7 +420,10 @@ async function processNewJobEmailQueue() {
       processNewJobEmailQueue();
       return;
     }
-    const claimed = companyEmail && (await claimAndSendToCompany(companyEmail));
+    const claimed =
+      isNewJobType || !companyEmail
+        ? true
+        : await claimAndSendToCompany(companyEmail);
     if (companyEmail && !claimed) {
       console.log(
         `[Email queue] Skip job #${row.job_id} → ${companyEmail}: claim failed (another process or rate limit)`,
@@ -841,21 +846,10 @@ async function sendNewJobEmail(job, opts = {}) {
       )
       .first();
     if (existingJob) return { queued: false, reason: "duplicate_job_in_queue" };
-    const existingCompany = await db("new_job_email_queue")
-      .where("company_email_lower", companyEmail)
-      .where((qb) =>
-        qb.where("email_type", "new_job").orWhereNull("email_type"),
-      )
-      .first();
-    if (existingCompany)
-      return { queued: false, reason: "company_already_in_queue" };
   } catch (e) {
     if (e.code === "42P01") {
       /* table doesn't exist yet */
     } else throw e;
-  }
-  if (await hasRecentlySentToCompany(companyEmail)) {
-    return { queued: false, reason: "already_sent_last_7_days" };
   }
 
   const now = Date.now();
@@ -911,27 +905,26 @@ async function sendNewJobEmail(job, opts = {}) {
 }
 
 /**
- * Send one email per company when multiple jobs are uploaded (bulk).
- * Evaluates the first job for candidates, then queues if conditions met.
+ * Queue one email for a single job (bulk insert: one email per job).
+ * Evaluates the job for candidates, then queues if conditions met.
  * @returns {{ queued: boolean; reason?: string }}
  */
-async function sendNewJobEmailToCompany(jobs, batchIndex, batchTotal) {
-  if (!newJobTransporter || !Array.isArray(jobs) || jobs.length === 0) {
+async function sendNewJobEmailForJob(job, batchIndex, batchTotal) {
+  if (!newJobTransporter || !job) {
     return { queued: false, reason: "no_transporter_or_empty" };
   }
-  const first = jobs[0];
-  const email = (first.company_email || "").trim();
-  if (!email || first.dont_send_email) {
+  const email = (job.company_email || "").trim();
+  if (!email || job.dont_send_email) {
     return { queued: false, reason: "no_email_or_dont_send" };
   }
   const fullJob = await db("jobs")
-    .where("id", first.id)
+    .where("id", job.id)
     .select("*")
     .first();
   if (!fullJob) return { queued: false, reason: "job_not_found" };
 
   const evalResult = await evaluateJobForNewJobEmail(fullJob).catch((e) => {
-    console.error("[evaluateJob] Bulk failed for job", first.id, ":", e.message);
+    console.error("[evaluateJob] Bulk failed for job", job.id, ":", e.message);
     return { shouldQueue: false, reason: e.message };
   });
 
@@ -941,12 +934,12 @@ async function sendNewJobEmailToCompany(jobs, batchIndex, batchTotal) {
 
   return sendNewJobEmail(
     {
-      id: first.id,
-      jobName: first.jobName,
-      companyName: first.companyName,
-      company_email: first.company_email,
-      jobSalary: first.jobSalary,
-      dont_send_email: first.dont_send_email,
+      id: job.id,
+      jobName: job.jobName,
+      companyName: job.companyName,
+      company_email: job.company_email,
+      jobSalary: job.jobSalary,
+      dont_send_email: job.dont_send_email,
     },
     {
       batchIndex,
@@ -1982,27 +1975,20 @@ router.post("/bulk", async (req, res) => {
       );
     }
 
-    // Send one email per company (group by company_email to avoid duplicates when company uploads multiple jobs)
+    // Queue one email per job (as many emails as jobs the company has)
     const jobsWithIds = toInsert
       .map((j, i) => ({ ...j, id: ids[i]?.id ?? ids[i] }))
       .filter((j) => !j.dont_send_email && (j.company_email || "").trim());
-    const byCompany = new Map();
-    for (const j of jobsWithIds) {
-      const key = (j.company_email || "").trim().toLowerCase();
-      if (!byCompany.has(key)) byCompany.set(key, []);
-      byCompany.get(key).push(j);
-    }
-    const companies = Array.from(byCompany.values());
     const emailStats = {
       queued: 0,
       skippedNoEmail: toInsert.length - jobsWithIds.length,
       skipped: {},
     };
-    for (let i = 0; i < companies.length; i++) {
-      const result = await sendNewJobEmailToCompany(
-        companies[i],
+    for (let i = 0; i < jobsWithIds.length; i++) {
+      const result = await sendNewJobEmailForJob(
+        jobsWithIds[i],
         i,
-        companies.length,
+        jobsWithIds.length,
       );
       if (result.queued) {
         emailStats.queued++;
@@ -2013,8 +1999,13 @@ router.post("/bulk", async (req, res) => {
     }
 
     console.log(
-      `✅ SUCCESS: Inserted ${ids.length} jobs. Emails: ${emailStats.queued} queued, ${companies.length - emailStats.queued} skipped.`,
+      `✅ SUCCESS: Inserted ${ids.length} jobs. Emails: ${emailStats.queued} queued, ${jobsWithIds.length - emailStats.queued} skipped.`,
     );
+    if (Object.keys(emailStats.skipped).length > 0) {
+      console.log(
+        `[Email queue] Skip reasons: ${JSON.stringify(emailStats.skipped)} (jobs with email: ${jobsWithIds.length}, queued: ${emailStats.queued})`,
+      );
+    }
     if (failedJobs.length > 0) {
       console.warn(
         `[!] Note: ${failedJobs.length} jobs were skipped due to errors.`,
@@ -2031,7 +2022,7 @@ router.post("/bulk", async (req, res) => {
       skippedAsDuplicates,
       failedJobs: failedJobs,
       emailQueue: {
-        companiesWithEmail: companies.length,
+        jobsWithEmail: jobsWithIds.length,
         queued: emailStats.queued,
         skippedNoEmail: emailStats.skippedNoEmail,
         skipped: emailStats.skipped,

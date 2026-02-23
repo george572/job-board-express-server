@@ -8,6 +8,10 @@ primary_region = 'fra'
 
 [build]
 
+# Run DB migrations before switching to the new release. If this fails, deploy is aborted.
+[deploy]
+  release_command = "npx knex migrate:latest"
+
 [http_service]
   internal_port = 4000
   force_https = true

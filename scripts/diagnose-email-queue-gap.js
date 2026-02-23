@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Diagnose why 45 uploaded jobs resulted in only 29 in the email queue.
- * Run: node scripts/diagnose-email-queue-gap.js
+ * Diagnose why N uploaded jobs resulted in fewer emails in the queue.
+ * Run: node scripts/diagnose-email-queue-gap.js [limit]
+ *      node scripts/diagnose-email-queue-gap.js 77
  *
  * Checks:
- * 1. First 45 jobs by created_at DESC (most recent upload)
+ * 1. First N jobs by id DESC (most recent upload)
  * 2. Which have company_email, dont_send_email
  * 3. Group by company_email (one email per company)
  * 4. Which are in new_job_email_queue
@@ -16,7 +17,7 @@ const env = process.env.NODE_ENV || "development";
 const db = require("knex")(knexConfig[env]);
 
 async function main() {
-  const limit = 45;
+  const limit = parseInt(process.argv[2] || "45", 10) || 45;
 
   const jobs = await db("jobs")
     .select("id", "jobName", "companyName", "company_email", "dont_send_email", "created_at")
@@ -38,7 +39,7 @@ async function main() {
     byEmail.get(key).push(j);
   }
 
-  console.log("\n=== EMAIL QUEUE DIAGNOSIS (45 most recent jobs by id DESC) ===\n");
+  console.log(`\n=== EMAIL QUEUE DIAGNOSIS (${limit} most recent jobs by id DESC) ===\n`);
   console.log("Total jobs fetched:", jobs.length);
   console.log("Jobs in email queue:", queuedJobIds.size);
   console.log("Unique company emails in jobs:", byEmail.size);
