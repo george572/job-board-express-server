@@ -3,12 +3,15 @@
  * Find approved jobs that have company_email and are NOT in the new_job email queue,
  * then requeue them (evaluate + add to queue). One email per job.
  *
+ * Default: only the 100 most recent jobs (by id) are considered. Use --all to consider every job.
+ *
  * Usage:
- *   node scripts/requeue-jobs-not-in-email-queue.js              # all such jobs
- *   node scripts/requeue-jobs-not-in-email-queue.js 77          # only 77 most recent by id
- *   node scripts/requeue-jobs-not-in-email-queue.js --dry-run    # print IDs and count, do not requeue
- *   node scripts/requeue-jobs-not-in-email-queue.js --ids 1067,1063,1061  # requeue these IDs only
- *   node scripts/requeue-jobs-not-in-email-queue.js --ids-file scripts/requeue-ids.txt
+ *   node scripts/requeue-jobs-not-in-email-queue.js              # 100 most recent only
+ *   node scripts/requeue-jobs-not-in-email-queue.js 77          # 77 most recent only
+ *   node scripts/requeue-jobs-not-in-email-queue.js --all        # consider ALL jobs (use with care)
+ *   node scripts/requeue-jobs-not-in-email-queue.js --dry-run   # print IDs and count, do not requeue
+ *   node scripts/requeue-jobs-not-in-email-queue.js --ids 1067,1063,1061
+ *   node scripts/requeue-jobs-not-in-email-queue.js --ids-file scripts/requeue-ids-from-diagnose.txt
  */
 require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
 const fs = require("fs");
@@ -38,15 +41,21 @@ async function main() {
       .filter((n) => !isNaN(n) && n > 0);
   }
 
+  const useAll = rawArgs.includes("--all");
   const args = rawArgs.filter(
     (a) =>
       a !== "--dry-run" &&
+      a !== "--all" &&
       a !== "--ids" &&
       a !== "--ids-file" &&
       (idsArgIdx < 0 || a !== rawArgs[idsArgIdx + 1]) &&
       (idsFileIdx < 0 || a !== rawArgs[idsFileIdx + 1]),
   );
-  const limit = args.length > 0 ? parseInt(args[0], 10) : null;
+  const limit =
+    useAll ? null : (args.length > 0 ? parseInt(args[0], 10) : 100);
+  if (!useAll && args.length === 0) {
+    console.log("(Default: considering only the 100 most recent jobs. Use --all to consider every job.)\n");
+  }
 
   let jobIds;
 
@@ -67,6 +76,9 @@ async function main() {
 
     if (limit != null && limit > 0) {
       jobsQuery.limit(limit);
+      console.log(`Considering ${limit} most recent jobs (by id DESC).\n`);
+    } else if (limit === null) {
+      console.log("Considering ALL jobs (--all).\n");
     }
 
     const jobs = await jobsQuery;
