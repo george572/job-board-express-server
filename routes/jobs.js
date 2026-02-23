@@ -2166,6 +2166,11 @@ const patchOrPutJob = async (req, res) => {
         const job = await db("jobs").where("id", jobId).select("jobName").first();
         if (job) cache.del(`/vakansia/${slugify(job.jobName)}-${jobId}`);
       }
+      // Invalidate job description cache when jobDescription was updated
+      if (updateData.jobDescription !== undefined) {
+        const descCache = req.app.locals.jobDescCache;
+        if (descCache) descCache.del(`desc_${jobId}`);
+      }
     }
 
     res.status(200).json({ message: "Job updated successfully" });
