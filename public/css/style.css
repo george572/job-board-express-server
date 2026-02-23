@@ -1005,10 +1005,6 @@
     --tw-font-weight: 500;
     font-weight: 500;
   }
-  .font-\[550\] {
-    --tw-font-weight: 550;
-    font-weight: 550;
-  }
   .font-bold {
     --tw-font-weight: var(--font-weight-bold);
     font-weight: var(--font-weight-bold);

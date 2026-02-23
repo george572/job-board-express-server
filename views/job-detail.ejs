@@ -220,19 +220,19 @@
           <section class="flex gap-2 flex-col h-auto items-start justify-start">
             <dl class="text-[14px] flex flex-col">
               <dt class="font-[mrgvlovani] font-[300] text-[#3F3F3F]"> ანაზღაურება </dt>
-              <dd class="mt-1 font-[550]"> <%= job.jobSalary ? '₾' + job.jobSalary : 'შეთანხმებით' %></dd>
+              <dd class="mt-1 font-[400]"> <%= job.jobSalary ? '₾' + job.jobSalary : 'შეთანხმებით' %></dd>
             </dl>
             <dl class="text-[14px] flex flex-col">
               <dt class="font-[mrgvlovani] font-[300] text-[#3F3F3F]"> ლოკაცია </dt>
-              <dd class="mt-1 font-[550]"><%= job.job_address || job.job_city || '-' %></dd>
+              <dd class="mt-1 font-[400]"><%= job.job_address || job.job_city || '-' %></dd>
             </dl>
             <dl class="text-[14px] flex flex-col">
               <dt class="font-[mrgvlovani] font-[300] text-[#3F3F3F]"> განაკვეთი </dt>
-              <dd class="mt-1 font-[550]"><%= job.job_type === 'full-time' ? 'სრული' : 'ნახევარი' %></dd>
+              <dd class="mt-1 font-[400]"><%= job.job_type === 'full-time' ? 'სრული' : 'ნახევარი' %></dd>
             </dl>
             <dl class="text-[14px] flex flex-col">
               <dt class="font-[mrgvlovani] font-[300] text-[#3F3F3F]"> გამოცდილება </dt>
-              <dd class="mt-1 font-[550]"><%= job.job_experience ? job.job_experience + ' წელი' : '-' %></dd>
+              <dd class="mt-1 font-[400]"><%= job.job_experience ? job.job_experience + ' წელი' : '-' %></dd>
             </dl>
           </section>
           <%
