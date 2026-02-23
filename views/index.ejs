@@ -24,14 +24,6 @@
     {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"მთავარი","item":"https://samushao.ge/"},{"@type":"ListItem","position":2,"name":"ვაკანსიები","item":"<%= (seo && seo.canonical) ? seo.canonical : 'https://samushao.ge/' %>"}]}
   </script>
   <link rel="stylesheet" href="/css/style.css" />
-  <!-- Fade in on index -->
-  <script>
-    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-    const SCROLL_KEY = 'scrollPos';
-    const PAGE_KEY = 'currentPage';
-    const JOBS_HTML_KEY = 'jobsContainerHTML';
-    (function(){ var p=sessionStorage.getItem('currentPage'); if(p&&parseInt(p,10)>1&&!sessionStorage.getItem('jobsContainerHTML')){ var pageNum=parseInt(p,10); var params=new URLSearchParams(window.location.search); params.set('section','main'); params.set('page','1'); params.set('limit',String(pageNum*5)); window.__restoreFetch=fetch('/api/home/section?'+params.toString(),{cache:'no-store'}).then(function(r){return r.text();});}})();
-  </script>
   <% if (currentPage > 1) { %>
   <link rel="prev" href="https://samushao.ge/<%= currentPage === 2 ? '' : '?page=' + (currentPage - 1) %>">
   <% } %>
@@ -40,7 +32,7 @@
   <% } %>
 </head>
 
-<body class="font-markgeo text-secondary bg-[#F8F9FA]" data-instant-intensity="viewport">
+<body class="font-markgeo text-secondary bg-[#F8F9FA]">
   <%- include('partials/gtm-noscript') %>
   <%- include('partials/header') %>
   <%- include('partials/filters') %>
@@ -330,610 +322,291 @@
   <% } %>
   </div>
   <script>
-    const categoryNames = {
-      '1': 'საოფისე',
-      '2': 'მომხმარებელთან ურთიერთობები',
-      '3': 'გაყიდვები',
-      '4': 'საბანკო-საფინანსო',
-      '5': 'საწყობი და წარმოება',
-      '6': 'საცალო ვაჭრობა',
-      '7': 'მზარეული',
-      '8': 'აზარტული',
-      '9': 'მენეჯმენტი',
-      '10': 'ფარმაცია',
-      '11': 'მიმტანი',
-      '12': 'ინჟინერია',
-      '13': 'ლოჯისტიკა',
-      '14': 'სამედიცინო',
-      '15': 'უსაფრთხოება',
-      '16': 'დისტრიბუცია',
-      '17': 'ინფორმაციული ტექნოლოგიები',
-      '18': 'დიასახლისი',
-      '19': 'სხვა',
-      '20': 'ბუღალტერია',
-      '21': 'მძღოლი',
-      '22': 'Web/Digital/Design',
-      '23': 'ექთანი',
-      '24': 'ექიმი',
-      '25': 'ადმინისტრატორი',
-      '26': 'HR'
-    };
+  // ─── LOAD-MORE & JOB TRACKING ───────────────────────────────────────────
 
-    const container = document.getElementById('jobs-container');
-    const jobsArea = document.getElementById('jobs-area');
-    const loadingEl = document.getElementById('loading-indicator');
-    const SCROLL_THRESHOLD = 400;
-    let isLoadingMore = false;
-    let scrollHandler = null;
+  const categoryNames = {
+    '1':'საოფისე','2':'მომხმარებელთან ურთიერთობები','3':'გაყიდვები',
+    '4':'საბანკო-საფინანსო','5':'საწყობი და წარმოება','6':'საცალო ვაჭრობა',
+    '7':'მზარეული','8':'აზარტული','9':'მენეჯმენტი','10':'ფარმაცია',
+    '11':'მიმტანი','12':'ინჟინერია','13':'ლოჯისტიკა','14':'სამედიცინო',
+    '15':'უსაფრთხოება','16':'დისტრიბუცია','17':'ინფორმაციული ტექნოლოგიები',
+    '18':'დიასახლისი','19':'სხვა','20':'ბუღალტერია','21':'მძღოლი',
+    '22':'Web/Digital/Design','23':'ექთანი','24':'ექიმი',
+    '25':'ადმინისტრატორი','26':'HR'
+  };
 
-    function trackPremiumPrioritizedClicks(link, section) {
-      try {
-        if (!window.amplitude) return;
-        var props = {
-          job_id: link.getAttribute('data-job-id'),
-          job_category: categoryNames[link.getAttribute('data-job-category')] || link.getAttribute('data-job-category'),
-          job_title: link.getAttribute('data-job-title'),
-          company: link.getAttribute('data-job-company'),
-          location: link.getAttribute('data-job-location'),
-          section: section
-        };
-        if (link.getAttribute('data-premium') === 'true') window.amplitude.track('Premium Job Clicked', props);
-        if (link.getAttribute('data-prioritize') === 'true') window.amplitude.track('Prioritized Job Clicked', props);
-      } catch (e) {}
-    }
+  window._isLoadingMore = false;
 
-    function bindNormalJobClicks(root) {
-      try {
-        if (!window.amplitude) return;
-        const scope = root || document;
-        const links = scope.querySelectorAll('#jobs-container a[data-job-id]');
-        links.forEach(function (link) {
-          if (link.__normalJobBound) return;
-          link.__normalJobBound = true;
-          link.addEventListener('click', function () {
-            try {
-              const categoryId = this.getAttribute('data-job-category');
-              window.amplitude.track('Normal Job Clicked', {
-                job_id: this.getAttribute('data-job-id'),
-                job_category: categoryNames[categoryId] || categoryId,
-                job_title: this.getAttribute('data-job-title'),
-                salary_range: this.getAttribute('data-salary-range'),
-                company: this.getAttribute('data-job-company'),
-                location: this.getAttribute('data-job-location')
-              });
-              trackPremiumPrioritizedClicks(this, 'normal');
-            } catch (e) {}
-          });
-        });
-      } catch (e) {}
-    }
+  function trackPremiumPrioritizedClicks(link, section) {
+    try {
+      if (!window.amplitude) return;
+      var props = {
+        job_id: link.getAttribute('data-job-id'),
+        job_category: categoryNames[link.getAttribute('data-job-category')] || link.getAttribute('data-job-category'),
+        job_title: link.getAttribute('data-job-title'),
+        company: link.getAttribute('data-job-company'),
+        location: link.getAttribute('data-job-location'),
+        section: section
+      };
+      if (link.getAttribute('data-premium') === 'true') window.amplitude.track('Premium Job Clicked', props);
+      if (link.getAttribute('data-prioritize') === 'true') window.amplitude.track('Prioritized Job Clicked', props);
+    } catch(e) {}
+  }
 
-    function loadMoreJobs() {
-      const jobsAreaEl = document.getElementById('jobs-area');
-      const containerEl = document.getElementById('jobs-container');
-      if (!jobsAreaEl || !containerEl || isLoadingMore) return;
-      const currentPage = parseInt(jobsAreaEl.dataset.currentPage || '1', 10);
-      const totalPages = parseInt(jobsAreaEl.dataset.totalPages || '1', 10);
-      if (currentPage >= totalPages) return;
-
-      isLoadingMore = true;
-      if (loadingEl) loadingEl.style.display = 'flex';
-
-      const params = new URLSearchParams(window.location.search);
-      params.set('page', currentPage + 1);
-      params.set('append', '1');
-      const base = (window.location.pathname || '/').replace(/\/$/, '') || '/';
-      const url = base + (params.toString() ? '?' + params.toString() : '?append=1');
-
-      fetch(url, { cache: 'no-store' })
-        .then(function (res) { return res.text(); })
-        .then(function (html) {
-          var parser = new DOMParser();
-          var doc = parser.parseFromString(html, 'text/html');
-          var fetchedContainer = doc.getElementById('jobs-container');
-          if (fetchedContainer) {
-            var articles = fetchedContainer.querySelectorAll('article');
-            articles.forEach(function (art) {
-              containerEl.appendChild(art.cloneNode(true));
+  function bindNormalJobClicks(root) {
+    try {
+      if (!window.amplitude) return;
+      var links = (root || document).querySelectorAll('#jobs-container a[data-job-id]');
+      links.forEach(function(link) {
+        if (link.__normalJobBound) return;
+        link.__normalJobBound = true;
+        link.addEventListener('click', function() {
+          try {
+            var cid = this.getAttribute('data-job-category');
+            window.amplitude.track('Normal Job Clicked', {
+              job_id: this.getAttribute('data-job-id'),
+              job_category: categoryNames[cid] || cid,
+              job_title: this.getAttribute('data-job-title'),
+              salary_range: this.getAttribute('data-salary-range'),
+              company: this.getAttribute('data-job-company'),
+              location: this.getAttribute('data-job-location')
             });
-            jobsAreaEl.dataset.currentPage = String(currentPage + 1);
-            bindNormalJobClicks(containerEl);
-          }
-        })
-        .catch(function (err) {
-          console.error('Load more error:', err);
-        })
-        .finally(function () {
-          isLoadingMore = false;
-          if (loadingEl) loadingEl.style.display = 'none';
+            trackPremiumPrioritizedClicks(this, 'normal');
+          } catch(e) {}
         });
-    }
-
-    function onScroll() {
-      const jobsAreaEl = document.getElementById('jobs-area');
-      if (!jobsAreaEl) return;
-      const currentPage = parseInt(jobsAreaEl.dataset.currentPage || '1', 10);
-      const totalPages = parseInt(jobsAreaEl.dataset.totalPages || '1', 10);
-      if (isLoadingMore || currentPage >= totalPages) return;
-
-      var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      var scrollHeight = document.documentElement.scrollHeight;
-      var clientHeight = document.documentElement.clientHeight;
-      if (scrollTop + clientHeight >= scrollHeight - SCROLL_THRESHOLD) {
-        loadMoreJobs();
-      }
-    }
-
-    function initLoadMore() {
-      if (scrollHandler) {
-        window.removeEventListener('scroll', scrollHandler);
-      }
-      scrollHandler = function () {
-        requestAnimationFrame(onScroll);
-      };
-      window.addEventListener('scroll', scrollHandler, { passive: true });
-    }
-
-    function removeDuplicateJobs() {
-      const containerEl = document.getElementById('jobs-container');
-      if (!containerEl) return;
-      const articles = containerEl.querySelectorAll('article[data-job-id]');
-      const seen = new Set();
-      articles.forEach(function(art) {
-        const id = art.getAttribute('data-job-id');
-        if (id && seen.has(id)) art.remove();
-        else if (id) seen.add(id);
       });
-    }
+    } catch(e) {}
+  }
 
-    removeDuplicateJobs();
-    window.removeDuplicateJobs = removeDuplicateJobs;
-    window.loadMoreJobs = loadMoreJobs;
-    bindNormalJobClicks(container);
-    initLoadMore();
-    window.reinitLoadMore = initLoadMore;
+  function removeDuplicateJobs() {
+    var c = document.getElementById('jobs-container');
+    if (!c) return;
+    var seen = new Set();
+    c.querySelectorAll('article[data-job-id]').forEach(function(a) {
+      var id = a.getAttribute('data-job-id');
+      if (id && seen.has(id)) a.remove(); else if (id) seen.add(id);
+    });
+  }
 
-    // Lazy-load below-fold sections (today's jobs, main jobs) when they scroll into view
-    (function initLazySections() {
-      const sections = document.querySelectorAll('[data-lazy-section][data-lazy-loaded="false"]');
-      if (sections.length === 0) return;
+  function loadMoreJobs() {
+    var jobsAreaEl = document.getElementById('jobs-area');
+    var containerEl = document.getElementById('jobs-container');
+    var loadingEl = document.getElementById('loading-indicator');
+    if (!jobsAreaEl || !containerEl || window._isLoadingMore) return;
+    var cur = parseInt(jobsAreaEl.dataset.currentPage || '1', 10);
+    var tot = parseInt(jobsAreaEl.dataset.totalPages || '1', 10);
+    if (cur >= tot) return;
 
-      const loadSection = function (el) {
-        const section = el.getAttribute('data-lazy-section');
-        if (!section || el.getAttribute('data-lazy-loaded') === 'true') return;
-        el.setAttribute('data-lazy-loaded', 'true');
+    window._isLoadingMore = true;
+    if (loadingEl) loadingEl.style.display = 'flex';
 
-        const params = new URLSearchParams(window.location.search);
-        params.set('section', section);
-        if (section === 'main') params.set('page', '1');
-        const url = '/api/home/section?' + params.toString();
-
-        fetch(url, { cache: 'no-store' })
-          .then(function (res) { return res.text(); })
-          .then(function (html) {
-            if (section === 'today') {
-              var wrapper = document.createElement('div');
-              wrapper.innerHTML = html.trim();
-              var sectionEl = wrapper.firstChild;
-              if (sectionEl && el.parentNode) {
-                el.parentNode.replaceChild(sectionEl, el);
-              }
-            } else if (section === 'main') {
-              var jobsArea = document.getElementById('jobs-area');
-              if (jobsArea) {
-                jobsArea.innerHTML = html;
-                var meta = jobsArea.querySelector('#jobs-area-meta');
-                if (meta) {
-                  jobsArea.dataset.currentPage = meta.getAttribute('data-current-page') || '1';
-                  jobsArea.dataset.totalPages = meta.getAttribute('data-total-pages') || '1';
-                }
-                bindNormalJobClicks(document.getElementById('jobs-container'));
-                if (window.reinitLoadMore) window.reinitLoadMore();
-                if (window.removeDuplicateJobs) window.removeDuplicateJobs();
-              }
-            }
-          })
-          .catch(function (err) {
-            console.error('Lazy section load error:', err);
-            el.setAttribute('data-lazy-loaded', 'false');
+    var params = new URLSearchParams(window.location.search);
+    params.set('page', cur + 1);
+    params.set('append', '1');
+    var base = (window.location.pathname || '/').replace(/\/$/, '') || '/';
+    fetch(base + '?' + params.toString(), { cache: 'no-store' })
+      .then(function(r) { return r.text(); })
+      .then(function(html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var fc = doc.getElementById('jobs-container');
+        if (fc) {
+          fc.querySelectorAll('article').forEach(function(a) {
+            containerEl.appendChild(a.cloneNode(true));
           });
-      };
+          jobsAreaEl.dataset.currentPage = String(cur + 1);
+          bindNormalJobClicks(containerEl);
+        }
+      })
+      .catch(function(e) { console.error('Load more:', e); })
+      .finally(function() {
+        window._isLoadingMore = false;
+        if (loadingEl) loadingEl.style.display = 'none';
+      });
+  }
 
-      var io = window.IntersectionObserver ? new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-          if (entry.isIntersecting) {
-            var el = entry.target;
-            io.unobserve(el);
-            loadSection(el);
-          }
-        });
-      }, { rootMargin: '200px 0px', threshold: 0.01 }) : null;
-
-      if (io) {
-        sections.forEach(function (el) { io.observe(el); });
-      } else {
-        sections.forEach(loadSection);
-      }
-    })();
-
-    function loadPage(targetPage, htmlPromise) {
-      var params = new URLSearchParams(window.location.search);
-      params.set('page', String(targetPage));
-      params.delete('append');
-      var base = (window.location.pathname || '/').replace(/\/$/, '') || '/';
-      var url = base + (params.toString() ? '?' + params.toString() : '');
-      var promise = htmlPromise || fetch(url, { cache: 'no-store' }).then(function (res) { return res.text(); });
-      return promise.then(function (html) {
-          var parser = new DOMParser();
-          var doc = parser.parseFromString(html, 'text/html');
-          var fetchedContainer = doc.getElementById('jobs-container');
-          var currentContainer = document.getElementById('jobs-container');
-          var currentJobsArea = document.getElementById('jobs-area');
-          var meta = doc.getElementById('jobs-area-meta') || doc.getElementById('jobs-area');
-          if (fetchedContainer && currentContainer) {
-            currentContainer.innerHTML = fetchedContainer.innerHTML;
-          }
-          if (meta && currentJobsArea) {
-            currentJobsArea.dataset.currentPage = meta.getAttribute('data-current-page') || meta.dataset.currentPage || '1';
-            currentJobsArea.dataset.totalPages = meta.getAttribute('data-total-pages') || meta.dataset.totalPages || '1';
-          }
-          if (window.removeDuplicateJobs) window.removeDuplicateJobs();
-          if (window.reinitLoadMore) window.reinitLoadMore();
-          bindNormalJobClicks(container);
-        });
-    }
-    window.loadPage = loadPage;
-
-    (function restoreScroll() {
-      var savedY = sessionStorage.getItem(SCROLL_KEY);
-      var savedPage = sessionStorage.getItem(PAGE_KEY);
-      var savedHtml = sessionStorage.getItem(JOBS_HTML_KEY);
-      if (savedY === null || savedPage === null) return;
-      var page = parseInt(savedPage, 10);
-      var y = parseInt(savedY, 10);
-      sessionStorage.removeItem(SCROLL_KEY);
-      sessionStorage.removeItem(PAGE_KEY);
-      sessionStorage.removeItem(JOBS_HTML_KEY);
-      if (page === 1) {
-        window.scrollTo(0, y);
-      } else if (savedHtml) {
+  function loadPage(targetPage, htmlPromise) {
+    var params = new URLSearchParams(window.location.search);
+    params.set('page', String(targetPage));
+    params.delete('append');
+    var base = (window.location.pathname || '/').replace(/\/$/, '') || '/';
+    var url = base + (params.toString() ? '?' + params.toString() : '');
+    return (htmlPromise || fetch(url, { cache: 'no-store' }).then(function(r) { return r.text(); }))
+      .then(function(html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var fc = doc.getElementById('jobs-container');
         var jc = document.getElementById('jobs-container');
         var ja = document.getElementById('jobs-area');
-        if (jc && ja) {
-          jc.innerHTML = savedHtml;
-          ja.dataset.currentPage = String(page);
-          if (window.removeDuplicateJobs) window.removeDuplicateJobs();
-          if (window.reinitLoadMore) window.reinitLoadMore();
-          bindNormalJobClicks(container);
-          requestAnimationFrame(function () { window.scrollTo(0, y); });
-        } else {
-          loadPage(page).then(function () { requestAnimationFrame(function () { window.scrollTo(0, y); }); });
+        var meta = doc.getElementById('jobs-area-meta') || doc.getElementById('jobs-area');
+        if (fc && jc) jc.innerHTML = fc.innerHTML;
+        if (meta && ja) {
+          ja.dataset.currentPage = meta.getAttribute('data-current-page') || meta.dataset.currentPage || '1';
+          ja.dataset.totalPages = meta.getAttribute('data-total-pages') || meta.dataset.totalPages || '1';
         }
-      } else {
-        loadPage(page, window.__restoreFetch).then(function () {
+        removeDuplicateJobs();
+        bindNormalJobClicks(jc);
+        setupScrollListener();
+      });
+  }
+
+  // ─── SCROLL LISTENER — only ONE, ever ───────────────────────────────────
+  function onScroll() {
+    var ja = document.getElementById('jobs-area');
+    if (!ja || window._isLoadingMore) return;
+    var cur = parseInt(ja.dataset.currentPage || '1', 10);
+    var tot = parseInt(ja.dataset.totalPages || '1', 10);
+    if (cur >= tot) return;
+    if (window.pageYOffset + window.innerHeight >= document.documentElement.scrollHeight - 400) {
+      loadMoreJobs();
+    }
+  }
+
+  function setupScrollListener() {
+    if (window.__scrollRaf) cancelAnimationFrame(window.__scrollRaf);
+    if (window.__scrollFn) window.removeEventListener('scroll', window.__scrollFn);
+    window.__scrollFn = function() {
+      if (window.__scrollRaf) cancelAnimationFrame(window.__scrollRaf);
+      window.__scrollRaf = requestAnimationFrame(onScroll);
+    };
+    window.addEventListener('scroll', window.__scrollFn, { passive: true });
+  }
+
+  // ─── LAZY SECTIONS ───────────────────────────────────────────────────────
+  function initLazySections() {
+    var sections = document.querySelectorAll('[data-lazy-section][data-lazy-loaded="false"]');
+    if (!sections.length) return;
+    var io = window.IntersectionObserver ? new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (!entry.isIntersecting) return;
+        var el = entry.target;
+        io.unobserve(el);
+        loadSection(el);
+      });
+    }, { rootMargin: '200px 0px', threshold: 0.01 }) : null;
+    sections.forEach(function(el) { io ? io.observe(el) : loadSection(el); });
+  }
+
+  function loadSection(el) {
+    var section = el.getAttribute('data-lazy-section');
+    if (!section || el.getAttribute('data-lazy-loaded') === 'true') return;
+    el.setAttribute('data-lazy-loaded', 'true');
+    var params = new URLSearchParams(window.location.search);
+    params.set('section', section);
+    if (section === 'main') params.set('page', '1');
+    fetch('/api/home/section?' + params.toString(), { cache: 'no-store' })
+      .then(function(r) { return r.text(); })
+      .then(function(html) {
+        if (section === 'today') {
+          var wrap = document.createElement('div');
+          wrap.innerHTML = html.trim();
+          if (wrap.firstChild && el.parentNode) el.parentNode.replaceChild(wrap.firstChild, el);
+        } else if (section === 'main') {
           var ja = document.getElementById('jobs-area');
-          if (ja) ja.dataset.currentPage = String(page);
-          requestAnimationFrame(function () { window.scrollTo(0, y); });
-        });
-      }
-    })();
-
-    window.addEventListener('pageshow', function (e) {
-      if (e.persisted) {
-        var savedY = sessionStorage.getItem(SCROLL_KEY);
-        if (savedY !== null) {
-          setTimeout(function () { window.scrollTo(0, parseInt(savedY, 10)); }, 50);
-          sessionStorage.removeItem(SCROLL_KEY);
-          sessionStorage.removeItem(PAGE_KEY);
+          if (!ja) return;
+          ja.innerHTML = html;
+          var meta = ja.querySelector('#jobs-area-meta');
+          if (meta) {
+            ja.dataset.currentPage = meta.getAttribute('data-current-page') || '1';
+            ja.dataset.totalPages = meta.getAttribute('data-total-pages') || '1';
+          }
+          bindNormalJobClicks(document.getElementById('jobs-container'));
+          removeDuplicateJobs();
+          setupScrollListener();
         }
-      }
+      })
+      .catch(function() { el.setAttribute('data-lazy-loaded', 'false'); });
+  }
+
+  // ─── SLIDERS ─────────────────────────────────────────────────────────────
+  function bindSlider(scrollId, prevSel, nextSel) {
+    var scroll = document.getElementById(scrollId);
+    if (!scroll) return;
+    [prevSel, nextSel].forEach(function(sel, i) {
+      document.querySelectorAll(sel).forEach(function(btn) {
+        var clone = btn.cloneNode(true);
+        btn.parentNode.replaceChild(clone, btn);
+        clone.addEventListener('click', function() {
+          scroll.scrollBy({ left: i === 0 ? -320 : 320, behavior: 'smooth' });
+        });
+      });
     });
+  }
 
-    var scrollTimeout;
-    window.addEventListener('scroll', function () {
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(function () {
-        var ja = document.getElementById('jobs-area');
-        if (ja) {
-          sessionStorage.setItem(SCROLL_KEY, String(window.scrollY));
-          sessionStorage.setItem(PAGE_KEY, ja.dataset.currentPage || '1');
-        }
-      }, 250);
-    }, { passive: true });
+  function initSliders() {
+    bindSlider('top-salary-scroll',      '.top-salary-prev',      '.top-salary-next');
+    bindSlider('top-popular-scroll',     '.top-popular-prev',     '.top-popular-next');
+    bindSlider('form-submission-scroll', '.form-submission-prev', '.form-submission-next');
+    bindSlider('recommended-scroll',     '.recommended-prev',     '.recommended-next');
+    bindSlider('top-cv-fit-scroll',      '.top-cv-fit-prev',      '.top-cv-fit-next');
+  }
 
-    document.addEventListener('click', function (e) {
-      var t = e.target;
-      if (!t || typeof t.closest !== 'function') return;
-      if (t.closest('a') || t.closest('form')) {
-        var ja = document.getElementById('jobs-area');
-        var jc = document.getElementById('jobs-container');
-        if (ja) {
-          sessionStorage.setItem(SCROLL_KEY, String(window.scrollY));
-          sessionStorage.setItem(PAGE_KEY, ja.dataset.currentPage || '1');
-          if (jc) try { sessionStorage.setItem(JOBS_HTML_KEY, jc.innerHTML); } catch(err) {}
-        }
-      }
-    }, true);
-
-  </script>
-
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      var scrollEl = document.getElementById('top-salary-scroll');
-      var prevBtn = document.querySelector('.top-salary-prev');
-      var nextBtn = document.querySelector('.top-salary-next');
-      if (scrollEl && prevBtn) prevBtn.addEventListener('click', function () {
-        scrollEl.scrollBy({ left: -320, behavior: 'smooth' });
-      });
-      if (scrollEl && nextBtn) nextBtn.addEventListener('click', function () {
-        scrollEl.scrollBy({ left: 320, behavior: 'smooth' });
-      });
-
-      var popularScroll = document.getElementById('top-popular-scroll');
-      var popularPrev = document.querySelector('.top-popular-prev');
-      var popularNext = document.querySelector('.top-popular-next');
-      if (popularScroll && popularPrev) popularPrev.addEventListener('click', function () {
-        popularScroll.scrollBy({ left: -320, behavior: 'smooth' });
-      });
-      if (popularScroll && popularNext) popularNext.addEventListener('click', function () {
-        popularScroll.scrollBy({ left: 320, behavior: 'smooth' });
-      });
-
-      var formSubmissionScroll = document.getElementById('form-submission-scroll');
-      var formSubmissionPrev = document.querySelector('.form-submission-prev');
-      var formSubmissionNext = document.querySelector('.form-submission-next');
-      if (formSubmissionScroll && formSubmissionPrev) formSubmissionPrev.addEventListener('click', function () {
-        formSubmissionScroll.scrollBy({ left: -320, behavior: 'smooth' });
-      });
-      if (formSubmissionScroll && formSubmissionNext) formSubmissionNext.addEventListener('click', function () {
-        formSubmissionScroll.scrollBy({ left: 320, behavior: 'smooth' });
-      });
-
-      var recommendedScroll = document.getElementById('recommended-scroll');
-      var recommendedPrev = document.querySelector('.recommended-prev');
-      var recommendedNext = document.querySelector('.recommended-next');
-      if (recommendedScroll && recommendedPrev) recommendedPrev.addEventListener('click', function () {
-        recommendedScroll.scrollBy({ left: -320, behavior: 'smooth' });
-      });
-      if (recommendedScroll && recommendedNext) recommendedNext.addEventListener('click', function () {
-        recommendedScroll.scrollBy({ left: 320, behavior: 'smooth' });
-      });
-
-      var topCvFitScroll = document.getElementById('top-cv-fit-scroll');
-      var topCvFitPrev = document.querySelector('.top-cv-fit-prev');
-      var topCvFitNext = document.querySelector('.top-cv-fit-next');
-      if (topCvFitScroll && topCvFitPrev) topCvFitPrev.addEventListener('click', function () {
-        topCvFitScroll.scrollBy({ left: -320, behavior: 'smooth' });
-      });
-      if (topCvFitScroll && topCvFitNext) topCvFitNext.addEventListener('click', function () {
-        topCvFitScroll.scrollBy({ left: 320, behavior: 'smooth' });
-      });
-
-      var topCvFitScroll = document.getElementById('top-cv-fit-scroll');
-      var topCvFitPrev = document.querySelector('.top-cv-fit-prev');
-      var topCvFitNext = document.querySelector('.top-cv-fit-next');
-      if (topCvFitScroll && topCvFitPrev) topCvFitPrev.addEventListener('click', function () {
-        topCvFitScroll.scrollBy({ left: -320, behavior: 'smooth' });
-      });
-      if (topCvFitScroll && topCvFitNext) topCvFitNext.addEventListener('click', function () {
-        topCvFitScroll.scrollBy({ left: 320, behavior: 'smooth' });
-      });
-
-      // Recommended: job click tracking
-      const recommendedCards = document.querySelectorAll('.recommended-card a[data-job-id]');
-      recommendedCards.forEach(function (card) {
-        card.addEventListener('click', function () {
+  // ─── AMPLITUDE TRACKING ──────────────────────────────────────────────────
+  function initTracking() {
+    function trackSliderJob(selector, eventName, section) {
+      document.querySelectorAll(selector + ' a[data-job-id]').forEach(function(card) {
+        if (card.__sliderBound) return;
+        card.__sliderBound = true;
+        card.addEventListener('click', function() {
           try {
-            if (window.amplitude) {
-              const categoryId = this.getAttribute('data-job-category');
-              window.amplitude.track('Recommended Job Clicked', {
-                job_id: this.getAttribute('data-job-id'),
-                job_category: categoryNames[categoryId] || categoryId,
-                job_title: this.getAttribute('data-job-title'),
-                salary_range: this.getAttribute('data-salary-range'),
-                title: this.getAttribute('data-job-title'),
-                company: this.getAttribute('data-job-company'),
-                location: this.getAttribute('data-job-location')
-              });
-              trackPremiumPrioritizedClicks(this, 'recommended');
-            }
-          } catch (e) {}
+            if (!window.amplitude) return;
+            var cid = this.getAttribute('data-job-category');
+            window.amplitude.track(eventName, {
+              job_id: this.getAttribute('data-job-id'),
+              job_category: categoryNames[cid] || cid,
+              job_title: this.getAttribute('data-job-title'),
+              salary_range: this.getAttribute('data-salary-range'),
+              company: this.getAttribute('data-job-company'),
+              location: this.getAttribute('data-job-location')
+            });
+            trackPremiumPrioritizedClicks(this, section);
+          } catch(e) {}
         });
       });
+    }
+    trackSliderJob('.recommended-card',     'Recommended Job Clicked',               'recommended');
+    trackSliderJob('.top-popular-card',     'Most Popular Job Clicked',              'most_popular');
+    trackSliderJob('.top-cv-fit-card',      'Top CV Fit Job Clicked',                'top_cv_fit');
+    trackSliderJob('.top-salary-card',      'Highest Paid Job Clicked',              'highest_paid');
+    trackSliderJob('.form-submission-card', 'Jobs Without CV Requirement Job Clicked','jobs_without_cv_requirement');
 
-      // Recommended: swipe/scroll tracking
-      if (recommendedScroll) {
-        var lastRecommendedScrollLeft = recommendedScroll.scrollLeft;
-        var recommendedScrollTimeout;
-        recommendedScroll.addEventListener('scroll', function () {
-          clearTimeout(recommendedScrollTimeout);
-          recommendedScrollTimeout = setTimeout(function () {
-            var now = recommendedScroll.scrollLeft;
-            if (now !== lastRecommendedScrollLeft && window.amplitude) {
-              try {
-                window.amplitude.track('Recommended Slider Swiped', {
-                  direction: now > lastRecommendedScrollLeft ? 'left' : 'right'
-                });
-              } catch (e) {}
-              lastRecommendedScrollLeft = now;
-            }
-          }, 150);
-        });
-      }
-
-      // Recommended: "See all" click tracking
-      const recommendedSeeAllLink = document.getElementById('recommended-see-all-link');
-      if (recommendedSeeAllLink) {
-        recommendedSeeAllLink.addEventListener('click', function () {
-          try {
-            if (window.amplitude) {
-              window.amplitude.track('Recommended See All Clicked');
-            }
-          } catch (e) {}
-        });
-      }
-
-      // Most popular: click tracking
-      const popularCards = document.querySelectorAll('.top-popular-card a[data-job-id]');
-      popularCards.forEach(function (card) {
-        card.addEventListener('click', function () {
-          try {
-            if (window.amplitude) {
-              const categoryId = this.getAttribute('data-job-category');
-              window.amplitude.track('Most Popular Job Clicked', {
-                job_id: this.getAttribute('data-job-id'),
-                job_category: categoryNames[categoryId] || categoryId,
-                job_title: this.getAttribute('data-job-title'),
-                salary_range: this.getAttribute('data-salary-range'),
-                title: this.getAttribute('data-job-title'),
-                company: this.getAttribute('data-job-company'),
-                location: this.getAttribute('data-job-location')
-              });
-              trackPremiumPrioritizedClicks(this, 'most_popular');
-            }
-          } catch (e) {}
-        });
+    var rAll = document.getElementById('recommended-see-all-link');
+    if (rAll && !rAll.__seeAllBound) {
+      rAll.__seeAllBound = true;
+      rAll.addEventListener('click', function() {
+        try { if (window.amplitude) window.amplitude.track('Recommended See All Clicked'); } catch(e) {}
       });
-
-      // Most popular: swipe/scroll tracking
-      if (popularScroll) {
-        var lastPopularScrollLeft = popularScroll.scrollLeft;
-        var popularScrollTimeout;
-        popularScroll.addEventListener('scroll', function () {
-          clearTimeout(popularScrollTimeout);
-          popularScrollTimeout = setTimeout(function () {
-            var now = popularScroll.scrollLeft;
-            if (now !== lastPopularScrollLeft && window.amplitude) {
-              try {
-                window.amplitude.track('Most Popular Slider Swiped', {
-                  direction: now > lastPopularScrollLeft ? 'left' : 'right'
-                });
-              } catch (e) {}
-              lastPopularScrollLeft = now;
-            }
-          }, 150);
-        });
-      }
-
-      // Top CV fit: job click tracking
-      const topCvFitCards = document.querySelectorAll('.top-cv-fit-card a[data-job-id]');
-      topCvFitCards.forEach(function (card) {
-        card.addEventListener('click', function () {
-          try {
-            if (window.amplitude) {
-              const categoryId = this.getAttribute('data-job-category');
-              window.amplitude.track('Top CV Fit Job Clicked', {
-                job_id: this.getAttribute('data-job-id'),
-                job_category: categoryNames[categoryId] || categoryId,
-                job_title: this.getAttribute('data-job-title'),
-                salary_range: this.getAttribute('data-salary-range'),
-                title: this.getAttribute('data-job-title'),
-                company: this.getAttribute('data-job-company'),
-                location: this.getAttribute('data-job-location')
-              });
-              trackPremiumPrioritizedClicks(this, 'top_cv_fit');
-            }
-          } catch (e) {}
-        });
-      });
-
-      // Top CV fit: swipe/scroll tracking
-      if (topCvFitScroll) {
-        var lastTopCvFitScrollLeft = topCvFitScroll.scrollLeft;
-        var topCvFitScrollTimeout;
-        topCvFitScroll.addEventListener('scroll', function () {
-          clearTimeout(topCvFitScrollTimeout);
-          topCvFitScrollTimeout = setTimeout(function () {
-            var now = topCvFitScroll.scrollLeft;
-            if (now !== lastTopCvFitScrollLeft && window.amplitude) {
-              try {
-                window.amplitude.track('Top CV Fit Slider Swiped', {
-                  direction: now > lastTopCvFitScrollLeft ? 'left' : 'right'
-                });
-              } catch (e) {}
-              lastTopCvFitScrollLeft = now;
-            }
-          }, 150);
-        });
-      }
-
-      // Top CV fit: "See all" click tracking
-      ['top-cv-fit-see-all-link', 'top-cv-fit-see-all-link-mobile'].forEach(function (id) {
-        var el = document.getElementById(id);
-        if (el) {
-          el.addEventListener('click', function () {
-            try {
-              if (window.amplitude) window.amplitude.track('Top CV Fit See All Clicked');
-            } catch (e) {}
-          });
-        }
-      });
-
-      const cards = document.querySelectorAll('.top-salary-card a[data-job-id]');
-      cards.forEach(function (card) {
-        card.addEventListener('click', function () {
-          try {
-            if (window.amplitude) {
-              const categoryId = this.getAttribute('data-job-category');
-              window.amplitude.track('Highest Paid Job Clicked', {
-                job_id: this.getAttribute('data-job-id'),
-                job_category: categoryNames[categoryId] || categoryId,
-                job_title: this.getAttribute('data-job-title'),
-                salary_range: this.getAttribute('data-salary-range'),
-                title: this.getAttribute('data-job-title'),
-                company: this.getAttribute('data-job-company'),
-                location: this.getAttribute('data-job-location')
-              });
-              trackPremiumPrioritizedClicks(this, 'highest_paid');
-            }
-          } catch (e) {}
-        });
-      });
-
-      // Jobs without CV requirement: job click tracking
-      const formSubmissionCards = document.querySelectorAll('.form-submission-card a[data-job-id]');
-      formSubmissionCards.forEach(function (card) {
-        card.addEventListener('click', function () {
-          try {
-            if (window.amplitude) {
-              const categoryId = this.getAttribute('data-job-category');
-              window.amplitude.track('Jobs Without CV Requirement Job Clicked', {
-                job_id: this.getAttribute('data-job-id'),
-                job_category: categoryNames[categoryId] || categoryId,
-                job_title: this.getAttribute('data-job-title'),
-                salary_range: this.getAttribute('data-salary-range'),
-                title: this.getAttribute('data-job-title'),
-                company: this.getAttribute('data-job-company'),
-                location: this.getAttribute('data-job-location')
-              });
-              trackPremiumPrioritizedClicks(this, 'jobs_without_cv_requirement');
-            }
-          } catch (e) {}
-        });
-      });
-
-      // Jobs without CV requirement: swipe/scroll tracking
-      if (formSubmissionScroll) {
-        var lastFormSubmissionScrollLeft = formSubmissionScroll.scrollLeft;
-        var formSubmissionScrollTimeout;
-        formSubmissionScroll.addEventListener('scroll', function () {
-          clearTimeout(formSubmissionScrollTimeout);
-          formSubmissionScrollTimeout = setTimeout(function () {
-            var now = formSubmissionScroll.scrollLeft;
-            if (now !== lastFormSubmissionScrollLeft && window.amplitude) {
-              try {
-                window.amplitude.track('Jobs Without CV Requirement Slider Swiped', {
-                  direction: now > lastFormSubmissionScrollLeft ? 'left' : 'right'
-                });
-              } catch (e) {}
-              lastFormSubmissionScrollLeft = now;
-            }
-          }, 150);
+    }
+    ['top-cv-fit-see-all-link','top-cv-fit-see-all-link-mobile'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el && !el.__seeAllBound) {
+        el.__seeAllBound = true;
+        el.addEventListener('click', function() {
+          try { if (window.amplitude) window.amplitude.track('Top CV Fit See All Clicked'); } catch(e) {}
         });
       }
     });
-  </script>
-  <%- include('partials/instant-page') %>
+  }
+
+  // ─── MAIN PAGE INIT — runs once per page, guaranteed ─────────────────────
+  function pageInit() {
+    removeDuplicateJobs();
+    bindNormalJobClicks(document.getElementById('jobs-container'));
+    setupScrollListener();
+    initLazySections();
+    initSliders();
+    initTracking();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', pageInit);
+  } else {
+    pageInit();
+  }
+
+  window.loadMoreJobs = loadMoreJobs;
+  window.loadPage = loadPage;
+  window.removeDuplicateJobs = removeDuplicateJobs;
+  window.reinitLoadMore = setupScrollListener;
+</script>
 </body>
 
 </html>

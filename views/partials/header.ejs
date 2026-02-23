@@ -7,7 +7,7 @@
   gtag('js', new Date());
   gtag('config', 'G-5NY4ZR4ZZX');
 </script>
-<div class="sticky top-0 z-50 w-full bg-gradient-to-r from-[#FAFAFA] to-[#FFFFFF] border border-gray-200 rounded-lg">
+<div id="site-header" class="sticky top-0 z-50 w-full bg-gradient-to-r from-[#FAFAFA] to-[#FFFFFF] border border-gray-200 rounded-lg">
   <header class="h-[60px] md:h-[112px] mx-auto p-4 flex justify-between items-center">
     <div class="flex items-center">
       <a href="/" class="cursor-pointer pr-2">
@@ -94,155 +94,61 @@
   }
 </style>
 <script>
-  // Burger toggle functionality - wait for DOM to load
-  document.addEventListener('DOMContentLoaded', function() {
-    const burgerToggle = document.getElementById('burgerToggle');
-    const responsiveNav = document.getElementById('responsiveNav');
-
+  function initHeader() {
+    var burgerToggle = document.getElementById('burgerToggle');
+    var responsiveNav = document.getElementById('responsiveNav');
     if (burgerToggle && responsiveNav) {
       burgerToggle.addEventListener('click', function(e) {
         e.stopPropagation();
         responsiveNav.classList.toggle('translate-x-full');
         burgerToggle.classList.toggle('active');
       });
-
-      // Close navbar when clicking outside
       document.addEventListener('click', function(e) {
-        if (!responsiveNav.classList.contains('translate-x-full') && 
-            !responsiveNav.contains(e.target) && 
+        if (!responsiveNav.classList.contains('translate-x-full') &&
+            !responsiveNav.contains(e.target) &&
             !burgerToggle.contains(e.target)) {
           responsiveNav.classList.add('translate-x-full');
           burgerToggle.classList.remove('active');
         }
       });
     }
-  });
 
-  function handleCredentialResponse(response) {
-    fetch('/api/auth/google', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          token: response.credential
-        })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) window.location.reload();
-      })
-      .catch(err => console.error("Auth Error:", err));
-  }
-  window.onload = function() {
-    const loginBtn = document.getElementById('headerGoogleLoginBtn');
-
+    var loginBtn = document.getElementById('headerGoogleLoginBtn');
     if (loginBtn) {
-      loginBtn.onclick = () => {
-        const client = google.accounts.oauth2.initTokenClient({
+      loginBtn.onclick = function() {
+        var client = google.accounts.oauth2.initTokenClient({
           client_id: "1057690677446-ld6vggfgc9bgj6rc56sdddoqvl9ro4qk.apps.googleusercontent.com",
           scope: 'email profile openid',
-          callback: (response) => {
-            // Send token to backend
+          callback: function(response) {
             fetch('/api/auth/google', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  access_token: response.access_token
-                })
-              })
-              .then(res => res.json())
-              .then(data => {
-                if (data.success) {
-                  window.location.reload(); // Reload to show logged-in state
-                }
-              })
-              .catch(err => console.error("Auth Error:", err));
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ access_token: response.access_token })
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+              if (data.success) window.location.reload();
+            })
+            .catch(function(err) { console.error("Auth Error:", err); });
           }
         });
-
-        // This opens the Google login popup
         client.requestAccessToken();
       };
     }
-  };
+  }
 
   document.addEventListener('click', function(e) {
-    const popup = document.getElementById('logoutPopup');
-    const popupContent = popup?.querySelector('div'); // The actual small popup div
-
-    // If popup is visible and click is outside the popup content
-    if (!popup.classList.contains('hidden') && !popupContent.contains(e.target)) {
+    var popup = document.getElementById('logoutPopup');
+    if (!popup) return;
+    var popupContent = popup.querySelector('div');
+    if (!popup.classList.contains('hidden') && popupContent && !popupContent.contains(e.target)) {
       popup.classList.add('hidden');
     }
   });
 
-  // Job link interceptor: use cached job + fetch only description (no full reload)
-  // Skip on touch devices – fetch+document.write+pushState breaks clicks after bfcache restore on mobile
-  var isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-
-  // Prefetch description: hover on desktop, touchstart on mobile (warms server cache)
-  window.__descPrefetch = window.__descPrefetch || {};
-  function prefetchDesc(jobId) {
-    if (!jobId || window.__descPrefetch[jobId]) return;
-    window.__descPrefetch[jobId] = fetch('/api/jobs/' + jobId + '/description', { credentials: 'same-origin' })
-      .then(function(r) { return r.json(); })
-      .then(function(d) { window.__descPrefetch[jobId] = d; return d; })
-      .catch(function() { delete window.__descPrefetch[jobId]; });
-  }
-  if (!isTouch) {
-    document.addEventListener('mouseenter', function(e) {
-      var t = e.target;
-      if (!t || typeof t.closest !== 'function') return;
-      var link = t.closest('a.js-job-link[data-job-id]');
-      if (link) prefetchDesc(link.getAttribute('data-job-id'));
-    }, true);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initHeader);
   } else {
-    document.addEventListener('touchstart', function(e) {
-      var t = e.target;
-      if (!t || typeof t.closest !== 'function') return;
-      var link = t.closest('a.js-job-link[data-job-id]');
-      if (link) prefetchDesc(link.getAttribute('data-job-id'));
-    }, { passive: true, capture: true });
-    fetch('/api/ping', { credentials: 'same-origin' }).catch(function(){});
+    initHeader();
   }
-
-  document.addEventListener('click', function(e) {
-    var t = e.target;
-    if (!t || typeof t.closest !== 'function') return;
-    var link = t.closest('a.js-job-link[href^="/vakansia/"][data-job-b64]');
-    if (!link || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
-    e.preventDefault();
-    var href = link.getAttribute('href');
-    var pathOnly = href.split('?')[0];
-    var jobB64 = link.getAttribute('data-job-b64');
-    if (!jobB64) { window.location.href = href; return; }
-    var job;
-    try { job = JSON.parse(atob(jobB64)); } catch (err) { window.location.href = href; return; }
-    if (!job || !job.id) { window.location.href = href; return; }
-    fetch(pathOnly, {
-      method: 'GET',
-      credentials: 'same-origin',
-      headers: { 'X-Cached-Job': jobB64 }
-    }).then(function(r) {
-      if (!r.ok) throw new Error(r.status);
-      return r.text();
-    }).then(function(html) {
-      window.__docWriteNav = true;
-      document.open();
-      document.write(html);
-      document.close();
-      window.scrollTo(0, 0);
-      window.history.pushState({}, '', pathOnly);
-    }).catch(function() { window.location.href = href; });
-  }, true);
-
-  window.addEventListener('popstate', function() {
-    if (window.__docWriteNav) {
-      window.location.reload();
-    }
-  });
-
 </script>
