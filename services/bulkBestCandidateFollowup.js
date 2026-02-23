@@ -197,8 +197,10 @@ async function runBulkBestCandidateFollowupFromLast7Days(db, opts = {}) {
     });
   }
 
+  // Only skip jobs that already have a PENDING (unsent) followup row; already-sent rows are fine to re-queue
   const existing = await db("new_job_email_queue")
     .where("email_type", "best_candidate_followup")
+    .whereNull("sent_at")
     .whereIn("job_id", toQueue.map((t) => t.job_id))
     .select("job_id");
   const existingJobIds = new Set((existing || []).map((r) => r.job_id));

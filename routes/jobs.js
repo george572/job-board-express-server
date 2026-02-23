@@ -199,10 +199,10 @@ async function claimAndSendToCompany(companyEmail) {
 
 async function getQueueCount() {
   try {
-    const r = await db("new_job_email_queue").count("id as n").first();
+    const r = await db("new_job_email_queue").whereNull("sent_at").count("id as n").first();
     return parseInt(r?.n || 0, 10);
   } catch (e) {
-    if (e.code === "42P01") return 0; // table doesn't exist yet
+    if (e.code === "42P01" || e.code === "42703") return 0;
     console.error("getQueueCount error:", e.message);
     return 0;
   }
@@ -275,10 +275,12 @@ async function processNewJobEmailQueue() {
         "j.jobSalary_min",
       )
       .whereRaw("q.send_after <= NOW()")
+      .whereNull("q.sent_at")
       .orderBy("q.send_after")
       .first();
     if (!row) {
       const nextRow = await db("new_job_email_queue")
+        .whereNull("sent_at")
         .select("send_after")
         .orderBy("send_after")
         .first();
@@ -390,7 +392,13 @@ async function processNewJobEmailQueue() {
             `📧 Sent best-candidate follow-up to ${companyEmail} (job #${row.job_id})`,
           );
         }
-        await db("new_job_email_queue").where("id", row.queue_id).del();
+        // Mark as sent instead of deleting — preserves best_candidate_id for admin
+        const hasSentAtCol = await db.schema.hasColumn("new_job_email_queue", "sent_at").catch(() => false);
+        if (hasSentAtCol) {
+          await db("new_job_email_queue").where("id", row.queue_id).update({ sent_at: db.fn.now() });
+        } else {
+          await db("new_job_email_queue").where("id", row.queue_id).del();
+        }
         newJobEmailLastSentAt = Date.now();
         const nextDelay = randomBetween(
           MIN_DELAY_BETWEEN_SENDS_MS,
@@ -2253,37 +2261,44 @@ router.getEmailQueueStatus = async () => {
 
 router.getEmailQueueDetails = async () => {
   try {
-    // Raw counts from queue table (no join) so we see best_candidate_followup etc. even if join drops rows
-    const queueCounts =
-      await db("new_job_email_queue")
-        .select("email_type")
-        .count("id as n")
-        .groupBy("email_type");
-    const pendingByType = {};
-    let queueTableTotal = 0;
-    for (const row of queueCounts || []) {
-      const type = row.email_type || "new_job";
-      const n = parseInt(row.n || 0, 10);
-      pendingByType[type] = n;
-      queueTableTotal += n;
-    }
-
     const hasBestCandidateId = await db.schema.hasColumn(
       "new_job_email_queue",
       "best_candidate_id",
     );
-    // Pending = every row in new_job_email_queue. One row in table = one item in pending with status "queued". No filter.
-    const pendingRows = await db("new_job_email_queue")
+    const hasSentAtCol = await db.schema.hasColumn(
+      "new_job_email_queue",
+      "sent_at",
+    );
+
+    // All rows from queue table (pending + sent follow-ups that are kept)
+    const allQueueRows = await db("new_job_email_queue")
       .orderBy("send_after", "asc");
-    const rows = Array.isArray(pendingRows) ? pendingRows : [];
-    const jobIds = [...new Set(rows.map((r) => r.job_id).filter(Boolean))];
+    const rows = Array.isArray(allQueueRows) ? allQueueRows : [];
+
+    // Split: pending (not yet sent) vs sent-followups (sent_at IS NOT NULL)
+    const pendingRows = hasSentAtCol ? rows.filter((r) => !r.sent_at) : rows;
+    const sentFollowupRows = hasSentAtCol ? rows.filter((r) => !!r.sent_at) : [];
+
+    // Counts by type (pending only)
+    const pendingByType = {};
+    let queueTableTotal = 0;
+    for (const r of pendingRows) {
+      const type = r.email_type || "new_job";
+      pendingByType[type] = (pendingByType[type] || 0) + 1;
+      queueTableTotal++;
+    }
+
+    // Resolve jobs for all queue rows
+    const allJobIds = [...new Set(rows.map((r) => r.job_id).filter(Boolean))];
     const jobRows =
-      jobIds.length > 0
+      allJobIds.length > 0
         ? await db("jobs")
-            .whereIn("id", jobIds)
+            .whereIn("id", allJobIds)
             .select("id", "jobName", "companyName", "company_email")
         : [];
     const jobMap = Object.fromEntries((jobRows || []).map((j) => [j.id, j]));
+
+    // Resolve best candidates for all rows that have best_candidate_id
     const bestCandidateIds =
       hasBestCandidateId ? rows.map((r) => r.best_candidate_id).filter(Boolean) : [];
     const realUserIds = bestCandidateIds.filter(
@@ -2354,8 +2369,7 @@ router.getEmailQueueDetails = async () => {
       }
     }
 
-    const job = (id) => jobMap[id] || {};
-    // Helper: ensure each queue item exposes candidate cv_url or phone/email for admin
+    const getJob = (id) => jobMap[id] || {};
     const candidateCvUrlOrContact = (bc) => {
       if (!bc) return null;
       if (bc.cv_url) return bc.cv_url;
@@ -2363,25 +2377,35 @@ router.getEmailQueueDetails = async () => {
       if (bc.email) return `email: ${bc.email}`;
       return null;
     };
-    const pending = rows.map((r) => {
+
+    // Build queue item with candidate info
+    const buildItem = (r, status) => {
       const item = {
         queue_id: r.id,
         job_id: r.job_id,
         email_type: r.email_type || "new_job",
-        job_name: job(r.job_id).jobName ?? null,
-        company_name: job(r.job_id).companyName ?? null,
-        company_email: job(r.job_id).company_email ?? r.company_email_lower ?? null,
+        job_name: getJob(r.job_id).jobName ?? null,
+        company_name: getJob(r.job_id).companyName ?? null,
+        company_email: getJob(r.job_id).company_email ?? r.company_email_lower ?? null,
         send_after: r.send_after,
-        status: "queued",
+        status,
       };
+      if (status === "sent" && r.sent_at) {
+        item.sent_at = r.sent_at;
+      }
       if (hasBestCandidateId && r.best_candidate_id) {
         const bc = bestCandidateMap[r.best_candidate_id] || null;
         item.best_candidate = bc;
         item.candidate_cv_url_or_contact = candidateCvUrlOrContact(bc);
       }
       return item;
-    });
+    };
 
+    const pending = pendingRows.map((r) => buildItem(r, "queued"));
+    // Sent follow-ups from the queue (have sent_at, candidate data preserved)
+    const sentFollowups = sentFollowupRows.map((r) => buildItem(r, "sent"));
+
+    // Also include the original new_job_email_sent tracking rows
     const hasMarketingSent = await db.schema.hasColumn(
       "jobs",
       "marketing_email_sent",
@@ -2395,7 +2419,7 @@ router.getEmailQueueDetails = async () => {
       : hasGeneralMarketingSent
         ? "general_marketing_email_sent"
         : null;
-    const sentRows = sentFlagCol
+    const sentTrackingRows = sentFlagCol
       ? await db.raw(
           `SELECT s.company_email_lower, s.sent_at, j.id as job_id, j.job_name, j.company_name
            FROM new_job_email_sent s
@@ -2409,15 +2433,18 @@ router.getEmailQueueDetails = async () => {
            ORDER BY s.sent_at DESC`,
         )
       : { rows: [] };
-    const sentData = Array.isArray(sentRows) ? sentRows : sentRows?.rows || [];
-    const sent = sentData.map((r) => ({
+    const sentTrackingData = Array.isArray(sentTrackingRows) ? sentTrackingRows : sentTrackingRows?.rows || [];
+    const sentFromTracking = sentTrackingData.map((r) => ({
       job_id: r.job_id,
       job_name: r.job_name,
       company_name: r.company_name,
       company_email: r.company_email_lower,
       sent_at: r.sent_at,
       status: "sent",
+      email_type: "new_job",
     }));
+
+    const sent = [...sentFollowups, ...sentFromTracking];
 
     return {
       pending,
@@ -2425,6 +2452,8 @@ router.getEmailQueueDetails = async () => {
       summary: {
         queued: pending.length,
         sent: sent.length,
+        sent_followups: sentFollowups.length,
+        sent_new_job: sentFromTracking.length,
         queue_table_total: queueTableTotal,
         pending_by_type: pendingByType,
       },

@@ -415,7 +415,7 @@ app.use((req, res, next) => {
           }
         }
       }
-      return res.set("Content-Type", "text/html; charset=utf-8").send(cached);
+      return res.set({ "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache" }).send(cached);
     }
   }
   next();
@@ -515,7 +515,7 @@ app.use((req, res, next) => {
           }
         }
       }
-      return res.set("Content-Type", "text/html; charset=utf-8").send(cached);
+      return res.set({ "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache" }).send(cached);
     }
     const origSend = res.send.bind(res);
     res.send = function (body) {
@@ -1883,6 +1883,8 @@ const jobDescCache = new NodeCache({ stdTTL: 1800, checkperiod: 120 });
 app.locals.jobDescCache = jobDescCache;
 app.get("/api/jobs/:id/description", async (req, res) => {
   try {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    res.set("Pragma", "no-cache");
     const jobId = parseInt(req.params.id, 10);
     if (!jobId || isNaN(jobId)) return res.status(400).json({ error: "Invalid job ID" });
 
