@@ -186,9 +186,9 @@
           <% if (job.job_premium_status === 'premiumPlus' || job.job_premium_status === 'premium') { %>
             <div class="mb-3">
               <% if (job.job_premium_status === 'premiumPlus') { %>
-                <span class="text-[11px] px-2 py-0.5 rounded bg-[#FF5B0F] text-white font-[400]">პრემიუმ +</span>
+                <span class="text-[11px] px-2 py-0.5 rounded bg-[#FF5B0F] text-white font-[500]">პრემიუმ +</span>
               <% } else { %>
-                <span class="text-[11px] px-2 py-0.5 rounded bg-[#315EFF] text-white font-[400]">პრემიუმი</span>
+                <span class="text-[11px] px-2 py-0.5 rounded bg-[#315EFF] text-white font-[500]">პრემიუმი</span>
               <% } %>
             </div>
           <% } %>
@@ -196,7 +196,7 @@
             <h1 class="mb-0 lg:mb-6 flex items-center gap-2 flex-wrap">
             <span class="text-[16px] text-[#151515] font-[500] pb-2"><%= 'ვაკანსია' + ' - ' + job.jobName %></span>
             <% if (typeof isExpired !== 'undefined' && isExpired) { %>
-            <span class="text-[11px] px-2 py-0.5 rounded bg-gray-200 text-gray-600 font-[400]">არქივი</span>
+            <span class="text-[11px] px-2 py-0.5 rounded bg-gray-200 text-gray-600 font-[500]">არქივი</span>
             <% } %>
           </h1>
             <div class="flex lg:hidden gap-2 items-center">
@@ -206,7 +206,7 @@
               </div>
               <% } %>
               <div class="flex flex-col gap-1">
-                <h2 class="text-[14px] text-[#6B7280] font-[400]"><%= job.companyName %></h2><time class="w-full text-[12px] text-start font-[400]">9 Feb - 11 Mar</time>
+                <h2 class="text-[14px] text-[#6B7280] font-[500]"><%= job.companyName %></h2><time class="w-full text-[12px] text-start font-[500]">9 Feb - 11 Mar</time>
               </div>
             </div>
             <!---->
@@ -218,7 +218,7 @@
                 </div>
                 <% } %>
                 <div class="flex flex-col gap-1">
-                  <h2 class="text-[14px] text-[#6B7280] font-[400]"><%= job.companyName %></h2><time class="w-full text-[12px] text-start font-[400]">9 Feb - 11 Mar</time>
+                  <h2 class="text-[14px] text-[#6B7280] font-[500]"><%= job.companyName %></h2><time class="w-full text-[12px] text-start font-[500]">9 Feb - 11 Mar</time>
                 </div>
               </div>
             </div>
@@ -226,20 +226,20 @@
           <div class="w-full h-[1px] bg-[#F0F0F0] my-6"></div>
           <section class="flex gap-2 flex-col h-auto items-start justify-start">
             <dl class="text-[14px] flex flex-col">
-              <dt class="font-[400] text-[#6B7280]"> ანაზღაურება </dt>
-              <dd class="mt-1 font-[400]"> <%= job.jobSalary ? '₾' + job.jobSalary : 'შეთანხმებით' %></dd>
+              <dt class="font-[500] text-[#6B7280]"> ანაზღაურება </dt>
+              <dd class="mt-1 font-[500]"> <%= job.jobSalary ? '₾' + job.jobSalary : 'შეთანხმებით' %></dd>
             </dl>
             <dl class="text-[14px] flex flex-col">
-              <dt class="font-[400] text-[#6B7280]"> ლოკაცია </dt>
-              <dd class="mt-1 font-[400]"><%= job.job_address || job.job_city || '-' %></dd>
+              <dt class="font-[500] text-[#6B7280]"> ლოკაცია </dt>
+              <dd class="mt-1 font-[500]"><%= job.job_address || job.job_city || '-' %></dd>
             </dl>
             <dl class="text-[14px] flex flex-col">
-              <dt class="font-[400] text-[#6B7280]"> განაკვეთი </dt>
-              <dd class="mt-1 font-[400]"><%= job.job_type === 'full-time' ? 'სრული' : 'ნახევარი' %></dd>
+              <dt class="font-[500] text-[#6B7280]"> განაკვეთი </dt>
+              <dd class="mt-1 font-[500]"><%= job.job_type === 'full-time' ? 'სრული' : 'ნახევარი' %></dd>
             </dl>
             <dl class="text-[14px] flex flex-col">
-              <dt class="font-[400] text-[#6B7280]"> გამოცდილება </dt>
-              <dd class="mt-1 font-[400]"><%= job.job_experience ? job.job_experience + ' წელი' : '-' %></dd>
+              <dt class="font-[500] text-[#6B7280]"> გამოცდილება </dt>
+              <dd class="mt-1 font-[500]"><%= job.job_experience ? job.job_experience + ' წელი' : '-' %></dd>
             </dl>
           </section>
           <%
@@ -269,7 +269,7 @@
             <button id="openDialogBtn" class="bg-[#315EFF] w-[296px] h-[52px] text-white rounded-lg my-8 mb-1 text-[16px] mt-8 <% if (!user) { %>opacity-50 cursor-not-allowed<% } else { %>cursor-pointer<% } %>" <% if (!user) { %>disabled<% } %>> გააგზავნე რეზიუმე </button>
             <% if (typeof acceptFormSubmissions !== 'undefined' && acceptFormSubmissions) { %>
             <p class="pl-4">ან შეავსე განაცხადის ფორმა</p>
-            <button type="button" id="openFormBtnDesktop" class=" w-[296px] h-[52px] border bg-[#315EFF] text-white rounded-lg text-[14px] font-[400] mt-2">
+            <button type="button" id="openFormBtnDesktop" class=" w-[296px] h-[52px] border bg-[#315EFF] text-white rounded-lg text-[14px] font-[500] mt-2">
               განაცხადის ფორმა
             </button>
             <% } %>
@@ -279,7 +279,7 @@
         </section>
       </nav>
       <section class="px-4">
-        <div id="jobDescriptionCard" class="w-full bg-white rounded-lg p-4 lg:p-8 font-[400] border border-[#E5E5E5] mt-5 hidden">
+        <div id="jobDescriptionCard" class="w-full bg-white rounded-lg p-4 lg:p-8 font-[500] border border-[#E5E5E5] mt-5 hidden">
           <div id="jobDescription" class="break-words desc-text text-sm" aria-live="polite"></div>
         </div>
 
@@ -337,7 +337,7 @@
         <button id="openDialogBtn2" class="bg-[#315EFF] mt-2 w-full min-h-[52px] text-white rounded-lg my-8 mt-0 mb-1 text-[16px] <% if (!user) { %>opacity-50 cursor-not-allowed<% } else { %>cursor-pointer<% } %>" <% if (!user) { %>disabled<% } %>> გააგზავნე რეზიუმე </button>
         <% if (typeof acceptFormSubmissions !== 'undefined' && acceptFormSubmissions) { %>
         <p class="text-center">ან შეავსე განაცხადის ფორმა</p>
-        <button type="button" id="openFormBtn" class="cursor-pointer min-w-[296px] w-full h-[52px] border bg-[#315EFF] text-white rounded-lg text-[14px] font-[400] mt-2">
+        <button type="button" id="openFormBtn" class="cursor-pointer min-w-[296px] w-full h-[52px] border bg-[#315EFF] text-white rounded-lg text-[14px] font-[500] mt-2">
           განაცხადის ფორმა
         </button>
         <% } %>
@@ -357,7 +357,7 @@
         <div>
           <!-- Header with close button -->
           <div class="w-full flex justify-between items-center">
-            <span id="dialogHeaderText" class="text-[16px] font-[400]">ატვირთე რეზიუმე</span>
+            <span id="dialogHeaderText" class="text-[16px] font-[500]">ატვირთე რეზიუმე</span>
             <button id="closeDialogBtn" class="cursor-pointer">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M1.40098 14L0.000976562 12.6L5.60098 7L0.000976562 1.4L1.40098 0L7.00098 5.6L12.601 0L14.001 1.4L8.40098 7L14.001 12.6L12.601 14L7.00098 8.4L1.40098 14Z" fill="#151515"></path>
@@ -378,17 +378,17 @@
                 <path d="M8.66941 23.3333V10.4708C8.66941 9.8291 8.90274 9.28466 9.36941 8.83743C9.83608 8.39021 10.3902 8.1666 11.0319 8.1666H23.8361C24.4777 8.1666 25.027 8.39507 25.484 8.85202C25.9409 9.30896 26.1694 9.85827 26.1694 10.4999V19.8333L20.3361 25.6666H11.0027C10.3611 25.6666 9.81177 25.4381 9.35483 24.9812C8.89788 24.5242 8.66941 23.9749 8.66941 23.3333ZM2.86524 7.2916C2.74858 6.64993 2.87496 6.07146 3.24441 5.55618C3.61385 5.04091 4.11941 4.72493 4.76108 4.60827L17.4194 2.36243C18.0611 2.24577 18.6395 2.37216 19.1548 2.7416C19.6701 3.11105 19.9861 3.6166 20.1027 4.25827L20.3944 5.83327H11.0027C9.71941 5.83327 8.6208 6.29021 7.70691 7.2041C6.79302 8.11799 6.33608 9.2166 6.33608 10.4999V21.6416C6.02496 21.4666 5.7576 21.2333 5.53399 20.9416C5.31038 20.6499 5.16941 20.3194 5.11108 19.9499L2.86524 7.2916ZM23.8361 18.6666H19.1694V23.3333L23.8361 18.6666Z" fill="#315EFF"></path>
               </g>
             </svg>
-            <span class="underline font-[400]">აირჩიე ფაილი</span>
+            <span class="underline font-[500]">აირჩიე ფაილი</span>
           </div>
 
-          <div id="uploadFormatText" class="text-[14px] font-[400] mt-2">
+          <div id="uploadFormatText" class="text-[14px] font-[500] mt-2">
             <span>ფორმატი:</span>
-            <span class="text-[#315EFF] font-[400] pl-2">.PDF .DOC .DOCX</span>
+            <span class="text-[#315EFF] font-[500] pl-2">.PDF .DOC .DOCX</span>
           </div>
 
           <!-- Selected file (shown when a file is chosen OR an existing CV is found) -->
           <div id="selectedFileBox" class="hidden p-4 mt-6 min-h-[94px] rounded-lg border border-[#E5E5E5] flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2 font-[400] min-w-0 flex-1">
+            <div class="flex items-center gap-2 font-[500] min-w-0 flex-1">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="flex-shrink-0 text-[#315EFF]">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm0 2l5 5h-5V4zM8 13h8v2H8v-2zm0 4h8v2H8v-2z" fill="currentColor"/>
               </svg>
@@ -404,7 +404,7 @@
 
           <!-- Upload progress -->
           <div id="uploadProgressBox" class="hidden mt-4">
-            <div class="flex justify-between text-[14px] font-[400] mb-1">
+            <div class="flex justify-between text-[14px] font-[500] mb-1">
               <span>იტვირთება...</span>
               <span id="uploadProgressPercent">0%</span>
             </div>
@@ -432,7 +432,7 @@
       <div class="dialog-backdrop" id="formDialogBackdrop"></div>
       <div class="dialog-panel p-8">
         <div class="w-full flex justify-between items-center mb-4">
-          <span class="text-[16px] font-[400]">განაცხადის ფორმა</span>
+          <span class="text-[16px] font-[500]">განაცხადის ფორმა</span>
           <button type="button" id="closeFormDialogBtn" class="cursor-pointer">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1.40098 14L0.000976562 12.6L5.60098 7L0.000976562 1.4L1.40098 0L7.00098 5.6L12.601 0L14.001 1.4L8.40098 7L14.001 12.6L12.601 14L7.00098 8.4L1.40098 14Z" fill="#151515"></path></svg>
           </button>
@@ -442,7 +442,7 @@
           <input type="text" name="applicant_name" required placeholder="სახელი" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px]" />
           <input type="tel" name="applicant_phone" placeholder="ტელეფონი" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px]" />
           <textarea name="message" placeholder="ორიოდე სიტყვით თქვენს შესახებ" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] resize-none"></textarea>
-          <button type="submit" class="w-full h-[52px] bg-[#315EFF] text-white rounded-lg text-[16px] font-[400]">გაგზავნა</button>
+          <button type="submit" class="w-full h-[52px] bg-[#315EFF] text-white rounded-lg text-[16px] font-[500]">გაგზავნა</button>
         </form>
         <p id="formSuccessDialog" class="hidden text-[14px] text-green-600 mt-2 text-center">გამოგზავნილია!</p>
       </div>

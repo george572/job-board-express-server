@@ -992,10 +992,6 @@
     --tw-leading: var(--leading-snug);
     line-height: var(--leading-snug);
   }
-  .font-\[400\] {
-    --tw-font-weight: 400;
-    font-weight: 400;
-  }
   .font-\[500\] {
     --tw-font-weight: 500;
     font-weight: 500;
