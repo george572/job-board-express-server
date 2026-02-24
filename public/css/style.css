@@ -3,7 +3,7 @@
 @layer theme, base, components, utilities;
 @layer theme {
   :root, :host {
-    --font-sans: 'FiraGO', ui-sans-serif, system-ui, sans-serif;
+    --font-sans: ui-sans-serif, system-ui, sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
       "Liberation Mono", "Courier New", monospace;
     --color-red-400: oklch(0.704 0.191 22.216);
@@ -1470,33 +1470,35 @@
     }
   }
 }
-@font-face {
-  font-family: 'FiraGO';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('/fonts/FiraGO-Regular.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'FiraGO';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('/fonts/FiraGO-Medium.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'FiraGO';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('/fonts/FiraGO-SemiBold.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'FiraGO';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('/fonts/FiraGO-Bold.woff2') format('woff2');
+@media (min-width: 768px) {
+  @font-face {
+    font-family: 'Noto Sans Georgian Fallback';
+    src: local('Segoe UI'), local('Arial'), local('Helvetica Neue'), local('Helvetica');
+    ascent-override: 106.80%;
+    descent-override: 29.20%;
+    line-gap-override: 0%;
+  }
+  @font-face {
+    font-family: 'Noto Sans Georgian';
+    font-style: normal;
+    font-weight: 400 700;
+    font-stretch: 100%;
+    font-display: optional;
+    src: url('/fonts/NotoSansGeorgian-georgian.woff2') format('woff2');
+    unicode-range: U+0589, U+10A0-10FF, U+1C90-1CBA, U+1CBD-1CBF, U+205A, U+2D00-2D2F, U+2E31;
+  }
+  @font-face {
+    font-family: 'Noto Sans Georgian';
+    font-style: normal;
+    font-weight: 400 700;
+    font-stretch: 100%;
+    font-display: optional;
+    src: url('/fonts/NotoSansGeorgian-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  :root {
+    --font-sans: 'Noto Sans Georgian', 'Noto Sans Georgian Fallback', ui-sans-serif, system-ui, sans-serif;
+  }
 }
 @property --tw-translate-x {
   syntax: "*";

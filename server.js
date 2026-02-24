@@ -544,6 +544,11 @@ app.use(
   }),
 );
 
+// Fonts never change — cache for 1 year
+app.use("/fonts", express.static(path.join(__dirname, "public/fonts"), {
+  maxAge: "365d",
+  immutable: true,
+}));
 // Serve static files with long cache
 app.use(express.static(path.join(__dirname, "public"), { maxAge: "7d" }));
 app.use("/uploads", express.static("uploads", { maxAge: "30d" }));
