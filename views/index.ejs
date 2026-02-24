@@ -602,6 +602,13 @@
     pageInit();
   }
 
+  window.addEventListener('pageshow', function(e) {
+    if (e.persisted) {
+      setupScrollListener();
+      initSliders();
+    }
+  });
+
   window.loadMoreJobs = loadMoreJobs;
   window.loadPage = loadPage;
   window.removeDuplicateJobs = removeDuplicateJobs;

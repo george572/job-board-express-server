@@ -165,7 +165,6 @@
         }).catch(function(){});
       }
       window.addEventListener('pagehide', sendDuration);
-      window.addEventListener('beforeunload', sendDuration);
       document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'hidden') sendDuration(); });
     })();
   </script>

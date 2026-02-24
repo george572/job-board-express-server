@@ -415,7 +415,7 @@ app.use((req, res, next) => {
           }
         }
       }
-      return res.set({ "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache" }).send(cached);
+      return res.set({ "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-cache" }).send(cached);
     }
   }
   next();
@@ -515,7 +515,7 @@ app.use((req, res, next) => {
           }
         }
       }
-      return res.set({ "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache" }).send(cached);
+      return res.set({ "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-cache" }).send(cached);
     }
     const origSend = res.send.bind(res);
     res.send = function (body) {
@@ -1794,8 +1794,7 @@ app.get("/vakansia/:slug", async (req, res) => {
       return res.status(404).render("404", { message: "Job not found" });
     }
 
-    res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
-    res.set("Pragma", "no-cache");
+    res.set("Cache-Control", "private, no-cache");
 
     const correctSlug = slugify(job.jobName) + "-" + job.id;
     if (!cachedJobB64) {
