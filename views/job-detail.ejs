@@ -272,8 +272,8 @@
         </section>
       </nav>
       <section class="px-4">
-        <div class="w-full bg-white rounded-lg p-4 lg:p-8 font-[400] border border-[#E5E5E5] mt-5">
-          <div id="jobDescription" class="break-words desc-text text-sm" aria-live="polite">იტვირთება...</div>
+        <div id="jobDescriptionCard" class="w-full bg-white rounded-lg p-4 lg:p-8 font-[400] border border-[#E5E5E5] mt-5 hidden">
+          <div id="jobDescription" class="break-words desc-text text-sm" aria-live="polite"></div>
         </div>
 
 
@@ -463,6 +463,8 @@
 
       function injectDesc(text) {
         if (!text) { descEl.textContent = ''; return; }
+        var card = document.getElementById('jobDescriptionCard');
+        if (card) card.classList.remove('hidden');
         if (isHtml(text)) {
           descEl.classList.remove('whitespace-pre-wrap');
           descEl.innerHTML = formattedDisplay(text);
