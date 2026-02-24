@@ -12,7 +12,15 @@
     <% if (job.job_premium_status === 'premium' || job.job_premium_status === 'premiumPlus') { %>data-premium="true"<% } %>
     <% if (job.prioritize === true || job.prioritize === 1 || job.prioritize === 'true') { %>data-prioritize="true"<% } %>
   >
-    <% if (job.job_premium_status === 'premiumPlus' || job.job_premium_status === 'premium') { %><div class="w-full mb-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-[#315EFF] text-white font-[400]"><%= job.job_premium_status === 'premiumPlus' ? 'პრემიუმ+' : 'პრემიუმი' %></span></div><% } %>
+    <% if (job.job_premium_status === 'premiumPlus' || job.job_premium_status === 'premium') { %>
+      <div class="w-full mb-2">
+        <% if (job.job_premium_status === 'premiumPlus') { %>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-[#FF5B0F] text-white font-[400]">პრემიუმ +</span>
+        <% } else { %>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-[#315EFF] text-white font-[400]">პრემიუმი</span>
+        <% } %>
+      </div>
+    <% } %>
     <header class="w-full text-sm flex justify-between">
       <div class="flex gap-2 items-center">
         <% if (job.company_logo) { %>

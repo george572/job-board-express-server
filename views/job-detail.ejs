@@ -184,7 +184,15 @@
               <path d="M3.86089 7.1124L1.14214 4.39365C1.07964 4.33115 1.03589 4.26865 1.01089 4.20615C0.985889 4.14365 0.973389 4.0749 0.973389 3.9999C0.973389 3.9249 0.985889 3.85615 1.01089 3.79365C1.03589 3.73115 1.07964 3.66865 1.14214 3.60615L3.86089 0.887402C3.89839 0.849902 3.93901 0.821777 3.98276 0.803027C4.02651 0.784277 4.07339 0.774902 4.12339 0.774902C4.22339 0.774902 4.31089 0.809277 4.38589 0.878027C4.46089 0.946777 4.49839 1.0374 4.49839 1.1499V6.8499C4.49839 6.9624 4.46089 7.05303 4.38589 7.12178C4.31089 7.19053 4.22339 7.2249 4.12339 7.2249C4.09839 7.2249 4.01089 7.1874 3.86089 7.1124Z" fill="#151515"></path>
             </svg><span class="text-[14px]">ყველა ვაკანსია</span></a></div>
         <section class="bg-white rounded-lg self-start w-full lg:min-w-[360px] lg:max-w-[360px] relative <%= (job.job_premium_status === 'premium' || job.job_premium_status === 'premiumPlus') ? 'pt-2 px-4 pb-4 lg:px-8 lg:pb-8 border border-[#EBEBEB]' : 'p-4 lg:p-8 border border-[#EBEBEB]' %>">
-          <% if (job.job_premium_status === 'premiumPlus' || job.job_premium_status === 'premium') { %><div class="mb-3"><span class="text-[11px] px-2 py-0.5 rounded bg-[#315EFF] text-white font-[400]"><%= job.job_premium_status === 'premiumPlus' ? 'პრემიუმ+' : 'პრემიუმი' %></span></div><% } %>
+          <% if (job.job_premium_status === 'premiumPlus' || job.job_premium_status === 'premium') { %>
+            <div class="mb-3">
+              <% if (job.job_premium_status === 'premiumPlus') { %>
+                <span class="text-[11px] px-2 py-0.5 rounded bg-[#FF5B0F] text-white font-[400]">პრემიუმ +</span>
+              <% } else { %>
+                <span class="text-[11px] px-2 py-0.5 rounded bg-[#315EFF] text-white font-[400]">პრემიუმი</span>
+              <% } %>
+            </div>
+          <% } %>
           <header>
             <h1 class="mb-0 lg:mb-6 flex items-center gap-2 flex-wrap">
             <span class="text-[16px] text-[#151515] font-[500] pb-2"><%= 'ვაკანსია' + ' - ' + job.jobName %></span>

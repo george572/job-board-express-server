@@ -257,7 +257,7 @@ async function processNewJobEmailQueue() {
         `[Email queue] DB now: ${debug.db_now}, first send_after: ${debug.first_send_after}`,
       );
     }
-    const row = await db("new_job_email_queue as q")
+    let row = await db("new_job_email_queue as q")
       .leftJoin("jobs as j", "j.id", "q.job_id")
       .select(
         "q.id as queue_id",
@@ -299,6 +299,29 @@ async function processNewJobEmailQueue() {
         newJobEmailProcessorScheduled = false;
       }
       return;
+    }
+    try {
+      const hasSentAtCol = await db.schema
+        .hasColumn("new_job_email_queue", "sent_at")
+        .catch(() => false);
+      if (hasSentAtCol) {
+        const updatedRows = await db("new_job_email_queue")
+          .where("id", row.queue_id)
+          .whereNull("sent_at")
+          .update({ sent_at: db.fn.now() })
+          .returning("*");
+        if (!updatedRows || updatedRows.length === 0) {
+          console.log(
+            `[Email queue] Queue row #${row.queue_id} already claimed by another worker; moving to next item.`,
+          );
+          processNewJobEmailQueue();
+          return;
+        }
+        const claimed = updatedRows[0];
+        row = { ...row, ...claimed };
+      }
+    } catch (claimErr) {
+      console.error("processNewJobEmailQueue claim error:", claimErr.message);
     }
     // No sends after 18:00 Georgia: reschedule to next day 10:00, 10:07, 10:14… (spread)
     if (isAfter1830()) {
@@ -473,11 +496,37 @@ async function processNewJobEmailQueue() {
         await db("jobs")
           .where("id", row.job_id)
           .update({ marketing_email_sent: true });
+        try {
+          // Track that we've sent a new-job email to this company (used by diagnostics/follow-ups)
+          await db("new_job_email_sent")
+            .insert({
+              company_email_lower: companyEmail,
+              sent_at: db.fn.now(),
+            })
+            .onConflict("company_email_lower")
+            .merge({ sent_at: db.fn.now() });
+        } catch (trackErr) {
+          console.error("new_job_email_sent upsert error:", trackErr.message);
+        }
         console.log(
           `📧 Sent new-job email to ${job.company_email?.trim()} (job #${job.id}: ${job.jobName})`,
         );
       }
-      await db("new_job_email_queue").where("id", row.queue_id).del();
+      // Mark queue row as sent (do not delete) so sent items keep best_candidate + cv/contact
+      try {
+        const hasSentAtCol = await db.schema
+          .hasColumn("new_job_email_queue", "sent_at")
+          .catch(() => false);
+        if (hasSentAtCol) {
+          await db("new_job_email_queue")
+            .where("id", row.queue_id)
+            .update({ sent_at: db.fn.now() });
+        } else {
+          await db("new_job_email_queue").where("id", row.queue_id).del();
+        }
+      } catch (sentMarkErr) {
+        console.error("new_job_email_queue sent_at update error:", sentMarkErr.message);
+      }
       newJobEmailLastSentAt = Date.now();
       const nextDelay = randomBetween(
         MIN_DELAY_BETWEEN_SENDS_MS,
