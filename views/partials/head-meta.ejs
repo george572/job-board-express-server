@@ -1,15 +1,6 @@
-<!-- Google Tag Manager -->
-<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','GTM-M3NVD46L');</script>
-<!-- End Google Tag Manager -->
-
-<link rel="icon" type="image/x-icon" href="/images/favicon.ico">
-<link rel="preconnect" href="https://samushao.ge">
 <link rel="preload" href="/fonts/FiraGO-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/css/style.css" as="style">
+<link rel="icon" type="image/x-icon" href="/images/favicon.ico">
 <% 
   var siteName = 'Samushao.ge';
   var title = (seo && seo.title) ? seo.title : (siteName + ' - ვაკანსიები');
@@ -27,78 +18,79 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <meta property="og:url" content="<%= canonical %>">
 <link rel="canonical" href="<%= canonical %>">
 <% } %>
-<!-- Twitter Card (fallback to OG when not set) -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="<%= title %>">
 <meta name="twitter:description" content="<%= description %>">
 <meta name="twitter:image" content="<%= ogImage %>">
 
-<!-- Microsoft Clarity -->
-<script type="text/javascript">
+<!-- GTM -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-M3NVD46L');</script>
+
+<script>
+window.addEventListener('load', function() {
+  var initTracking = function() {
+    // Clarity
     (function(c,l,a,r,i,t,y){
         c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
         t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
         y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
     })(window, document, "clarity", "script", "vgfbdtfkcg");
-</script>
 
-<!-- Matomo & Amplitude - Delayed initialization -->
-<script>
-  // Initialize Matomo and Amplitude after page load + delay
-  window.addEventListener('load', function() {
-    var initAnalytics = function() {
-      // Matomo initialization
-      var _paq = window._paq = window._paq || [];
-      _paq.push(['trackPageView']);
-      _paq.push(['enableLinkTracking']);
-      (function() {
-        var u="https://samushaoge.matomo.cloud/";
-        _paq.push(['setTrackerUrl', u+'matomo.php']);
-        _paq.push(['setSiteId', '1']);
-        var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];
-        g.async=true; g.src='https://cdn.matomo.cloud/samushaoge.matomo.cloud/matomo.js'; s.parentNode.insertBefore(g,s);
-      })();
+    // Matomo
+    var _paq = window._paq = window._paq || [];
+    _paq.push(['trackPageView']);
+    _paq.push(['enableLinkTracking']);
+    (function() {
+      var u="https://samushaoge.matomo.cloud/";
+      _paq.push(['setTrackerUrl', u+'matomo.php']);
+      _paq.push(['setSiteId', '1']);
+      var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];
+      g.async=true; g.src='https://cdn.matomo.cloud/samushaoge.matomo.cloud/matomo.js'; s.parentNode.insertBefore(g,s);
+    })();
 
-      // Amplitude initialization
-      var ampScript = document.createElement('script');
-      ampScript.src = 'https://cdn.amplitude.com/script/80195a7a80425609b3760c948db9fec2.js';
-      ampScript.onload = function() {
-        var engagementScript = document.createElement('script');
-        engagementScript.src = 'https://cdn.amplitude.com/script/80195a7a80425609b3760c948db9fec2.engagement.js';
-        engagementScript.onload = function() {
-          window.amplitude.add(window.sessionReplay.plugin({sampleRate: 1}));
-          window.amplitude.init('80195a7a80425609b3760c948db9fec2', {
-            fetchRemoteConfig: true,
-            autocapture: {
-              attribution: true,
-              fileDownloads: true,
-              formInteractions: true,
-              pageViews: true,
-              sessions: true,
-              elementInteractions: true,
-              networkTracking: true,
-              webVitals: true,
-              frustrationInteractions: {
-                errorClicks: true,
-                deadClicks: true,
-                rageClicks: true
-              }
+    // Amplitude
+    var ampScript = document.createElement('script');
+    ampScript.src = 'https://cdn.amplitude.com/script/80195a7a80425609b3760c948db9fec2.js';
+    ampScript.onload = function() {
+      var engagementScript = document.createElement('script');
+      engagementScript.src = 'https://cdn.amplitude.com/script/80195a7a80425609b3760c948db9fec2.engagement.js';
+      engagementScript.onload = function() {
+        window.amplitude.add(window.sessionReplay.plugin({sampleRate: 1}));
+        window.amplitude.init('80195a7a80425609b3760c948db9fec2', {
+          fetchRemoteConfig: true,
+          autocapture: {
+            attribution: true,
+            fileDownloads: true,
+            formInteractions: true,
+            pageViews: true,
+            sessions: true,
+            elementInteractions: true,
+            networkTracking: true,
+            webVitals: true,
+            frustrationInteractions: {
+              errorClicks: true,
+              deadClicks: true,
+              rageClicks: true
             }
-          });
-          window.amplitude.add(window.engagement.plugin());
-        };
-        document.head.appendChild(engagementScript);
+          }
+        });
+        window.amplitude.add(window.engagement.plugin());
       };
-      document.head.appendChild(ampScript);
+      document.head.appendChild(engagementScript);
     };
+    document.head.appendChild(ampScript);
+  };
 
-    // Use requestIdleCallback if available, otherwise setTimeout
-    if (window.requestIdleCallback) {
-      requestIdleCallback(function() {
-        setTimeout(initAnalytics, 2000);
-      }, { timeout: 3000 });
-    } else {
-      setTimeout(initAnalytics, 2500);
-    }
-  });
+  if (window.requestIdleCallback) {
+    requestIdleCallback(function() {
+      setTimeout(initTracking, 2000);
+    }, { timeout: 3000 });
+  } else {
+    setTimeout(initTracking, 2500);
+  }
+});
 </script>
