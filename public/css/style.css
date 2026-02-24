@@ -1,37 +1,9 @@
 /*! tailwindcss v4.1.18 | MIT License | https://tailwindcss.com */
-
-@font-face {
-  font-family: "Firago";
-  src: url("/fonts/firago-latin-200-normal.woff2") format("woff2"),
-       url("/fonts/firago-latin-200-normal.woff") format("woff");
-  font-weight: 200;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Firago";
-  src: url("/fonts/firago-latin-400-normal.woff2") format("woff2"),
-       url("/fonts/firago-latin-400-normal.woff") format("woff");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Firago";
-  src: url("/fonts/firago-latin-500-normal.woff2") format("woff2"),
-       url("/fonts/firago-latin-500-normal.woff") format("woff");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-
 @layer properties;
 @layer theme, base, components, utilities;
 @layer theme {
   :root, :host {
-    --font-sans: "Firago", ui-sans-serif, system-ui, sans-serif;
+    --font-sans: ui-sans-serif, system-ui, sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
       "Liberation Mono", "Courier New", monospace;
     --color-red-400: oklch(0.704 0.191 22.216);
@@ -1020,10 +992,6 @@
     --tw-leading: var(--leading-snug);
     line-height: var(--leading-snug);
   }
-  .font-\[300\] {
-    --tw-font-weight: 300;
-    font-weight: 300;
-  }
   .font-\[400\] {
     --tw-font-weight: 400;
     font-weight: 400;
@@ -1055,8 +1023,8 @@
   .whitespace-pre-wrap {
     white-space: pre-wrap;
   }
-  .text-\[\#3F3F3F\] {
-    color: #3F3F3F;
+  .text-\[\#6B7280\] {
+    color: #6B7280;
   }
   .text-\[\#315EFF\] {
     color: #315EFF;

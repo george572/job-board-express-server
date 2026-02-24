@@ -206,7 +206,7 @@
               </div>
               <% } %>
               <div class="flex flex-col gap-1">
-                <h2 class="text-[14px] text-[#3F3F3F] font-[400]"><%= job.companyName %></h2><time class="w-full text-[12px] text-start font-[400]">9 Feb - 11 Mar</time>
+                <h2 class="text-[14px] text-[#6B7280] font-[400]"><%= job.companyName %></h2><time class="w-full text-[12px] text-start font-[400]">9 Feb - 11 Mar</time>
               </div>
             </div>
             <!---->
@@ -218,7 +218,7 @@
                 </div>
                 <% } %>
                 <div class="flex flex-col gap-1">
-                  <h2 class="text-[14px] text-[#3F3F3F] font-[400]"><%= job.companyName %></h2><time class="w-full text-[12px] text-start font-[400]">9 Feb - 11 Mar</time>
+                  <h2 class="text-[14px] text-[#6B7280] font-[400]"><%= job.companyName %></h2><time class="w-full text-[12px] text-start font-[400]">9 Feb - 11 Mar</time>
                 </div>
               </div>
             </div>
@@ -226,19 +226,19 @@
           <div class="w-full h-[1px] bg-[#F0F0F0] my-6"></div>
           <section class="flex gap-2 flex-col h-auto items-start justify-start">
             <dl class="text-[14px] flex flex-col">
-              <dt class="font-[300] text-[#3F3F3F]"> ანაზღაურება </dt>
+              <dt class="font-[400] text-[#6B7280]"> ანაზღაურება </dt>
               <dd class="mt-1 font-[400]"> <%= job.jobSalary ? '₾' + job.jobSalary : 'შეთანხმებით' %></dd>
             </dl>
             <dl class="text-[14px] flex flex-col">
-              <dt class="font-[300] text-[#3F3F3F]"> ლოკაცია </dt>
+              <dt class="font-[400] text-[#6B7280]"> ლოკაცია </dt>
               <dd class="mt-1 font-[400]"><%= job.job_address || job.job_city || '-' %></dd>
             </dl>
             <dl class="text-[14px] flex flex-col">
-              <dt class="font-[300] text-[#3F3F3F]"> განაკვეთი </dt>
+              <dt class="font-[400] text-[#6B7280]"> განაკვეთი </dt>
               <dd class="mt-1 font-[400]"><%= job.job_type === 'full-time' ? 'სრული' : 'ნახევარი' %></dd>
             </dl>
             <dl class="text-[14px] flex flex-col">
-              <dt class="font-[300] text-[#3F3F3F]"> გამოცდილება </dt>
+              <dt class="font-[400] text-[#6B7280]"> გამოცდილება </dt>
               <dd class="mt-1 font-[400]"><%= job.job_experience ? job.job_experience + ' წელი' : '-' %></dd>
             </dl>
           </section>
