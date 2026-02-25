@@ -95,10 +95,10 @@
 
   /* Compact header-on-scroll */
   #site-header {
-    --site-header-height: 20px;
+    --site-header-height: 60px;
     --site-header-padding-y: 1rem;
     --site-header-padding-x: 1rem;
-    --site-header-nav-top: 20px;
+    --site-header-nav-top: 62px;
     transition: box-shadow 200ms ease, border-color 200ms ease;
   }
 
@@ -110,17 +110,27 @@
   }
 
   #site-header.is-compact {
-    --site-header-height: 52px;
+    --site-header-height: 60px;
     --site-header-padding-y: 0.5rem;
-    --site-header-nav-top: 54px;
+    --site-header-nav-top: 64px;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
   }
 
   @media (min-width: 768px) {
     #site-header.is-compact {
-      --site-header-height: 76px;
-      --site-header-padding-y: 0.75rem;
-      --site-header-nav-top: 92px;
+      --site-header-height: 60px;
+      --site-header-padding-y: 0.5rem;
+      --site-header-nav-top: 64px;
+    }
+  }
+
+  /* Expose header height for filters (exactly below header) */
+  body {
+    --site-header-height: 60px;
+  }
+  @media (min-width: 768px) {
+    body {
+      --site-header-height: 112px;
     }
   }
 
@@ -209,9 +219,20 @@
         window.requestAnimationFrame(updateHeaderCompact);
       }
 
+      function syncHeaderHeightToBody() {
+        var h = getComputedStyle(siteHeader).getPropertyValue('--site-header-height').trim();
+        if (h) document.body.style.setProperty('--site-header-height', h);
+      }
+      syncHeaderHeightToBody();
       window.addEventListener('scroll', onScroll, { passive: true });
-      window.addEventListener('pageshow', updateHeaderCompact);
+      window.addEventListener('pageshow', function() {
+        updateHeaderCompact();
+        syncHeaderHeightToBody();
+      });
       updateHeaderCompact();
+      /* Keep body var in sync when compact toggles (for filters bar) */
+      var observer = new MutationObserver(syncHeaderHeightToBody);
+      observer.observe(siteHeader, { attributes: true, attributeFilter: ['class'] });
     }
   }
 

@@ -245,9 +245,6 @@
   .top-12 {
     top: calc(var(--spacing) * 12);
   }
-  .top-\[60px\] {
-    top: 60px;
-  }
   .top-\[62px\] {
     top: 62px;
   }
@@ -1308,11 +1305,6 @@
   .md\:top-20 {
     @media (width >= 48rem) {
       top: calc(var(--spacing) * 20);
-    }
-  }
-  .md\:top-\[113px\] {
-    @media (width >= 48rem) {
-      top: 113px;
     }
   }
   .md\:top-\[128px\] {
