@@ -35,18 +35,48 @@ let lastPremiumExpiryCleanup = 0;
 let lastPineconeExpiredJobsCleanup = 0;
 const PREMIUM_EXPIRY_CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 min
 
+/** Today's date in Georgia (YYYY-MM-DD) for premium expiry. 0 days left = expired. */
+function getTodayGeorgiaYYYYMMDD() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: TZ_GEORGIA });
+}
+
+/** If premium_until is set and 0 days left (or past), treat job as regular for display and optionally persist. */
+function normalizeJobPremiumByDaysLeft(job) {
+  if (!job || !["premium", "premiumPlus"].includes(job.job_premium_status)) return;
+  const until = job.premium_until;
+  if (until == null) return;
+  const untilStr =
+    typeof until === "string"
+      ? until.slice(0, 10)
+      : until instanceof Date
+        ? until.toISOString().slice(0, 10)
+        : null;
+  if (!untilStr) return;
+  const todayGeorgia = getTodayGeorgiaYYYYMMDD();
+  if (untilStr <= todayGeorgia) {
+    job.job_premium_status = "regular";
+  }
+}
+
 async function runPremiumExpiryCleanup() {
   if (Date.now() - lastPremiumExpiryCleanup < PREMIUM_EXPIRY_CLEANUP_INTERVAL_MS) return;
   lastPremiumExpiryCleanup = Date.now();
   try {
+    // 0 days left = premium_until <= today (Georgia). Expired = set to regular.
     const result = await db.raw(
       `UPDATE jobs SET job_premium_status = 'regular'
        WHERE job_premium_status IN ('premium','premiumPlus')
-       AND premium_until IS NOT NULL
-       AND premium_until < (NOW() AT TIME ZONE 'Asia/Tbilisi')::date`
+       AND (
+         premium_until IS NULL
+         OR premium_until <= (NOW() AT TIME ZONE 'Asia/Tbilisi')::date
+       )`
     );
     const n = result?.rowCount ?? result?.[1] ?? 0;
-    if (n > 0) console.log("[premium expiry] Cleared", n, "expired premium job(s)");
+    if (n > 0) {
+      console.log("[premium expiry] Cleared", n, "expired premium job(s)");
+      if (app.locals.pageCache) app.locals.pageCache.flushAll();
+      if (app.locals.relatedJobsCache) app.locals.relatedJobsCache.flushAll();
+    }
   } catch (e) {
     console.error("premium expiry cleanup error:", e?.message);
   }
@@ -379,7 +409,7 @@ if (process.env.NODE_ENV === "production") {
 
 // Fast path: serve cached HTML for anonymous visitors BEFORE session/visitor/DB middleware
 // Skips 3 sequential DB round-trips (~15-30ms) for every cached anonymous page view
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
   if (req.method !== "GET") return next();
   if (hasCookie(req, "connect.sid")) return next();
   const pathOnly = req.path;
@@ -392,6 +422,23 @@ app.use((req, res, next) => {
         const jobIdRaw = extractIdFromSlug(jobMatch[1]);
         const jobId = jobIdRaw ? parseInt(jobIdRaw, 10) : null;
         if (jobId && !isNaN(jobId)) {
+          // If job was demoted or 0 days left for premium, invalidate cache so next request gets correct badge
+          try {
+            const row = await db("jobs").where({ id: jobId }).select("job_premium_status", "premium_until").first();
+            if (row) {
+              const isRegular = row.job_premium_status === "regular";
+              const zeroDaysLeft =
+                row.premium_until != null &&
+                ["premium", "premiumPlus"].includes(row.job_premium_status) &&
+                String(row.premium_until).slice(0, 10) <= getTodayGeorgiaYYYYMMDD();
+              if (isRegular || zeroDaysLeft) {
+                pageCache.del(key);
+                return next();
+              }
+            }
+          } catch (e) {
+            /* continue and serve cached */
+          }
           db.raw("UPDATE jobs SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?", [jobId]).catch(() => {});
           const vidMatch = (req.headers.cookie || "").match(/\bvid=([^;]+)/);
           const visitorId = vidMatch ? decodeURIComponent(vidMatch[1]) : null;
@@ -478,7 +525,7 @@ app.use(async (req, res, next) => {
 // Page cache: serve cached HTML for anonymous visitors (24h)
 // Runs after visitor middleware so req.visitorId is set for job view tracking on cache hits
 const CACHEABLE_PATHS = /^\/(vakansia\/[^/]+|kvelaze-motkhovnadi-vakansiebi|kvelaze-magalanazgaurebadi-vakansiebi|dgevandeli-vakansiebi|rekomendebuli-vakansiebi|vakansiebi-cv-gareshe|vakansiebi-shentvis|privacy-policy|terms-of-use|pricing)(\?.*)?$/;
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
   if (req.method !== "GET") return next();
   if (req.session?.user) return next();
   const pathOnly = req.path;
@@ -486,12 +533,28 @@ app.use((req, res, next) => {
     const key = req.originalUrl || req.url;
     const cached = pageCache.get(key);
     if (cached) {
-      // For job detail pages: record view_count and visitor_job_clicks on cache hit
+      // For job detail pages: if job was demoted from premium, invalidate cache so next request gets correct badge
       const jobMatch = pathOnly.match(/^\/vakansia\/(.+)$/);
       if (jobMatch) {
         const jobIdRaw = extractIdFromSlug(jobMatch[1]);
         const jobId = jobIdRaw ? parseInt(jobIdRaw, 10) : null;
         if (jobId && !isNaN(jobId)) {
+          try {
+            const row = await db("jobs").where({ id: jobId }).select("job_premium_status", "premium_until").first();
+            if (row) {
+              const isRegular = row.job_premium_status === "regular";
+              const zeroDaysLeft =
+                row.premium_until != null &&
+                ["premium", "premiumPlus"].includes(row.job_premium_status) &&
+                String(row.premium_until).slice(0, 10) <= getTodayGeorgiaYYYYMMDD();
+              if (isRegular || zeroDaysLeft) {
+                pageCache.del(key);
+                return next();
+              }
+            }
+          } catch (e) {
+            /* continue and serve cached */
+          }
           db.raw("UPDATE jobs SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?", [jobId]).catch((e) =>
             console.error("view_count increment error:", e?.message)
           );
@@ -1705,6 +1768,7 @@ app.post("/my-applications/auto-send-toggle", async (req, res) => {
 
 // Related jobs cache (keyed by category_id, 5-minute TTL)
 const relatedJobsCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
+app.locals.relatedJobsCache = relatedJobsCache;
 
 async function getRelatedJobsCached(categoryId, excludeJobId) {
   const cacheKey = `related_${categoryId}`;
@@ -1755,7 +1819,7 @@ async function getCategoryName(categoryId) {
 // get vacancy inner page
 app.get("/vakansia/:slug", async (req, res) => {
   try {
-    runPremiumExpiryCleanup().catch(() => {});
+    await runPremiumExpiryCleanup();
     runExpiredJobsPineconeCleanup().catch(() => {});
 
     const slug = req.params.slug;
@@ -1797,6 +1861,20 @@ app.get("/vakansia/:slug", async (req, res) => {
 
     if (!job) {
       return res.status(404).render("404", { message: "Job not found" });
+    }
+
+    // Always use current premium status from DB (expiry may have run on another instance or request)
+    const freshStatus = await db("jobs").where({ id: jobId }).select("job_premium_status", "premium_until").first();
+    if (freshStatus) {
+      job.job_premium_status = freshStatus.job_premium_status;
+      job.premium_until = freshStatus.premium_until;
+    }
+    // If 0 days left for premium (premium_until <= today Georgia), show as regular and persist
+    normalizeJobPremiumByDaysLeft(job);
+    if (job.job_premium_status === "regular" && freshStatus && ["premium", "premiumPlus"].includes(freshStatus.job_premium_status)) {
+      await db("jobs").where({ id: jobId }).update({ job_premium_status: "regular" });
+      const cacheKey = req.originalUrl || req.url;
+      if (app.locals.pageCache && cacheKey) app.locals.pageCache.del(cacheKey);
     }
 
     res.set("Cache-Control", "private, no-cache");
@@ -2651,4 +2729,9 @@ Sentry.setupExpressErrorHandler(app);
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
+  runPremiumExpiryCleanup().catch(() => {});
+  setInterval(
+    () => runPremiumExpiryCleanup().catch(() => {}),
+    PREMIUM_EXPIRY_CLEANUP_INTERVAL_MS,
+  );
 });

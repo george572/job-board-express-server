@@ -92,6 +92,59 @@
   #burgerToggle.active .burger-line:nth-child(3) {
     transform: rotate(-45deg) translateY(-12px);
   }
+
+  /* Compact header-on-scroll */
+  #site-header {
+    --site-header-height: 40px;
+    --site-header-padding-y: 1rem;
+    --site-header-padding-x: 1rem;
+    --site-header-nav-top: 62px;
+    transition: box-shadow 200ms ease, border-color 200ms ease;
+  }
+
+  @media (min-width: 768px) {
+    #site-header {
+      --site-header-height: 112px;
+      --site-header-nav-top: 128px;
+    }
+  }
+
+  #site-header.is-compact {
+    --site-header-height: 52px;
+    --site-header-padding-y: 0.5rem;
+    --site-header-nav-top: 54px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+  }
+
+  @media (min-width: 768px) {
+    #site-header.is-compact {
+      --site-header-height: 76px;
+      --site-header-padding-y: 0.75rem;
+      --site-header-nav-top: 92px;
+    }
+  }
+
+  #site-header > header {
+    height: var(--site-header-height);
+    padding: var(--site-header-padding-y) var(--site-header-padding-x);
+    transition: height 200ms ease, padding 200ms ease;
+    will-change: height, padding;
+  }
+
+  #site-header a[href="/"] img {
+    transition: width 200ms ease, transform 200ms ease, margin 200ms ease;
+    will-change: width, transform;
+  }
+
+  #site-header.is-compact a[href="/"] img {
+    width: 132px;
+    margin-block: 0;
+  }
+
+  #site-header #responsiveNav {
+    top: var(--site-header-nav-top);
+    transition: top 200ms ease, transform 300ms ease;
+  }
 </style>
 <script>
   function initHeader() {
@@ -134,6 +187,31 @@
         });
         client.requestAccessToken();
       };
+    }
+
+    // Compact header on scroll (animate down + restore at top)
+    var siteHeader = document.getElementById('site-header');
+    if (siteHeader) {
+      var lastCompact = null;
+      var ticking = false;
+
+      function updateHeaderCompact() {
+        ticking = false;
+        var shouldCompact = window.scrollY > 8;
+        if (shouldCompact === lastCompact) return;
+        siteHeader.classList.toggle('is-compact', shouldCompact);
+        lastCompact = shouldCompact;
+      }
+
+      function onScroll() {
+        if (ticking) return;
+        ticking = true;
+        window.requestAnimationFrame(updateHeaderCompact);
+      }
+
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('pageshow', updateHeaderCompact);
+      updateHeaderCompact();
     }
   }
 
