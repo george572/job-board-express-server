@@ -2184,7 +2184,7 @@ app.get("/api/filter-counts", async (req, res) => {
           .count("* as c")
           .groupBy("job_type"),
         applyOtherFilters(baseQuery().clone(), "job_city")
-          .whereIn("job_city", ["თბილისი", "ქუთაისი", "ბათუმი", "ზუგდიდი"])
+          .whereIn("job_city", ["თბილისი", "ქუთაისი", "ბათუმი", "ზუგდიდი", "გორი", "რუსთავი", "მცხეთა", "თელავი", "მესტია", "ფოთი", "ჭიათურა", "ზესტაფონი", "მარნეული"])
           .select("job_city")
           .count("* as c")
           .groupBy("job_city"),
