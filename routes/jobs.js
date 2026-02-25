@@ -239,6 +239,41 @@ function randomBetween(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+/**
+ * Atomically claim exactly one queue row (FOR UPDATE SKIP LOCKED) so the same
+ * email is never sent by multiple workers. Returns claimed row with job fields or null.
+ */
+async function claimOneEmailQueueRow() {
+  const hasSentAtCol = await db.schema
+    .hasColumn("new_job_email_queue", "sent_at")
+    .catch(() => false);
+  if (!hasSentAtCol) return null;
+
+  const result = await db.raw(
+    `WITH picked AS (
+       SELECT id FROM new_job_email_queue
+       WHERE send_after <= NOW() AND sent_at IS NULL
+       ORDER BY send_after
+       LIMIT 1
+       FOR UPDATE SKIP LOCKED
+     )
+     UPDATE new_job_email_queue q SET sent_at = NOW()
+     FROM picked
+     WHERE q.id = picked.id
+     RETURNING q.id AS queue_id, q.job_id, q.company_email_lower, q.send_after,
+       q.email_type, q.subject, q.html, q.best_candidate_id`
+  );
+  const rows = result?.rows ?? result?.[0] ?? [];
+  if (!rows.length) return null;
+
+  const claimed = rows[0];
+  const job = await db("jobs")
+    .where("id", claimed.job_id)
+    .select("jobName", "companyName", "company_email", "jobSalary", "jobSalary_min")
+    .first();
+  return { ...claimed, ...job };
+}
+
 async function processNewJobEmailQueue() {
   try {
     const count = await getQueueCount();
@@ -246,10 +281,9 @@ async function processNewJobEmailQueue() {
       newJobEmailProcessorScheduled = false;
       return;
     }
-    // Compare: send_after <= NOW() (both UTC in DB)
     const debug = await db
       .raw(
-        "SELECT NOW() as db_now, (SELECT send_after FROM new_job_email_queue ORDER BY send_after LIMIT 1) as first_send_after",
+        "SELECT NOW() as db_now, (SELECT send_after FROM new_job_email_queue WHERE sent_at IS NULL ORDER BY send_after LIMIT 1) as first_send_after",
       )
       .then((r) => r.rows?.[0]);
     if (debug) {
@@ -257,27 +291,8 @@ async function processNewJobEmailQueue() {
         `[Email queue] DB now: ${debug.db_now}, first send_after: ${debug.first_send_after}`,
       );
     }
-    let row = await db("new_job_email_queue as q")
-      .leftJoin("jobs as j", "j.id", "q.job_id")
-      .select(
-        "q.id as queue_id",
-        "q.job_id",
-        "q.company_email_lower",
-        "q.send_after",
-        "q.email_type",
-        "q.subject",
-        "q.html",
-        "q.best_candidate_id",
-        "j.jobName",
-        "j.companyName",
-        "j.company_email",
-        "j.jobSalary",
-        "j.jobSalary_min",
-      )
-      .whereRaw("q.send_after <= NOW()")
-      .whereNull("q.sent_at")
-      .orderBy("q.send_after")
-      .first();
+
+    let row = await claimOneEmailQueueRow();
     if (!row) {
       const nextRow = await db("new_job_email_queue")
         .whereNull("sent_at")
@@ -300,29 +315,6 @@ async function processNewJobEmailQueue() {
       }
       return;
     }
-    try {
-      const hasSentAtCol = await db.schema
-        .hasColumn("new_job_email_queue", "sent_at")
-        .catch(() => false);
-      if (hasSentAtCol) {
-        const updatedRows = await db("new_job_email_queue")
-          .where("id", row.queue_id)
-          .whereNull("sent_at")
-          .update({ sent_at: db.fn.now() })
-          .returning("*");
-        if (!updatedRows || updatedRows.length === 0) {
-          console.log(
-            `[Email queue] Queue row #${row.queue_id} already claimed by another worker; moving to next item.`,
-          );
-          processNewJobEmailQueue();
-          return;
-        }
-        const claimed = updatedRows[0];
-        row = { ...row, ...claimed };
-      }
-    } catch (claimErr) {
-      console.error("processNewJobEmailQueue claim error:", claimErr.message);
-    }
     // No sends after 18:00 Georgia: reschedule to next day 10:00, 10:07, 10:14… (spread)
     if (isAfter1830()) {
       const next0900 = getNextDay0900Georgia();
@@ -341,6 +333,7 @@ async function processNewJobEmailQueue() {
         .where("id", row.queue_id)
         .update({
           send_after: db.raw("?::timestamptz", [newSendAfter.toISOString()]),
+          sent_at: null,
         });
       console.log(
         `[Email queue] Rescheduled job #${row.job_id} to next day ${new Date(newSendAfter).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: TZ_GEORGIA })} (slot ${existingCount + 1}, was due after 18:30)`,
@@ -442,6 +435,21 @@ async function processNewJobEmailQueue() {
       await db("new_job_email_queue").where("id", row.queue_id).del();
       processNewJobEmailQueue();
       return;
+    }
+    // Never send new_job email twice for the same job (idempotency)
+    if (isNewJobType) {
+      const jobSent = await db("jobs")
+        .where("id", row.job_id)
+        .select("marketing_email_sent")
+        .first();
+      if (jobSent && jobSent.marketing_email_sent) {
+        console.log(
+          `[Email queue] Skip job #${row.job_id}: marketing_email_sent already true (no duplicate send)`,
+        );
+        await db("new_job_email_queue").where("id", row.queue_id).del();
+        processNewJobEmailQueue();
+        return;
+      }
     }
     const claimed =
       isNewJobType || !companyEmail
@@ -895,6 +903,11 @@ async function sendNewJobEmail(job, opts = {}) {
       )
       .first();
     if (existingJob) return { queued: false, reason: "duplicate_job_in_queue" };
+    // Also skip if we already sent for this job (e.g. from a previous queue run)
+    const jobAlreadySent = await db("jobs").where("id", job.id).select("marketing_email_sent").first();
+    if (jobAlreadySent && jobAlreadySent.marketing_email_sent) {
+      return { queued: false, reason: "already_sent" };
+    }
   } catch (e) {
     if (e.code === "42P01") {
       /* table doesn't exist yet */
@@ -945,7 +958,14 @@ async function sendNewJobEmail(job, opts = {}) {
     insertPayload.html = html;
   }
 
-  await db("new_job_email_queue").insert(insertPayload);
+  try {
+    await db("new_job_email_queue").insert(insertPayload);
+  } catch (e) {
+    if (e.code === "23505") {
+      return { queued: false, reason: "duplicate_job_in_queue" };
+    }
+    throw e;
+  }
   if (!newJobEmailProcessorScheduled) {
     newJobEmailProcessorScheduled = true;
     processNewJobEmailQueue();
