@@ -53,7 +53,7 @@
 (function() {
   var banner = document.getElementById('noCvBanner');
   if (!banner) return;
-  if (!document.cookie.match(/\bno_cv_banner_dismissed=/)) banner.style.display = 'block';
+  if (window.location.pathname === '/' && !document.cookie.match(/\bno_cv_banner_dismissed=/)) banner.style.display = 'block';
   var closeBtn = document.getElementById('noCvBannerClose');
   var cancelBtn = document.getElementById('noCvBannerCancel');
   var form = document.getElementById('noCvBannerForm');
