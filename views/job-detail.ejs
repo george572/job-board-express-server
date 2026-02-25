@@ -44,7 +44,8 @@
           postalCode: "0000",
           addressCountry: "GE"
         }
-      }
+      },
+      ...(job.work_mode === 'დისტანციური' ? { jobLocationType: "TELECOMMUTE" } : {})
     };
 
     if (job.jobSalary) {
@@ -240,6 +241,10 @@
             <dl class="text-[14px] flex flex-col">
               <dt class="font-[500] text-[#6B7280]"> გამოცდილება </dt>
               <dd class="mt-1 font-[500]"><%= job.job_experience ? job.job_experience + ' წელი' : '-' %></dd>
+            </dl>
+            <dl class="text-[14px] flex flex-col">
+              <dt class="font-[500] text-[#6B7280]"> სამუშაო რეჟიმი </dt>
+              <dd class="mt-1 font-[500]"><%= job.work_mode === 'დისტანციური' ? 'დისტანციური' : 'ადგილზე' %></dd>
             </dl>
           </section>
           <%

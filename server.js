@@ -119,6 +119,7 @@ async function getRecommendedJobs(db, visitorId, opts = {}) {
     min_salary,
     job_experience,
     job_type,
+    work_mode,
     job_city,
     searchQuery,
     userUid,
@@ -275,6 +276,10 @@ async function getRecommendedJobs(db, visitorId, opts = {}) {
   if (job_type) {
     const types = Array.isArray(job_type) ? job_type : [job_type];
     if (types.length > 0) baseQuery = baseQuery.whereIn("job_type", types);
+  }
+  if (work_mode) {
+    const modes = Array.isArray(work_mode) ? work_mode : [work_mode];
+    if (modes.length > 0) baseQuery = baseQuery.whereIn("work_mode", modes);
   }
   if (job_city) {
     const cities = Array.isArray(job_city) ? job_city : [job_city];
@@ -751,6 +756,7 @@ app.get("/", async (req, res) => {
       company,
       job_experience,
       job_type,
+      work_mode,
       job_city,
       page = 1,
       limit: limitParam = 5,
@@ -775,6 +781,7 @@ app.get("/", async (req, res) => {
       "company",
       "job_experience",
       "job_type",
+      "work_mode",
       "job_city",
       "hasSalary",
       "job_premium_status",
@@ -1058,6 +1065,11 @@ app.get("/", async (req, res) => {
       const types = Array.isArray(job_type) ? job_type : [job_type];
       query.whereIn("job_type", types);
       countQuery.whereIn("job_type", types);
+    }
+    if (work_mode) {
+      const modes = Array.isArray(work_mode) ? work_mode : [work_mode];
+      query.whereIn("work_mode", modes);
+      countQuery.whereIn("work_mode", modes);
     }
     if (job_city) {
       const cities = Array.isArray(job_city) ? job_city : [job_city];
@@ -2088,8 +2100,8 @@ const { getFilterCountsKey, get: getFilterCounts, set: setFilterCounts } = requi
 
 app.get("/api/filter-counts", async (req, res) => {
   try {
-    const { category, min_salary, job_experience, job_type, job_city, q } = req.query;
-    const cacheKey = getFilterCountsKey({ category, min_salary, job_experience, job_type, job_city, q });
+    const { category, min_salary, job_experience, job_type, work_mode, job_city, q } = req.query;
+    const cacheKey = getFilterCountsKey({ category, min_salary, job_experience, job_type, work_mode, job_city, q });
     const cached = getFilterCounts(cacheKey);
     if (cached) {
       return res.json(cached);
@@ -2099,6 +2111,7 @@ app.get("/api/filter-counts", async (req, res) => {
       (min_salary && min_salary.length > 0) ||
       (job_experience && job_experience.length > 0) ||
       (job_type && job_type.length > 0) ||
+      (work_mode && work_mode.length > 0) ||
       (job_city && job_city.length > 0) ||
       (q && typeof q === "string" && q.trim() !== "");
 
@@ -2136,6 +2149,10 @@ app.get("/api/filter-counts", async (req, res) => {
         const types = (Array.isArray(job_type) ? job_type : [job_type]).filter((t) => t != null && t !== "");
         if (types.length > 0) query.whereIn("job_type", types);
       }
+      if (exclude !== "work_mode" && work_mode) {
+        const modes = (Array.isArray(work_mode) ? work_mode : [work_mode]).filter((m) => m != null && m !== "");
+        if (modes.length > 0) query.whereIn("work_mode", modes);
+      }
       if (exclude !== "job_city" && job_city) {
         const cities = (Array.isArray(job_city) ? job_city : [job_city]).filter((c) => c != null && c !== "");
         if (cities.length > 0) query.whereIn("job_city", cities);
@@ -2151,7 +2168,7 @@ app.get("/api/filter-counts", async (req, res) => {
       return query;
     };
 
-    const [categoryRows, salary1000, salary2000, salary3000, salary4000, salary5000, salary6000, expRows, typeRows, cityRows] =
+    const [categoryRows, salary1000, salary2000, salary3000, salary4000, salary5000, salary6000, expRows, typeRows, workModeRows, cityRows] =
       await Promise.all([
         applyOtherFilters(baseQuery().clone(), "category")
           .select("category_id")
@@ -2183,6 +2200,10 @@ app.get("/api/filter-counts", async (req, res) => {
           .select("job_type")
           .count("* as c")
           .groupBy("job_type"),
+        applyOtherFilters(baseQuery().clone(), "work_mode")
+          .select("work_mode")
+          .count("* as c")
+          .groupBy("work_mode"),
         applyOtherFilters(baseQuery().clone(), "job_city")
           .whereIn("job_city", ["თბილისი", "ქუთაისი", "ბათუმი", "ზუგდიდი", "გორი", "რუსთავი", "მცხეთა", "თელავი", "მესტია", "ფოთი", "ჭიათურა", "ზესტაფონი", "მარნეული"])
           .select("job_city")
@@ -2214,6 +2235,11 @@ app.get("/api/filter-counts", async (req, res) => {
       if (r.job_type) jobTypeCounts[String(r.job_type)] = parseInt(r.c, 10) || 0;
     });
 
+    const workModeCounts = {};
+    (workModeRows || []).forEach((r) => {
+      if (r.work_mode) workModeCounts[String(r.work_mode)] = parseInt(r.c, 10) || 0;
+    });
+
     const cityCounts = {};
     (cityRows || []).forEach((r) => {
       if (r.job_city) cityCounts[String(r.job_city)] = parseInt(r.c, 10) || 0;
@@ -2224,6 +2250,7 @@ app.get("/api/filter-counts", async (req, res) => {
       min_salary: salaryCounts,
       job_experience: experienceCounts,
       job_type: jobTypeCounts,
+      work_mode: workModeCounts,
       job_city: cityCounts,
     };
     setFilterCounts(cacheKey, result);
@@ -2247,6 +2274,7 @@ app.get("/api/home/section", async (req, res) => {
       company,
       job_experience,
       job_type,
+      work_mode,
       job_city,
       page = 1,
       limit: limitParam = 5,
@@ -2264,6 +2292,7 @@ app.get("/api/home/section", async (req, res) => {
       "company",
       "job_experience",
       "job_type",
+      "work_mode",
       "job_city",
       "hasSalary",
       "job_premium_status",
@@ -2346,6 +2375,11 @@ app.get("/api/home/section", async (req, res) => {
         const types = Array.isArray(job_type) ? job_type : [job_type];
         query.whereIn("job_type", types);
         countQuery.whereIn("job_type", types);
+      }
+      if (work_mode) {
+        const modes = Array.isArray(work_mode) ? work_mode : [work_mode];
+        query.whereIn("work_mode", modes);
+        countQuery.whereIn("work_mode", modes);
       }
       if (job_city) {
         const cities = Array.isArray(job_city) ? job_city : [job_city];

@@ -1062,6 +1062,11 @@ router.get("/", async (req, res) => {
         "job_type",
         Array.isArray(job_type) ? job_type : [job_type],
       );
+    if (req.query.work_mode)
+      query.whereIn(
+        "work_mode",
+        Array.isArray(req.query.work_mode) ? req.query.work_mode : [req.query.work_mode],
+      );
     if (hasSalary === "true") query.whereNotNull("jobSalary");
     if (job_premium_status)
       query.whereIn(
@@ -1783,6 +1788,7 @@ router.post("/", upload.none(), async (req, res) => {
     job_city,
     job_address,
     job_type,
+    work_mode,
     job_premium_status,
     isHelio,
     helio_url,
@@ -1842,6 +1848,7 @@ router.post("/", upload.none(), async (req, res) => {
         job_city,
         job_address,
         job_type,
+        work_mode: work_mode || "ადგილზე",
         job_premium_status,
         isHelio,
         helio_url: (helio_url && String(helio_url).trim()) || null,
@@ -1961,6 +1968,7 @@ router.post("/bulk", async (req, res) => {
         job_city: job.job_city,
         job_address: job.job_address,
         job_type: job.job_type,
+        work_mode: job.work_mode || "ადგილზე",
         job_status: "approved",
         job_premium_status: "regular",
         isHelio: job.isHelio || false,
@@ -2119,6 +2127,7 @@ const JOB_UPDATE_WHITELIST = [
   "job_city",
   "job_address",
   "job_type",
+  "work_mode",
   "jobIsUrgent",
   "category_id",
   "job_premium_status",

@@ -15,6 +15,7 @@ const JOBS_LIST_COLUMNS = [
   "job_city",
   "job_address",
   "job_type",
+  "work_mode",
   "jobIsUrgent",
   "category_id",
   "job_premium_status",
