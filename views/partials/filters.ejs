@@ -50,6 +50,15 @@
     overflow-y: auto;
     padding: 4px 0;
   }
+  @media (max-width: 767px) {
+    .filter-ms { width: 100%; }
+    .filter-ms-panel {
+      left: 0;
+      right: 0;
+      width: 100%;
+      min-width: 0;
+      max-height: 60vh;
+    }
   .filter-ms-panel.open {
     display: block;
     animation: filterPanelIn 0.15s ease-out;
