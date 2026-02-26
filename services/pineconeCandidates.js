@@ -13,34 +13,11 @@ require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
 const { Pinecone } = require("@pinecone-database/pinecone");
 const { extractTextFromCv } = require("./cvTextExtractor");
+const { embedWithJina } = require("./jinaEmbeddings");
 
 const NAMESPACE = "candidates";
-const JINA_API_KEY = (process.env.JINA_API_KEY || "").trim();
 
 let _pinecone = null;
-
-async function embedWithJina(texts, task) {
-  if (!JINA_API_KEY) throw new Error("JINA_API_KEY is required for Jina embeddings");
-  const res = await fetch("https://api.jina.ai/v1/embeddings", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${JINA_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      input: texts,
-      model: "jina-embeddings-v3",
-      task, // "retrieval.passage" or "retrieval.query"
-      dimensions: 1024,
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Jina embed failed (${res.status}): ${body}`);
-  }
-  const json = await res.json();
-  return (json.data || []).map((d) => d.embedding);
-}
 
 function normalizeForMatch(s) {
   return String(s || "")

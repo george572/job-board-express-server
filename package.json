@@ -43,6 +43,7 @@
     "@sentry/node": "^10.38.0",
     "@tailwindcss/cli": "^4.1.18",
     "aa-sqlite": "^1.0.29",
+    "bottleneck": "^2.19.5",
     "cloudinary": "^2.5.1",
     "compression": "^1.8.1",
     "connect-pg-simple": "^10.0.0",
