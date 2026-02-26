@@ -2544,6 +2544,25 @@ app.use("/jobs", jobsRouter);
 // users router
 app.use("/users", require("./routes/users")(db));
 
+// GET /api/users/:userId/resume – return user's resume by user_id
+app.get("/api/users/:userId/resume", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const resume = await db("resumes")
+      .where("user_id", userId)
+      .orderBy("updated_at", "desc")
+      .select("id", "user_id", "file_url", "file_name", "created_at", "updated_at")
+      .first();
+    if (!resume) {
+      return res.status(404).json({ error: "Resume not found" });
+    }
+    res.json(resume);
+  } catch (err) {
+    console.error("api/users/:userId/resume error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // resumes router
 app.use("/resumes", require("./routes/resumes")(db));
 

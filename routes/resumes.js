@@ -27,7 +27,7 @@ module.exports = function (db) {
       .first()
       .then((row) => {
         if (!row) {
-          return res.status(404).json({ error: "Order not found" });
+          return res.status(404).json({ error: "Resume not found" });
         }
         return res.json({
           file_url: row.file_url,
@@ -91,9 +91,9 @@ module.exports = function (db) {
     const userId = req.params.id;
     try {
       const count = await db("resumes").where("user_id", userId).del();
-      if (count === 0) {
-        return res.status(404).json({ error: "Order not found" });
-      }
+if (count === 0) {
+      return res.status(404).json({ error: "Resume not found" });
+    }
       const { deleteCandidate } = require("../services/pineconeCandidates");
       const { invalidate } = require("../services/cvFitCache");
       await deleteCandidate(userId).catch((err) => console.warn("[Pinecone] Failed to delete candidate", userId, err.message));
