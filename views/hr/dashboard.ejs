@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <%- include('../partials/head-meta', { seo }) %>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="font-sans text-secondary bg-[#F8F9FA] min-h-screen flex flex-col">
+  <%- include('../partials/gtm-noscript') %>
+  <header class="border-b border-[#EBEBEB] bg-white">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-md mx-auto w-full px-4 py-12">
+    <h1 class="text-2xl font-medium text-[#151515] mb-4">HR Dashboard</h1>
+    <p class="text-gray-600 mb-2">შესული ხართ როგორც <strong><%= hrUser.email %></strong></p>
+    <p class="text-sm text-gray-500 mb-6">კომპანია: <%= hrUser.company_identifier %></p>
+    <form action="/hr/dashboard/logout" method="POST">
+      <button type="submit" class="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300">გასვლა</button>
+    </form>
+  </main>
+</body>
+</html>

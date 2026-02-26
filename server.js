@@ -635,6 +635,9 @@ app.use((req, res, next) => {
 // Set up view engine
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
+if (process.env.NODE_ENV !== "production") {
+  app.set("view cache", false);
+}
 
 // --- robots.txt (dynamic)
 app.get("/robots.txt", (req, res) => {
@@ -2544,15 +2547,26 @@ app.use("/jobs", jobsRouter);
 // users router
 app.use("/users", require("./routes/users")(db));
 
-// GET /api/users/:userId/resume – return user's resume by user_id
+// GET /api/users/:userId/resume – return user's resume by user_id (user_uid) or users.id
 app.get("/api/users/:userId/resume", async (req, res) => {
   try {
     const { userId } = req.params;
-    const resume = await db("resumes")
+    let resume = await db("resumes")
       .where("user_id", userId)
       .orderBy("updated_at", "desc")
       .select("id", "user_id", "file_url", "file_name", "created_at", "updated_at")
       .first();
+    // If not found, userId might be users.id (numeric) – resolve to user_uid
+    if (!resume && /^\d+$/.test(String(userId))) {
+      const user = await db("users").where("id", parseInt(userId, 10)).select("user_uid").first();
+      if (user) {
+        resume = await db("resumes")
+          .where("user_id", user.user_uid)
+          .orderBy("updated_at", "desc")
+          .select("id", "user_id", "file_url", "file_name", "created_at", "updated_at")
+          .first();
+      }
+    }
     if (!resume) {
       return res.status(404).json({ error: "Resume not found" });
     }
@@ -2577,6 +2591,9 @@ app.use("/send-cv", require("./routes/sendCv")(db));
 
 // Job form submission (alternative to CV)
 app.use("/submit-job-form", require("./routes/jobFormSubmit")(db));
+
+// HR dashboard (auth + session)
+app.use("/hr", require("./routes/hrDashboard")(db));
 
 // User without CV banner: submit form (saves to DB, sets cookie)
 app.post("/api/user-without-cv", async (req, res) => {

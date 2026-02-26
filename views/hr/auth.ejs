@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <%- include('../partials/head-meta', { seo }) %>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="font-sans text-secondary bg-[#F8F9FA] min-h-screen flex flex-col">
+  <%- include('../partials/gtm-noscript') %>
+  <main class="flex-1 max-w-lg mx-auto w-full px-4 py-12 h-screen flex items-center justify-centers ">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 md:p-6 w-full">
+
+      <% if (typeof error === 'string' && error) { %>
+        <div class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm max-w-[450px] w-full"><%= error %></div>
+      <% } %>
+
+      <% if (step === 'step1') { %>
+        <div id="company_error" class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm max-w-[450px] hidden" role="alert"></div>
+        <form id="company_form" action="/hr/auth/step1" method="POST" class="space-y-4 max-w-[450px] w-full">
+          <div>
+            <label for="company_identifier" class="block text-sm font-medium text-[#151515] mb-1">კომპანიის საიდენტიფიკაციო</label>
+            <input type="text" id="company_identifier" name="company_identifier" required
+              class="w-full max-w-[450px] px-4 py-2 border border-[#EBEBEB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#315EFF]"
+              placeholder="კომპანიის საიდენტიფიკაციო" autocomplete="organization" />
+          </div>
+          <button type="submit" id="company_submit" class="w-full max-w-[450px] px-4 py-3 rounded-lg bg-[#315EFF] text-white font-medium hover:bg-[#2a4fd9] flex items-center justify-center gap-2 min-h-[48px]">
+            <span class="btn_text">შემდეგი</span>
+            <span class="btn_loading hidden">
+              <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="32" stroke-dashoffset="12" stroke-linecap="round"></circle>
+              </svg>
+            </span>
+          </button>
+        </form>
+        <script>
+          (function() {
+            var form = document.getElementById('company_form');
+            var submitBtn = document.getElementById('company_submit');
+            var btnText = submitBtn && submitBtn.querySelector('.btn_text');
+            var btnLoading = submitBtn && submitBtn.querySelector('.btn_loading');
+            var errEl = document.getElementById('company_error');
+            var inputEl = document.getElementById('company_identifier');
+            var errorMsg = 'company identifier is not able to be retrieved by rs.ge';
+
+            form.addEventListener('submit', function(e) {
+              e.preventDefault();
+              var val = (inputEl && inputEl.value || '').trim();
+              if (!val) {
+                if (errEl) { errEl.textContent = errorMsg; errEl.classList.remove('hidden'); }
+                return;
+              }
+              if (errEl) { errEl.classList.add('hidden'); errEl.textContent = ''; }
+              if (btnText) btnText.classList.add('hidden');
+              if (btnLoading) btnLoading.classList.remove('hidden');
+              submitBtn.disabled = true;
+
+              fetch('/hr/auth/validate-company', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ company_identifier: val })
+              })
+                .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
+                .then(function(result) {
+                  if (result.data && result.data.ok) {
+                    window.location.href = '/hr/auth';
+                    return;
+                  }
+                  if (errEl) {
+                    errEl.textContent = (result.data && result.data.error) || errorMsg;
+                    errEl.classList.remove('hidden');
+                  }
+                })
+                .catch(function() {
+                  if (errEl) { errEl.textContent = errorMsg; errEl.classList.remove('hidden'); }
+                })
+                .finally(function() {
+                  submitBtn.disabled = false;
+                  if (btnText) btnText.classList.remove('hidden');
+                  if (btnLoading) btnLoading.classList.add('hidden');
+                });
+            });
+          })();
+        </script>
+      <% } %>
+
+      <% if (step === 'login') { %>
+        <div class="mb-4 flex items-center gap-3 max-w-[450px]">
+          <a href="/hr/auth/back" class="flex items-center justify-center w-10 h-10 rounded-lg border border-[#EBEBEB] text-gray-600 hover:bg-gray-50 hover:text-[#151515]" title="სხვა ნომრის შეყვანა">←</a>
+          <p class="text-sm text-gray-600">კომპანია: <strong><%= company_identifier %></strong></p>
+        </div>
+        <form action="/hr/auth/login" method="POST" class="space-y-4 max-w-[450px]">
+          <input type="hidden" name="company_identifier" value="<%= company_identifier %>" />
+          <div>
+            <label for="login_password" class="block text-sm font-medium text-[#151515] mb-1">პაროლი</label>
+            <input type="password" id="login_password" name="password" required minlength="6"
+              class="w-full max-w-[450px] px-4 py-2 border border-[#EBEBEB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#315EFF]"
+              placeholder="პაროლი" autocomplete="current-password" />
+          </div>
+          <button type="submit" class="w-full max-w-[450px] px-4 py-3 rounded-lg bg-[#315EFF] text-white font-medium hover:bg-[#2a4fd9]">შესვლა</button>
+        </form>
+      <% } %>
+
+      <% if (step === 'register') { %>
+        <div class="mb-4 flex items-center gap-3 max-w-[450px]">
+          <a href="/hr/auth/back" class="flex items-center justify-center w-10 h-10 rounded-lg border border-[#EBEBEB] text-gray-600 hover:bg-gray-50 hover:text-[#151515]" title="სხვა ნომრის შეყვანა">←</a>
+          <p class="text-sm text-gray-600">კომპანია: <strong><%= company_identifier %></strong></p>
+        </div>
+        <form action="/hr/auth/register" method="POST" class="space-y-4 max-w-[450px]">
+          <input type="hidden" name="company_identifier" value="<%= company_identifier %>" />
+          <div>
+            <label for="email" class="block text-sm font-medium text-[#151515] mb-1">ელფოსტა</label>
+            <input type="email" id="email" name="email" required
+              class="w-full max-w-[450px] px-4 py-2 border border-[#EBEBEB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#315EFF]"
+              placeholder="email@example.com" autocomplete="email" />
+          </div>
+          <div>
+            <label for="password" class="block text-sm font-medium text-[#151515] mb-1">პაროლი</label>
+            <input type="password" id="password" name="password" required minlength="6"
+              class="w-full max-w-[450px] px-4 py-2 border border-[#EBEBEB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#315EFF]"
+              placeholder="მინიმუმ 6 სიმბოლო" autocomplete="new-password" />
+          </div>
+          <div>
+            <label for="repeat_password" class="block text-sm font-medium text-[#151515] mb-1">გაიმეორეთ პაროლი</label>
+            <input type="password" id="repeat_password" name="repeat_password" required minlength="6"
+              class="w-full max-w-[450px] px-4 py-2 border border-[#EBEBEB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#315EFF]"
+              placeholder="გაიმეორეთ პაროლი" autocomplete="new-password" />
+          </div>
+          <button type="submit" class="w-full max-w-[450px] px-4 py-3 rounded-lg bg-[#315EFF] text-white font-medium hover:bg-[#2a4fd9]">რეგისტრაცია</button>
+        </form>
+      <% } %>
+    </div>
+  </main>
+</body>
+</html>
