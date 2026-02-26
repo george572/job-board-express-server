@@ -266,8 +266,8 @@ async function getRecommendedJobs(db, visitorId, opts = {}) {
   }
 
   if (min_salary) {
-    const min = parseInt(min_salary, 10);
-    if (!isNaN(min)) baseQuery = baseQuery.where("jobSalary_min", ">=", min);
+    const salaries = (Array.isArray(min_salary) ? min_salary : [min_salary]).map(s => parseInt(s, 10)).filter(n => !isNaN(n));
+    if (salaries.length > 0) baseQuery = baseQuery.where("jobSalary_min", ">=", Math.min(...salaries));
   }
   if (job_experience) {
     const exp = Array.isArray(job_experience) ? job_experience : [job_experience];
@@ -1054,9 +1054,9 @@ app.get("/", async (req, res) => {
       countQuery.whereIn("job_experience", exp);
     }
     if (min_salary) {
-      const min = parseInt(min_salary, 10);
-      if (!isNaN(min)) {
-        // Use precomputed numeric minimum salary for filtering
+      const salaries = (Array.isArray(min_salary) ? min_salary : [min_salary]).map(s => parseInt(s, 10)).filter(n => !isNaN(n));
+      if (salaries.length > 0) {
+        const min = Math.min(...salaries);
         query.where("jobSalary_min", ">=", min);
         countQuery.where("jobSalary_min", ">=", min);
       }
@@ -2137,9 +2137,8 @@ app.get("/api/filter-counts", async (req, res) => {
         }
       }
       if (exclude !== "min_salary" && min_salary) {
-        const val = Array.isArray(min_salary) ? min_salary[0] : min_salary;
-        const min = parseInt(val, 10);
-        if (!isNaN(min)) query.where("jobSalary_min", ">=", min);
+        const salaries = (Array.isArray(min_salary) ? min_salary : [min_salary]).map(s => parseInt(s, 10)).filter(n => !isNaN(n));
+        if (salaries.length > 0) query.where("jobSalary_min", ">=", Math.min(...salaries));
       }
       if (exclude !== "job_experience" && job_experience) {
         const exp = (Array.isArray(job_experience) ? job_experience : [job_experience]).filter((e) => e != null && e !== "");
@@ -2365,8 +2364,9 @@ app.get("/api/home/section", async (req, res) => {
         countQuery.whereIn("job_experience", exp);
       }
       if (min_salary) {
-        const min = parseInt(min_salary, 10);
-        if (!isNaN(min)) {
+        const salaries = (Array.isArray(min_salary) ? min_salary : [min_salary]).map(s => parseInt(s, 10)).filter(n => !isNaN(n));
+        if (salaries.length > 0) {
+          const min = Math.min(...salaries);
           query.where("jobSalary_min", ">=", min);
           countQuery.where("jobSalary_min", ">=", min);
         }

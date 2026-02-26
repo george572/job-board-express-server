@@ -1,8 +1,92 @@
+<style>
+  .filter-cb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid #cbd5e1;
+    border-radius: 5px;
+    flex-shrink: 0;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background: white;
+  }
+  .filter-cb:checked {
+    background-color: #315EFF;
+    border-color: #315EFF;
+  }
+  .filter-cb:checked::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 1px;
+    width: 5px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+  .filter-cb:hover {
+    border-color: #315EFF;
+  }
+  .filter-cb:focus-visible {
+    outline: 2px solid #315EFF;
+    outline-offset: 2px;
+  }
+  .filter-ms-panel {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: 100%;
+    margin-top: 4px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.06);
+    z-index: 50;
+    min-width: 240px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding: 4px 0;
+  }
+  .filter-ms-panel.open {
+    display: block;
+    animation: filterPanelIn 0.15s ease-out;
+  }
+  @keyframes filterPanelIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .filter-ms-panel::-webkit-scrollbar {
+    width: 6px;
+  }
+  .filter-ms-panel::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .filter-ms-panel::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+  }
+  @media (min-width: 768px) {
+    #filtersSection {
+      max-height: none !important;
+      overflow: visible !important;
+      display: flex;
+      padding-bottom: 1rem;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+  }
+</style>
+
 <div
   class="filters-sticky-wrapper py-2 px-4 sticky z-10 bg-[#f8f9fa]"
   style="top: var(--site-header-height, 60px);"
 >
-  <!-- Mobile: search bar + ფილტრი button only -->
+  <!-- Mobile: search bar + ფილტრი button -->
   <div class="flex md:hidden items-center gap-2">
     <button
       type="button"
@@ -40,250 +124,154 @@
         class="absolute right-2 top-1/2 -translate-y-1/2 p-2 cursor-pointer text-gray-500 hover:text-[#315EFF] min-h-[36px] min-w-[36px] flex items-center justify-center"
         aria-label="ძებნა"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke-width="1.5"
-          stroke="currentColor"
-          class="size-5"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-          ></path>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"></path>
         </svg>
       </button>
     </div>
   </div>
 
-  <!-- Mobile: collapsible filters dropdown -->
+  <!-- Filters section: collapsible on mobile, always visible on desktop -->
   <div
-    id="mobileFiltersDropdown"
-    class="px-4 md:hidden overflow-hidden transition-[max-height] duration-300 ease-in-out bg-[#f8f9fa]"
+    id="filtersSection"
+    class="transition-[max-height] duration-300 ease-in-out overflow-hidden"
     style="max-height: 0px"
+    data-open="false"
   >
-    <div class="flex flex-col gap-2 pt-2 pb-1">
-      <select
-        id="categoryFilter"
-        name="category"
-        class="text-xs p-2 border border-slate-200 bg-white h-[44px] rounded-lg cursor-pointer w-full"
-      >
-        <option value="">კატეგორიები</option>
-        <option value="1">საოფისე</option>
-        <option value="2">მომხმარებელთან ურთიერთობები</option>
-        <option value="3">გაყიდვები</option>
-        <option value="4">საბანკო-საფინანსო</option>
-        <option value="5">საწყობი და წარმოება</option>
-        <option value="6">საცალო ვაჭრობა</option>
-        <option value="7">მზარეული</option>
-        <option value="8">აზარტული</option>
-        <option value="9">მენეჯმენტი</option>
-        <option value="10">ფარმაცია</option>
-        <option value="11">მიმტანი</option>
-        <option value="12">ინჟინერია</option>
-        <option value="13">ლოჯისტიკა</option>
-        <option value="14">სამედიცინო</option>
-        <option value="15">უსაფრთხოება</option>
-        <option value="16">დისტრიბუცია</option>
-        <option value="17">ინფორმაციული ტექნოლოგიები</option>
-        <option value="18">დიასახლისი</option>
-        <option value="19">სხვა</option>
-        <option value="20">ბუღალტერია</option>
-        <option value="21">მძღოლი</option>
-        <option value="22">Web/Digital/Design</option>
-        <option value="23">ექთანი</option>
-        <option value="24">ექიმი</option>
-        <option value="25">ადმინისტრატორი</option>
-        <option value="26">HR</option>
-      </select>
-      <!-- salary (min) -->
-      <select
-        id="salaryFilter"
-        name="min_salary"
-        class="text-xs p-2 bg-white border-slate-200 h-[44px] border rounded-lg cursor-pointer w-full"
-      >
-        <option value="">ანაზღაურება</option>
-        <option value="1000">1000 GEL +</option>
-        <option value="2000">2000 GEL +</option>
-        <option value="3000">3000 GEL +</option>
-        <option value="4000">4000 GEL +</option>
-        <option value="5000">5000 GEL +</option>
-        <option value="6000">6000 GEL +</option>
-      </select>
-      <!-- experience -->
-      <select
-        id="experienceFilter"
-        name="job_experience"
-        class="text-xs p-2 border-slate-200 bg-white h-[44px] border rounded-lg cursor-pointer w-full"
-      >
-        <option value="">გამოცდილება</option>
-        <option value="intern">სტაჟირება</option>
-        <option value="0-1">0-1 წელი</option>
-        <option value="1-2">1-2 წელი</option>
-        <option value="3-5">3-5 წელი</option>
-        <option value="5+">5+ წელი</option>
-      </select>
-      <!-- job type -->
-      <select
-        id="jobTypeFilter"
-        name="job_type"
-        class="text-xs p-2 bg-white border-slate-200 h-[44px] border rounded-lg cursor-pointer w-full"
-      >
-        <option value="">განაკვეთი</option>
-        <option value="full-time">სრული განაკვეთი</option>
-        <option value="part-time">ნახევარი განაკვეთი</option>
-      </select>
-      <!-- work mode -->
-      <select
-        id="workModeFilter"
-        name="work_mode"
-        class="text-xs p-2 bg-white border-slate-200 h-[44px] border rounded-lg cursor-pointer w-full"
-      >
-        <option value="">სამუშაო რეჟიმი</option>
-        <option value="ადგილზე">ადგილზე</option>
-        <option value="დისტანციური">დისტანციური</option>
-      </select>
-      <!-- city -->
-      <select
-        id="cityFilter"
-        name="job_city"
-        class="text-xs p-2 bg-white border-slate-200 h-[44px] border rounded-lg cursor-pointer w-full"
-      >
-        <option value="">ქალაქი</option>
-        <option value="თბილისი">თბილისი</option>
-        <option value="ქუთაისი">ქუთაისი</option>
-        <option value="ბათუმი">ბათუმი</option>
-        <option value="ზუგდიდი">ზუგდიდი</option>
-        <option value="გორი">გორი</option>
-        <option value="რუსთავი">რუსთავი</option>
-        <option value="მცხეთა">მცხეთა</option>
-        <option value="თელავი">თელავი</option>
-        <option value="მესტია">მესტია</option>
-        <option value="ფოთი">ფოთი</option>
-        <option value="ჭიათურა">ჭიათურა</option>
-        <option value="ზესტაფონი">ზესტაფონი</option>
-        <option value="მარნეული">მარნეული</option>
-      </select>
-      <button
-        type="button"
-        id="submitFilterBtnMobile"
-        class="w-full h-[44px] rounded-lg bg-[#315EFF] text-white text-sm font-medium cursor-pointer hover:bg-[#2849d9]"
-      >
-        გაფილტრე
-      </button>
-    </div>
-  </div>
+    <div class="flex flex-col md:flex-row md:flex-wrap gap-2 md:gap-1 pt-2 md:pt-0 flex-1 md:items-center">
 
-  <!-- Desktop: filters + search -->
-  <div class="hidden md:flex pb-4 justify-between items-center gap-2 flex-wrap">
-    <div class="flex flex-wrap justify-start gap-1 flex-1 lg:flex-initial">
-      <select
-        id="categoryFilterDesktop"
-        name="category"
-        class="text-xs p-2 border border-slate-200 bg-white h-[44px] rounded-lg cursor-pointer w-[172px]"
-      >
-        <option value="">კატეგორიები</option>
-        <option value="1">საოფისე</option>
-        <option value="2">მომხმარებელთან ურთიერთობები</option>
-        <option value="3">გაყიდვები</option>
-        <option value="4">საბანკო-საფინანსო</option>
-        <option value="5">საწყობი და წარმოება</option>
-        <option value="6">საცალო ვაჭრობა</option>
-        <option value="7">მზარეული</option>
-        <option value="8">აზარტული</option>
-        <option value="9">მენეჯმენტი</option>
-        <option value="10">ფარმაცია</option>
-        <option value="11">მიმტანი</option>
-        <option value="12">ინჟინერია</option>
-        <option value="13">ლოჯისტიკა</option>
-        <option value="14">სამედიცინო</option>
-        <option value="15">უსაფრთხოება</option>
-        <option value="16">დისტრიბუცია</option>
-        <option value="17">ინფორმაციული ტექნოლოგიები</option>
-        <option value="18">დიასახლისი</option>
-        <option value="19">სხვა</option>
-        <option value="20">ბუღალტერია</option>
-        <option value="21">მძღოლი</option>
-        <option value="22">Web/Digital/Design</option>
-        <option value="23">ექთანი</option>
-        <option value="24">ექიმი</option>
-        <option value="25">ადმინისტრატორი</option>
-        <option value="26">HR</option>
-      </select>
-      <select
-        id="salaryFilterDesktop"
-        name="min_salary"
-        class="text-xs p-2 bg-white border-slate-200 h-[44px] border rounded-lg cursor-pointer w-[172px]"
-      >
-        <option value="">ანაზღაურება</option>
-        <option value="1000">1000 GEL +</option>
-        <option value="2000">2000 GEL +</option>
-        <option value="3000">3000 GEL +</option>
-        <option value="4000">4000 GEL +</option>
-        <option value="5000">5000 GEL +</option>
-        <option value="6000">6000 GEL +</option>
-      </select>
-      <select
-        id="experienceFilterDesktop"
-        name="job_experience"
-        class="text-xs p-2 border-slate-200 bg-white h-[44px] border rounded-lg cursor-pointer w-[172px]"
-      >
-        <option value="">გამოცდილება</option>
-        <option value="intern">სტაჟირება</option>
-        <option value="0-1">0-1 წელი</option>
-        <option value="1-2">1-2 წელი</option>
-        <option value="3-5">3-5 წელი</option>
-        <option value="5+">5+ წელი</option>
-      </select>
-      <select
-        id="jobTypeFilterDesktop"
-        name="job_type"
-        class="text-xs p-2 bg-white border-slate-200 h-[44px] border rounded-lg cursor-pointer w-[172px]"
-      >
-        <option value="">განაკვეთი</option>
-        <option value="full-time">სრული განაკვეთი</option>
-        <option value="part-time">ნახევარი განაკვეთი</option>
-      </select>
-      <select
-        id="workModeFilterDesktop"
-        name="work_mode"
-        class="text-xs p-2 bg-white border-slate-200 h-[44px] border rounded-lg cursor-pointer w-[172px]"
-      >
-        <option value="">სამუშაო რეჟიმი</option>
-        <option value="ადგილზე">ადგილზე</option>
-        <option value="დისტანციური">დისტანციური</option>
-      </select>
-      <select
-        id="cityFilterDesktop"
-        name="job_city"
-        class="text-xs p-2 bg-white border-slate-200 h-[44px] border rounded-lg cursor-pointer w-[172px]"
-      >
-        <option value="">ქალაქი</option>
-        <option value="თბილისი">თბილისი</option>
-        <option value="ქუთაისი">ქუთაისი</option>
-        <option value="ბათუმი">ბათუმი</option>
-        <option value="ზუგდიდი">ზუგდიდი</option>
-        <option value="გორი">გორი</option>
-        <option value="რუსთავი">რუსთავი</option>
-        <option value="მცხეთა">მცხეთა</option>
-        <option value="თელავი">თელავი</option>
-        <option value="მესტია">მესტია</option>
-        <option value="ფოთი">ფოთი</option>
-        <option value="ჭიათურა">ჭიათურა</option>
-        <option value="ზესტაფონი">ზესტაფონი</option>
-        <option value="მარნეული">მარნეული</option>
-      </select>
+      <!-- Category -->
+      <div class="filter-ms relative" data-filter-key="category">
+        <button type="button" class="filter-ms-trigger flex items-center justify-between gap-1.5 text-xs px-3 border border-slate-200 bg-white h-[44px] rounded-lg cursor-pointer w-full md:w-[172px] hover:bg-[#F5F8FF] transition-colors">
+          <span class="filter-ms-label truncate text-[#151515]">კატეგორიები</span>
+          <span class="filter-ms-badge hidden items-center justify-center bg-[#315EFF] text-white text-[11px] font-semibold rounded-full min-w-[20px] h-[20px] px-1.5">0</span>
+          <svg class="filter-ms-chevron w-4 h-4 text-gray-400 transition-transform duration-200 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
+        </button>
+        <div class="filter-ms-panel">
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="1"/><span class="flex-1">საოფისე</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="2"/><span class="flex-1">მომხმარებელთან ურთიერთობები</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="3"/><span class="flex-1">გაყიდვები</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="4"/><span class="flex-1">საბანკო-საფინანსო</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="5"/><span class="flex-1">საწყობი და წარმოება</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="6"/><span class="flex-1">საცალო ვაჭრობა</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="7"/><span class="flex-1">მზარეული</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="8"/><span class="flex-1">აზარტული</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="9"/><span class="flex-1">მენეჯმენტი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="10"/><span class="flex-1">ფარმაცია</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="11"/><span class="flex-1">მიმტანი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="12"/><span class="flex-1">ინჟინერია</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="13"/><span class="flex-1">ლოჯისტიკა</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="14"/><span class="flex-1">სამედიცინო</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="15"/><span class="flex-1">უსაფრთხოება</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="16"/><span class="flex-1">დისტრიბუცია</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="17"/><span class="flex-1">ინფორმაციული ტექნოლოგიები</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="18"/><span class="flex-1">დიასახლისი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="19"/><span class="flex-1">სხვა</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="20"/><span class="flex-1">ბუღალტერია</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="21"/><span class="flex-1">მძღოლი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="22"/><span class="flex-1">Web/Digital/Design</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="23"/><span class="flex-1">ექთანი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="24"/><span class="flex-1">ექიმი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="25"/><span class="flex-1">ადმინისტრატორი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="26"/><span class="flex-1">HR</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+        </div>
+      </div>
+
+      <!-- Salary -->
+      <div class="filter-ms relative" data-filter-key="min_salary">
+        <button type="button" class="filter-ms-trigger flex items-center justify-between gap-1.5 text-xs px-3 border border-slate-200 bg-white h-[44px] rounded-lg cursor-pointer w-full md:w-[172px] hover:bg-[#F5F8FF] transition-colors">
+          <span class="filter-ms-label truncate text-[#151515]">ანაზღაურება</span>
+          <span class="filter-ms-badge hidden items-center justify-center bg-[#315EFF] text-white text-[11px] font-semibold rounded-full min-w-[20px] h-[20px] px-1.5">0</span>
+          <svg class="filter-ms-chevron w-4 h-4 text-gray-400 transition-transform duration-200 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
+        </button>
+        <div class="filter-ms-panel">
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="1000"/><span class="flex-1">1000 GEL +</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="2000"/><span class="flex-1">2000 GEL +</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="3000"/><span class="flex-1">3000 GEL +</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="4000"/><span class="flex-1">4000 GEL +</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="5000"/><span class="flex-1">5000 GEL +</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="6000"/><span class="flex-1">6000 GEL +</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+        </div>
+      </div>
+
+      <!-- Experience -->
+      <div class="filter-ms relative" data-filter-key="job_experience">
+        <button type="button" class="filter-ms-trigger flex items-center justify-between gap-1.5 text-xs px-3 border border-slate-200 bg-white h-[44px] rounded-lg cursor-pointer w-full md:w-[172px] hover:bg-[#F5F8FF] transition-colors">
+          <span class="filter-ms-label truncate text-[#151515]">გამოცდილება</span>
+          <span class="filter-ms-badge hidden items-center justify-center bg-[#315EFF] text-white text-[11px] font-semibold rounded-full min-w-[20px] h-[20px] px-1.5">0</span>
+          <svg class="filter-ms-chevron w-4 h-4 text-gray-400 transition-transform duration-200 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
+        </button>
+        <div class="filter-ms-panel">
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="intern"/><span class="flex-1">სტაჟირება</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="0-1"/><span class="flex-1">0-1 წელი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="1-2"/><span class="flex-1">1-2 წელი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="3-5"/><span class="flex-1">3-5 წელი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="5+"/><span class="flex-1">5+ წელი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+        </div>
+      </div>
+
+      <!-- Job Type -->
+      <div class="filter-ms relative" data-filter-key="job_type">
+        <button type="button" class="filter-ms-trigger flex items-center justify-between gap-1.5 text-xs px-3 border border-slate-200 bg-white h-[44px] rounded-lg cursor-pointer w-full md:w-[172px] hover:bg-[#F5F8FF] transition-colors">
+          <span class="filter-ms-label truncate text-[#151515]">განაკვეთი</span>
+          <span class="filter-ms-badge hidden items-center justify-center bg-[#315EFF] text-white text-[11px] font-semibold rounded-full min-w-[20px] h-[20px] px-1.5">0</span>
+          <svg class="filter-ms-chevron w-4 h-4 text-gray-400 transition-transform duration-200 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
+        </button>
+        <div class="filter-ms-panel">
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="full-time"/><span class="flex-1">სრული განაკვეთი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="part-time"/><span class="flex-1">ნახევარი განაკვეთი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+        </div>
+      </div>
+
+      <!-- Work Mode -->
+      <div class="filter-ms relative" data-filter-key="work_mode">
+        <button type="button" class="filter-ms-trigger flex items-center justify-between gap-1.5 text-xs px-3 border border-slate-200 bg-white h-[44px] rounded-lg cursor-pointer w-full md:w-[172px] hover:bg-[#F5F8FF] transition-colors">
+          <span class="filter-ms-label truncate text-[#151515]">სამუშაო რეჟიმი</span>
+          <span class="filter-ms-badge hidden items-center justify-center bg-[#315EFF] text-white text-[11px] font-semibold rounded-full min-w-[20px] h-[20px] px-1.5">0</span>
+          <svg class="filter-ms-chevron w-4 h-4 text-gray-400 transition-transform duration-200 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
+        </button>
+        <div class="filter-ms-panel">
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="ადგილზე"/><span class="flex-1">ადგილზე</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="დისტანციური"/><span class="flex-1">დისტანციური</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+        </div>
+      </div>
+
+      <!-- City -->
+      <div class="filter-ms relative" data-filter-key="job_city">
+        <button type="button" class="filter-ms-trigger flex items-center justify-between gap-1.5 text-xs px-3 border border-slate-200 bg-white h-[44px] rounded-lg cursor-pointer w-full md:w-[172px] hover:bg-[#F5F8FF] transition-colors">
+          <span class="filter-ms-label truncate text-[#151515]">ქალაქი</span>
+          <span class="filter-ms-badge hidden items-center justify-center bg-[#315EFF] text-white text-[11px] font-semibold rounded-full min-w-[20px] h-[20px] px-1.5">0</span>
+          <svg class="filter-ms-chevron w-4 h-4 text-gray-400 transition-transform duration-200 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
+        </button>
+        <div class="filter-ms-panel">
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="თბილისი"/><span class="flex-1">თბილისი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="ქუთაისი"/><span class="flex-1">ქუთაისი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="ბათუმი"/><span class="flex-1">ბათუმი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="ზუგდიდი"/><span class="flex-1">ზუგდიდი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="გორი"/><span class="flex-1">გორი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="რუსთავი"/><span class="flex-1">რუსთავი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="მცხეთა"/><span class="flex-1">მცხეთა</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="თელავი"/><span class="flex-1">თელავი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="მესტია"/><span class="flex-1">მესტია</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="ფოთი"/><span class="flex-1">ფოთი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="ჭიათურა"/><span class="flex-1">ჭიათურა</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="ზესტაფონი"/><span class="flex-1">ზესტაფონი</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+          <label class="flex items-center gap-4 px-3 h-[50px] hover:bg-[#F5F8FF] cursor-pointer text-xs"><input type="checkbox" class="filter-cb" value="მარნეული"/><span class="flex-1">მარნეული</span><span class="filter-item-count text-gray-400 text-[11px]"></span></label>
+        </div>
+      </div>
+
+      <!-- Apply button -->
       <button
         type="button"
-        id="submitFilterBtnDesktop"
-        class="h-[44px] px-4 rounded-lg bg-[#315EFF] text-white text-sm font-medium cursor-pointer hover:bg-[#2849d9] shrink-0"
+        id="submitFilterBtn"
+        class="h-[44px] px-4 rounded-lg bg-[#315EFF] text-white text-sm font-medium cursor-pointer hover:bg-[#2849d9] shrink-0 w-full md:w-auto"
       >
         გაფილტრე
       </button>
     </div>
-    <div class="relative max-w-[200px] flex items-center">
+
+    <!-- Desktop search -->
+    <div class="hidden md:flex relative max-w-[200px] items-center">
       <input
         id="searchInputDesktop"
         placeholder="ძებნა"
@@ -297,19 +285,8 @@
         class="absolute right-2 top-1/2 -translate-y-1/2 p-2 cursor-pointer text-gray-500 hover:text-[#315EFF] min-h-[36px] min-w-[36px] flex items-center justify-center"
         aria-label="ძებნა"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke-width="1.5"
-          stroke="currentColor"
-          class="size-5"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-          ></path>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"></path>
         </svg>
       </button>
     </div>
@@ -334,195 +311,133 @@
 
 <script>
   (function () {
-    // Category ID to name mapping
-    const categoryNames = {
-      1: "საოფისე",
-      2: "მომხმარებელთან ურთიერთობები",
-      3: "გაყიდვები",
-      4: "საბანკო-საფინანსო",
-      5: "საწყობი და წარმოება",
-      6: "საცალო ვაჭრობა",
-      7: "მზარეული",
-      8: "აზარტული",
-      9: "მენეჯმენტი",
-      10: "ფარმაცია",
-      11: "მიმტანი",
-      12: "ინჟინერია",
-      13: "ლოჯისტიკა",
-      14: "სამედიცინო",
-      15: "უსაფრთხოება",
-      16: "დისტრიბუცია",
-      17: "ინფორმაციული ტექნოლოგიები",
-      18: "დიასახლისი",
-      19: "სხვა",
-      20: "ბუღალტერია",
-      21: "მძღოლი",
-      22: "Web/Digital/Design",
-      23: "ექთანი",
-      24: "ექიმი",
-      25: "ადმინისტრატორი",
-      26: "HR",
+    var categoryNames = {
+      1: "საოფისე", 2: "მომხმარებელთან ურთიერთობები", 3: "გაყიდვები",
+      4: "საბანკო-საფინანსო", 5: "საწყობი და წარმოება", 6: "საცალო ვაჭრობა",
+      7: "მზარეული", 8: "აზარტული", 9: "მენეჯმენტი", 10: "ფარმაცია",
+      11: "მიმტანი", 12: "ინჟინერია", 13: "ლოჯისტიკა", 14: "სამედიცინო",
+      15: "უსაფრთხოება", 16: "დისტრიბუცია", 17: "ინფორმაციული ტექნოლოგიები",
+      18: "დიასახლისი", 19: "სხვა", 20: "ბუღალტერია", 21: "მძღოლი",
+      22: "Web/Digital/Design", 23: "ექთანი", 24: "ექიმი",
+      25: "ადმინისტრატორი", 26: "HR",
     };
+    var experienceNames = { intern: "სტაჟირება", "0-1": "0-1 წელი", "1-2": "1-2 წელი", "3-5": "3-5 წელი", "5+": "5+ წელი" };
+    var jobTypeNames = { "full-time": "სრული განაკვეთი", "part-time": "ნახევარი განაკვეთი" };
+    var workModeNames = { "ადგილზე": "ადგილზე", "დისტანციური": "დისტანციური" };
+    var cityNames = { "თბილისი": "თბილისი", "ქუთაისი": "ქუთაისი", "ბათუმი": "ბათუმი", "ზუგდიდი": "ზუგდიდი", "გორი": "გორი", "რუსთავი": "რუსთავი", "მცხეთა": "მცხეთა", "თელავი": "თელავი", "მესტია": "მესტია", "ფოთი": "ფოთი", "ჭიათურა": "ჭიათურა", "ზესტაფონი": "ზესტაფონი", "მარნეული": "მარნეული" };
+    var salaryNames = { 1000: "1000 GEL +", 2000: "2000 GEL +", 3000: "3000 GEL +", 4000: "4000 GEL +", 5000: "5000 GEL +", 6000: "6000 GEL +" };
 
-    const experienceNames = {
-      intern: "სტაჟირება",
-      "0-1": "0-1 წელი",
-      "1-2": "1-2 წელი",
-      "3-5": "3-5 წელი",
-      "5+": "5+ წელი",
+    var defaultLabels = {
+      category: "კატეგორიები", min_salary: "ანაზღაურება", job_experience: "გამოცდილება",
+      job_type: "განაკვეთი", work_mode: "სამუშაო რეჟიმი", job_city: "ქალაქი",
     };
-
-    const jobTypeNames = {
-      "full-time": "სრული განაკვეთი",
-      "part-time": "ნახევარი განაკვეთი",
+    var namesMaps = {
+      category: categoryNames, min_salary: salaryNames, job_experience: experienceNames,
+      job_type: jobTypeNames, work_mode: workModeNames, job_city: cityNames,
     };
+    var filterKeys = ["category", "min_salary", "job_experience", "job_type", "work_mode", "job_city"];
 
-    const workModeNames = {
-      "ადგილზე": "ადგილზე",
-      "დისტანციური": "დისტანციური",
-    };
-
-    const cityNames = {
-      თბილისი: "თბილისი",
-      ქუთაისი: "ქუთაისი",
-      ბათუმი: "ბათუმი",
-      ზუგდიდი: "ზუგდიდი",
-      გორი: "გორი",
-      რუსთავი: "რუსთავი",
-      მცხეთა: "მცხეთა",
-      თელავი: "თელავი",
-      მესტია: "მესტია",
-      ფოთი: "ფოთი",
-      ჭიათურა: "ჭიათურა",
-      ზესტაფონი: "ზესტაფონი",
-      მარნეული: "მარნეული",
-    };
-
-    const salaryNames = {
-      1000: "1000 GEL +",
-      2000: "2000 GEL +",
-      3000: "3000 GEL +",
-      4000: "4000 GEL +",
-      5000: "5000 GEL +",
-      6000: "6000 GEL +",
-    };
-
-    const categoryFilter = document.getElementById("categoryFilter");
-    const salaryFilter = document.getElementById("salaryFilter");
-    const experienceFilter = document.getElementById("experienceFilter");
-    const jobTypeFilter = document.getElementById("jobTypeFilter");
-    const workModeFilter = document.getElementById("workModeFilter");
-    const cityFilter = document.getElementById("cityFilter");
-    const categoryFilterDesktop = document.getElementById(
-      "categoryFilterDesktop",
-    );
-    const salaryFilterDesktop = document.getElementById("salaryFilterDesktop");
-    const experienceFilterDesktop = document.getElementById(
-      "experienceFilterDesktop",
-    );
-    const jobTypeFilterDesktop = document.getElementById(
-      "jobTypeFilterDesktop",
-    );
-    const workModeFilterDesktop = document.getElementById(
-      "workModeFilterDesktop",
-    );
-    const cityFilterDesktop = document.getElementById("cityFilterDesktop");
-    const searchInput = document.getElementById("searchInput");
-    const searchInputDesktop = document.getElementById("searchInputDesktop");
-    const searchSubmitBtn = document.getElementById("searchSubmitBtn");
-    const searchSubmitBtnDesktop = document.getElementById(
-      "searchSubmitBtnDesktop",
-    );
-    const activeFiltersContainer = document.getElementById(
-      "activeFiltersContainer",
-    );
-    const activeFiltersList = document.getElementById("activeFiltersList");
-    const clearAllFiltersBtn = document.getElementById("clearAllFiltersBtn");
-
-    // Client-side cache for filter counts (keyed by current URL params). Loaded only when a filter is opened.
+    var searchInput = document.getElementById("searchInput");
+    var searchInputDesktop = document.getElementById("searchInputDesktop");
+    var searchSubmitBtn = document.getElementById("searchSubmitBtn");
+    var searchSubmitBtnDesktop = document.getElementById("searchSubmitBtnDesktop");
+    var activeFiltersContainer = document.getElementById("activeFiltersContainer");
+    var activeFiltersList = document.getElementById("activeFiltersList");
+    var clearAllFiltersBtn = document.getElementById("clearAllFiltersBtn");
+    var filtersSection = document.getElementById("filtersSection");
     var filterCountsCache = {};
 
-    function applyToSelect(sel, names, defaultLabel, dataKey, dataObj) {
-      if (!sel) return;
-      for (var i = 0; i < sel.options.length; i++) {
-        var opt = sel.options[i];
-        var val = opt.value;
-        var suffix =
-          dataObj && dataObj[val] !== undefined
-            ? " (" + dataObj[val] + ")"
-            : "";
-        opt.text = val ? (names[val] || val) + suffix : defaultLabel;
-      }
-    }
-    function applyFilterCountsToDropdowns(data) {
-      const cat = (data && data.category) || {};
-      const sal = (data && data.min_salary) || {};
-      const exp = (data && data.job_experience) || {};
-      const typ = (data && data.job_type) || {};
-      const cityData = (data && data.job_city) || {};
-      [categoryFilter, categoryFilterDesktop].forEach(function (s) {
-        if (s) applyToSelect(s, categoryNames, "კატეგორიები", "cat", cat);
-      });
-      [salaryFilter, salaryFilterDesktop].forEach(function (s) {
-        if (s) applyToSelect(s, salaryNames, "ანაზღაურება", "sal", sal);
-      });
-      [experienceFilter, experienceFilterDesktop].forEach(function (s) {
-        if (s) applyToSelect(s, experienceNames, "გამოცდილება", "exp", exp);
-      });
-      [jobTypeFilter, jobTypeFilterDesktop].forEach(function (s) {
-        if (s) applyToSelect(s, jobTypeNames, "განაკვეთი", "typ", typ);
-      });
-      const wm = (data && data.work_mode) || {};
-      [workModeFilter, workModeFilterDesktop].forEach(function (s) {
-        if (s) applyToSelect(s, workModeNames, "სამუშაო რეჟიმი", "wm", wm);
-      });
-      [cityFilter, cityFilterDesktop].forEach(function (s) {
-        if (s) applyToSelect(s, cityNames, "ქალაქი", "city", cityData);
-      });
+    // ── Panel management ──
+    function closeAllPanels() {
+      document.querySelectorAll(".filter-ms-panel.open").forEach(function (p) { p.classList.remove("open"); });
+      document.querySelectorAll(".filter-ms-chevron").forEach(function (c) { c.style.transform = ""; });
     }
 
-    // Load filter counts when a filter is opened (focus/click) or when selections change. Uses current select values (pending state).
-    function ensureFilterCountsLoaded() {
-      const params = getFiltersFromSelects();
-      const qs = new URLSearchParams();
-      if (params.category && params.category.length > 0)
-        params.category.forEach((c) => qs.append("category", c));
-      if (params.min_salary && params.min_salary.length > 0)
-        qs.set("min_salary", params.min_salary[0]);
-      if (params.job_experience && params.job_experience.length > 0)
-        params.job_experience.forEach((e) => qs.append("job_experience", e));
-      if (params.job_type && params.job_type.length > 0)
-        params.job_type.forEach((t) => qs.append("job_type", t));
-      if (params.work_mode && params.work_mode.length > 0)
-        params.work_mode.forEach((w) => qs.append("work_mode", w));
-      if (params.job_city && params.job_city.length > 0)
-        params.job_city.forEach((c) => qs.append("job_city", c));
-      if (params.q && params.q.trim()) qs.set("q", params.q.trim());
-      var cacheKey = qs.toString() || "base";
-      if (filterCountsCache[cacheKey]) {
-        applyFilterCountsToDropdowns(filterCountsCache[cacheKey]);
-        return;
+    function togglePanel(filterKey) {
+      var wrapper = document.querySelector('.filter-ms[data-filter-key="' + filterKey + '"]');
+      if (!wrapper) return;
+      var panel = wrapper.querySelector(".filter-ms-panel");
+      var chevron = wrapper.querySelector(".filter-ms-chevron");
+      var isOpen = panel.classList.contains("open");
+      closeAllPanels();
+      if (!isOpen) {
+        panel.classList.add("open");
+        if (chevron) chevron.style.transform = "rotate(180deg)";
+        ensureFilterCountsLoaded();
       }
-      var fetchUrl = qs.toString()
-        ? "/api/filter-counts?" + qs.toString()
-        : "/api/filter-counts";
-      fetch(fetchUrl)
-        .then(function (res) {
-          return res.json();
-        })
-        .then(function (data) {
-          filterCountsCache[cacheKey] = data;
-          applyFilterCountsToDropdowns(data);
-        })
-        .catch(function () {});
     }
 
-    // Get URL params
+    document.addEventListener("click", function (e) {
+      if (!e.target.closest(".filter-ms")) closeAllPanels();
+    });
+
+    document.querySelectorAll(".filter-ms-trigger").forEach(function (trigger) {
+      trigger.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var key = this.closest(".filter-ms").dataset.filterKey;
+        togglePanel(key);
+      });
+    });
+
+    // Prevent panel clicks from closing the panel
+    document.querySelectorAll(".filter-ms-panel").forEach(function (panel) {
+      panel.addEventListener("click", function (e) { e.stopPropagation(); });
+    });
+
+    // ── Selected values ──
+    function getSelectedValues(key) {
+      var wrapper = document.querySelector('.filter-ms[data-filter-key="' + key + '"]');
+      if (!wrapper) return [];
+      var checked = wrapper.querySelectorAll('.filter-ms-panel input[type="checkbox"]:checked');
+      return Array.from(checked).map(function (cb) { return cb.value; });
+    }
+
+    function getFiltersFromUI() {
+      var qEl = window.innerWidth < 768 ? searchInput : (searchInputDesktop || searchInput);
+      var filters = { q: qEl ? qEl.value.trim() : "" };
+      filterKeys.forEach(function (key) { filters[key] = getSelectedValues(key); });
+      return filters;
+    }
+
+    // ── Trigger label updates ──
+    function updateTriggerLabel(key) {
+      var wrapper = document.querySelector('.filter-ms[data-filter-key="' + key + '"]');
+      if (!wrapper) return;
+      var label = wrapper.querySelector(".filter-ms-label");
+      var badge = wrapper.querySelector(".filter-ms-badge");
+      var count = getSelectedValues(key).length;
+      if (label) label.textContent = defaultLabels[key] || key;
+      if (badge) {
+        badge.textContent = count;
+        if (count > 0) {
+          badge.classList.remove("hidden");
+          badge.classList.add("flex");
+        } else {
+          badge.classList.add("hidden");
+          badge.classList.remove("flex");
+        }
+      }
+    }
+
+    function updateAllTriggerLabels() {
+      filterKeys.forEach(updateTriggerLabel);
+    }
+
+    // ── Checkbox change handler ──
+    document.querySelectorAll('.filter-ms input[type="checkbox"]').forEach(function (cb) {
+      cb.addEventListener("change", function () {
+        var key = this.closest(".filter-ms").dataset.filterKey;
+        updateTriggerLabel(key);
+        debouncedEnsureFilterCounts();
+      });
+    });
+
+    // ── URL params ──
     function getUrlParams() {
-      const params = new URLSearchParams(window.location.search);
+      var params = new URLSearchParams(window.location.search);
       return {
         category: params.getAll("category"),
-        min_salary: params.get("min_salary") ? [params.get("min_salary")] : [],
+        min_salary: params.getAll("min_salary"),
         job_experience: params.getAll("job_experience"),
         job_type: params.getAll("job_type"),
         work_mode: params.getAll("work_mode"),
@@ -531,95 +446,111 @@
       };
     }
 
-    // Whether current URL has any filter params (used to show/hide top-salary slider)
     function hasActiveFilters() {
-      const p = getUrlParams();
-      return (
-        (p.category && p.category.length > 0) ||
-        (p.min_salary && p.min_salary.length > 0) ||
-        (p.job_experience && p.job_experience.length > 0) ||
-        (p.job_type && p.job_type.length > 0) ||
-        (p.work_mode && p.work_mode.length > 0) ||
-        (p.job_city && p.job_city.length > 0) ||
-        (p.q && typeof p.q === "string" && p.q.trim() !== "")
-      );
+      var p = getUrlParams();
+      return filterKeys.some(function (k) { return p[k] && p[k].length > 0; }) || (p.q && p.q.trim() !== "");
     }
 
-    function updateTopSalarySliderVisibility() {
-      var hide = hasActiveFilters();
-      var recommendedSection = document.getElementById(
-        "recommended-jobs-section",
-      );
-      var facebookPromoMain = document.getElementById("facebook-promo-main");
-      var slider = document.getElementById("top-salary-slider-section");
-      var topPopularSlider = document.getElementById(
-        "top-popular-slider-section",
-      );
-      var formSubmissionSlider = document.getElementById(
-        "form-submission-slider-section",
-      );
-      var topCvFitSlider = document.getElementById("top-cv-fit-slider-section");
-      var todaySection = document.getElementById("today-jobs-section");
-      var heading = document.getElementById("all-vacancies-heading");
-      if (recommendedSection)
-        recommendedSection.style.display = hide ? "none" : "";
-      if (facebookPromoMain)
-        facebookPromoMain.style.display = hide ? "none" : "";
-      if (slider) slider.style.display = hide ? "none" : "";
-      if (topPopularSlider) topPopularSlider.style.display = hide ? "none" : "";
-      if (formSubmissionSlider)
-        formSubmissionSlider.style.display = hide ? "none" : "";
-      if (topCvFitSlider) topCvFitSlider.style.display = hide ? "none" : "";
-      if (todaySection) todaySection.style.display = hide ? "none" : "";
-      if (heading) heading.style.display = hide ? "none" : "";
+    // ── Set checkboxes from URL ──
+    function setFiltersFromUrl() {
+      var params = getUrlParams();
+      filterKeys.forEach(function (key) {
+        var values = params[key] || [];
+        var wrapper = document.querySelector('.filter-ms[data-filter-key="' + key + '"]');
+        if (!wrapper) return;
+        wrapper.querySelectorAll('.filter-ms-panel input[type="checkbox"]').forEach(function (cb) {
+          cb.checked = values.indexOf(cb.value) !== -1;
+        });
+      });
+      [searchInput, searchInputDesktop].forEach(function (s) { if (s) s.value = params.q || ""; });
+      updateAllTriggerLabels();
     }
 
-    // Show/hide loading indicator inside jobs area
-    function setJobsLoading(isLoading) {
-      var loadingEl = document.getElementById("loading-indicator");
-      if (!loadingEl) return;
-      loadingEl.style.display = isLoading ? "block" : "none";
-    }
-
-    // Build URL string from filters (no page jump – used for fetch + pushState)
+    // ── Build URL ──
     function buildUrlFromFilters(filters) {
-      const params = new URLSearchParams();
-      if (filters.category && filters.category.length > 0) {
-        filters.category.forEach((cat) => params.append("category", cat));
-      }
-      if (filters.min_salary && filters.min_salary.length > 0) {
-        params.set("min_salary", filters.min_salary[0]);
-      }
-      if (filters.job_experience && filters.job_experience.length > 0) {
-        filters.job_experience.forEach((exp) =>
-          params.append("job_experience", exp),
-        );
-      }
-      if (filters.job_type && filters.job_type.length > 0) {
-        filters.job_type.forEach((type) => params.append("job_type", type));
-      }
-      if (filters.work_mode && filters.work_mode.length > 0) {
-        filters.work_mode.forEach((wm) => params.append("work_mode", wm));
-      }
-      if (filters.job_city && filters.job_city.length > 0) {
-        filters.job_city.forEach((city) => params.append("job_city", city));
-      }
-      if (filters.q && filters.q.trim()) {
-        params.set("q", filters.q.trim());
-      }
+      var params = new URLSearchParams();
+      filterKeys.forEach(function (key) {
+        if (filters[key] && filters[key].length > 0) {
+          filters[key].forEach(function (v) { params.append(key, v); });
+        }
+      });
+      if (filters.q && filters.q.trim()) params.set("q", filters.q.trim());
       return params.toString() ? "/?" + params.toString() : "/";
     }
 
-    // Update content without full reload (fetch + replace + pushState)
-    function updateUrl(filters) {
-      const newUrl = buildUrlFromFilters(filters);
+    // ── Filter counts ──
+    function applyFilterCountsToItems(data) {
+      filterKeys.forEach(function (key) {
+        var counts = (data && data[key]) ? data[key] : {};
+        var wrapper = document.querySelector('.filter-ms[data-filter-key="' + key + '"]');
+        if (!wrapper) return;
+        wrapper.querySelectorAll('.filter-ms-panel input[type="checkbox"]').forEach(function (cb) {
+          var countSpan = cb.closest("label").querySelector(".filter-item-count");
+          if (!countSpan) return;
+          var c = counts[cb.value];
+          countSpan.textContent = c !== undefined ? c : "";
+        });
+      });
+    }
 
-      setJobsLoading(true);
-
-      fetch(newUrl, { headers: { Accept: "text/html" } })
-        .then(function (res) {
-          return res.text();
+    function ensureFilterCountsLoaded() {
+      var params = getFiltersFromUI();
+      var qs = new URLSearchParams();
+      filterKeys.forEach(function (key) {
+        if (params[key] && params[key].length > 0) {
+          params[key].forEach(function (v) { qs.append(key, v); });
+        }
+      });
+      if (params.q && params.q.trim()) qs.set("q", params.q.trim());
+      var cacheKey = qs.toString() || "base";
+      if (filterCountsCache[cacheKey]) {
+        applyFilterCountsToItems(filterCountsCache[cacheKey]);
+        return;
+      }
+      var fetchUrl = qs.toString() ? "/api/filter-counts?" + qs.toString() : "/api/filter-counts";
+      fetch(fetchUrl)
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          filterCountsCache[cacheKey] = data;
+          applyFilterCountsToItems(data);
         })
+        .catch(function () {});
+    }
+
+    var filterCountsDebounce = null;
+    function debouncedEnsureFilterCounts() {
+      if (filterCountsDebounce) clearTimeout(filterCountsDebounce);
+      filterCountsDebounce = setTimeout(function () {
+        filterCountsDebounce = null;
+        ensureFilterCountsLoaded();
+      }, 200);
+    }
+
+    // ── Visibility toggles ──
+    function updateTopSalarySliderVisibility() {
+      var hide = hasActiveFilters();
+      var ids = [
+        "recommended-jobs-section", "facebook-promo-main", "top-salary-slider-section",
+        "top-popular-slider-section", "form-submission-slider-section",
+        "top-cv-fit-slider-section", "today-jobs-section", "all-vacancies-heading",
+      ];
+      ids.forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.style.display = hide ? "none" : "";
+      });
+    }
+
+    function setJobsLoading(isLoading) {
+      var loadingEl = document.getElementById("loading-indicator");
+      if (loadingEl) loadingEl.style.display = isLoading ? "block" : "none";
+    }
+
+    // ── Update URL (fetch + pushState) ──
+    function updateUrl(filters) {
+      var newUrl = buildUrlFromFilters(filters);
+      setJobsLoading(true);
+      fetch(newUrl, { headers: { Accept: "text/html" } })
+        .then(function (res) { return res.text(); })
         .then(function (html) {
           var parser = new DOMParser();
           var doc = parser.parseFromString(html, "text/html");
@@ -627,16 +558,10 @@
           var currentJobsArea = document.getElementById("jobs-area");
           if (fetchedJobsArea && currentJobsArea) {
             currentJobsArea.innerHTML = fetchedJobsArea.innerHTML;
-            currentJobsArea.dataset.currentPage =
-              fetchedJobsArea.dataset.currentPage || "1";
-            currentJobsArea.dataset.totalPages =
-              fetchedJobsArea.dataset.totalPages || "1";
+            currentJobsArea.dataset.currentPage = fetchedJobsArea.dataset.currentPage || "1";
+            currentJobsArea.dataset.totalPages = fetchedJobsArea.dataset.totalPages || "1";
             if (localStorage.getItem("enlisted_fb")) {
-              currentJobsArea
-                .querySelectorAll("[data-fb-promo]")
-                .forEach(function (el) {
-                  el.style.display = "none";
-                });
+              currentJobsArea.querySelectorAll("[data-fb-promo]").forEach(function (el) { el.style.display = "none"; });
             }
           }
           history.pushState({ filters: filters }, "", newUrl);
@@ -654,435 +579,151 @@
         });
     }
 
-    // Get display name for a filter
+    // ── Active filter tags ──
     function getFilterDisplayName(type, value) {
-      if (type === "category") return categoryNames[value] || value;
-      if (type === "min_salary") return salaryNames[value] || value + " GEL +";
-      if (type === "job_experience") return experienceNames[value] || value;
-      if (type === "job_type") return jobTypeNames[value] || value;
-      if (type === "work_mode") return workModeNames[value] || value;
-      if (type === "job_city") return cityNames[value] || value;
       if (type === "q") return "ძებნა: " + value;
-      return value;
+      var map = namesMaps[type];
+      return map ? (map[value] || value) : value;
     }
 
-    // Render active filter tags
     function renderActiveFilters() {
-      const params = getUrlParams();
+      var params = getUrlParams();
       activeFiltersList.innerHTML = "";
-
-      let hasFilters = false;
-
-      // Category filters (show first if multiple)
-      if (params.category && params.category.length > 0) {
-        hasFilters = true;
-        const cat = params.category[0];
-        const tag = createFilterTag(
-          "category",
-          cat,
-          getFilterDisplayName("category", cat),
-        );
-        activeFiltersList.appendChild(tag);
-      }
-
-      // Salary filter (show first if multiple)
-      if (params.min_salary && params.min_salary.length > 0) {
-        hasFilters = true;
-        const sal = params.min_salary[0];
-        const tag = createFilterTag(
-          "min_salary",
-          sal,
-          getFilterDisplayName("min_salary", sal),
-        );
-        activeFiltersList.appendChild(tag);
-      }
-
-      // Experience filters (show first if multiple)
-      if (params.job_experience && params.job_experience.length > 0) {
-        hasFilters = true;
-        const exp = params.job_experience[0];
-        const tag = createFilterTag(
-          "job_experience",
-          exp,
-          getFilterDisplayName("job_experience", exp),
-        );
-        activeFiltersList.appendChild(tag);
-      }
-
-      // Job type filters (show first if multiple)
-      if (params.job_type && params.job_type.length > 0) {
-        hasFilters = true;
-        const type = params.job_type[0];
-        const tag = createFilterTag(
-          "job_type",
-          type,
-          getFilterDisplayName("job_type", type),
-        );
-        activeFiltersList.appendChild(tag);
-      }
-
-      // Work mode filter
-      if (params.work_mode && params.work_mode.length > 0) {
-        hasFilters = true;
-        const wm = params.work_mode[0];
-        const tag = createFilterTag(
-          "work_mode",
-          wm,
-          getFilterDisplayName("work_mode", wm),
-        );
-        activeFiltersList.appendChild(tag);
-      }
-
-      // City filter
-      if (params.job_city && params.job_city.length > 0) {
-        hasFilters = true;
-        const city = params.job_city[0];
-        const tag = createFilterTag(
-          "job_city",
-          city,
-          getFilterDisplayName("job_city", city),
-        );
-        activeFiltersList.appendChild(tag);
-      }
-
-      // Search term
+      var hasFilters = false;
+      filterKeys.forEach(function (key) {
+        var values = params[key] || [];
+        values.forEach(function (val) {
+          hasFilters = true;
+          activeFiltersList.appendChild(createFilterTag(key, val, getFilterDisplayName(key, val)));
+        });
+      });
       if (params.q && params.q.trim()) {
         hasFilters = true;
-        const tag = createFilterTag(
-          "q",
-          params.q.trim(),
-          getFilterDisplayName("q", params.q.trim()),
-        );
-        activeFiltersList.appendChild(tag);
+        activeFiltersList.appendChild(createFilterTag("q", params.q.trim(), getFilterDisplayName("q", params.q.trim())));
       }
-
       activeFiltersContainer.style.display = hasFilters ? "flex" : "none";
     }
 
-    // Create a filter tag element
     function createFilterTag(type, value, displayName) {
-      const tag = document.createElement("div");
-      tag.className =
-        "flex items-center gap-1 bg-[#315EFF] text-white text-xs px-3 py-1 rounded-full";
-      const escapedDisplay = displayName
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/"/g, "&quot;");
-      const escapedValue = (value + "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/"/g, "&quot;");
-      tag.innerHTML = `
-        <span>${escapedDisplay}</span>
-        <button type="button" class="ml-1 cursor-pointer hover:opacity-80" data-filter-type="${type}" data-filter-value="${escapedValue}">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M9 3L3 9M3 3L9 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-      `;
-
-      const removeBtn = tag.querySelector("button");
-      removeBtn.addEventListener("click", function () {
-        removeFilter(type, value);
-      });
-
+      var tag = document.createElement("div");
+      tag.className = "flex items-center gap-1 bg-[#315EFF] text-white text-xs px-3 py-1 rounded-full";
+      var escapedDisplay = displayName.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+      var escapedValue = (value + "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+      tag.innerHTML =
+        '<span>' + escapedDisplay + '</span>' +
+        '<button type="button" class="ml-1 cursor-pointer hover:opacity-80" data-filter-type="' + type + '" data-filter-value="' + escapedValue + '">' +
+          '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+            '<path d="M9 3L3 9M3 3L9 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '</svg>' +
+        '</button>';
+      var removeBtn = tag.querySelector("button");
+      removeBtn.addEventListener("click", function () { removeFilter(type, value); });
       return tag;
     }
 
-    // Remove a specific filter
+    // ── Remove a specific filter value ──
     function removeFilter(type, value) {
-      const params = getUrlParams();
-      if (type === "category") {
-        params.category = [];
-        [categoryFilter, categoryFilterDesktop].forEach(function (s) {
-          if (s) s.value = "";
-        });
-      } else if (type === "min_salary") {
-        params.min_salary = [];
-        [salaryFilter, salaryFilterDesktop].forEach(function (s) {
-          if (s) s.value = "";
-        });
-      } else if (type === "job_experience") {
-        params.job_experience = [];
-        [experienceFilter, experienceFilterDesktop].forEach(function (s) {
-          if (s) s.value = "";
-        });
-      } else if (type === "job_type") {
-        params.job_type = [];
-        [jobTypeFilter, jobTypeFilterDesktop].forEach(function (s) {
-          if (s) s.value = "";
-        });
-      } else if (type === "work_mode") {
-        params.work_mode = [];
-        [workModeFilter, workModeFilterDesktop].forEach(function (s) {
-          if (s) s.value = "";
-        });
-      } else if (type === "job_city") {
-        params.job_city = [];
-        [cityFilter, cityFilterDesktop].forEach(function (s) {
-          if (s) s.value = "";
-        });
-      } else if (type === "q") {
+      var params = getUrlParams();
+      if (type === "q") {
         params.q = "";
-        [searchInput, searchInputDesktop].forEach(function (s) {
-          if (s) s.value = "";
-        });
+        [searchInput, searchInputDesktop].forEach(function (s) { if (s) s.value = ""; });
+      } else {
+        params[type] = (params[type] || []).filter(function (v) { return v !== String(value); });
+        var wrapper = document.querySelector('.filter-ms[data-filter-key="' + type + '"]');
+        if (wrapper) {
+          wrapper.querySelectorAll('.filter-ms-panel input[type="checkbox"]').forEach(function (cb) {
+            if (cb.value === String(value)) cb.checked = false;
+          });
+        }
       }
+      updateAllTriggerLabels();
       updateUrl(params);
     }
 
-    // Clear all filters
+    // ── Clear all filters ──
     function clearAllFilters() {
-      [categoryFilter, categoryFilterDesktop].forEach(function (s) {
-        if (s) s.value = "";
-      });
-      [salaryFilter, salaryFilterDesktop].forEach(function (s) {
-        if (s) s.value = "";
-      });
-      [experienceFilter, experienceFilterDesktop].forEach(function (s) {
-        if (s) s.value = "";
-      });
-      [jobTypeFilter, jobTypeFilterDesktop].forEach(function (s) {
-        if (s) s.value = "";
-      });
-      [workModeFilter, workModeFilterDesktop].forEach(function (s) {
-        if (s) s.value = "";
-      });
-      [cityFilter, cityFilterDesktop].forEach(function (s) {
-        if (s) s.value = "";
-      });
-      [searchInput, searchInputDesktop].forEach(function (s) {
-        if (s) s.value = "";
-      });
-      updateUrl({
-        category: [],
-        min_salary: [],
-        job_experience: [],
-        job_type: [],
-        work_mode: [],
-        job_city: [],
-        q: "",
-      });
+      document.querySelectorAll('.filter-ms input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
+      [searchInput, searchInputDesktop].forEach(function (s) { if (s) s.value = ""; });
+      updateAllTriggerLabels();
+      var empty = { q: "" };
+      filterKeys.forEach(function (k) { empty[k] = []; });
+      updateUrl(empty);
     }
 
-    // Set filter dropdowns from URL params (mobile + desktop)
-    function setFiltersFromUrl() {
-      const params = getUrlParams();
-      var cv =
-        params.category && params.category.length > 0 ? params.category[0] : "";
-      var sv =
-        params.min_salary && params.min_salary.length > 0
-          ? params.min_salary[0]
-          : "";
-      var ev =
-        params.job_experience && params.job_experience.length > 0
-          ? params.job_experience[0]
-          : "";
-      var tv =
-        params.job_type && params.job_type.length > 0 ? params.job_type[0] : "";
-      var wmv =
-        params.work_mode && params.work_mode.length > 0 ? params.work_mode[0] : "";
-      var civ =
-        params.job_city && params.job_city.length > 0 ? params.job_city[0] : "";
-      var qv = params.q || "";
-      [categoryFilter, categoryFilterDesktop].forEach(function (s) {
-        if (s) s.value = cv;
-      });
-      [salaryFilter, salaryFilterDesktop].forEach(function (s) {
-        if (s) s.value = sv;
-      });
-      [experienceFilter, experienceFilterDesktop].forEach(function (s) {
-        if (s) s.value = ev;
-      });
-      [jobTypeFilter, jobTypeFilterDesktop].forEach(function (s) {
-        if (s) s.value = tv;
-      });
-      [workModeFilter, workModeFilterDesktop].forEach(function (s) {
-        if (s) s.value = wmv;
-      });
-      [cityFilter, cityFilterDesktop].forEach(function (s) {
-        if (s) s.value = civ;
-      });
-      [searchInput, searchInputDesktop].forEach(function (s) {
-        if (s) s.value = qv;
-      });
-    }
-
-    // Get filter params from current select values (pending, not yet applied)
-    function getFiltersFromSelects() {
-      var catEl = categoryFilter || categoryFilterDesktop;
-      var salEl = salaryFilter || salaryFilterDesktop;
-      var expEl = experienceFilter || experienceFilterDesktop;
-      var typEl = jobTypeFilter || jobTypeFilterDesktop;
-      var wmEl = workModeFilter || workModeFilterDesktop;
-      var cityEl = cityFilter || cityFilterDesktop;
-      var qEl = window.innerWidth < 768 ? searchInput : (searchInputDesktop || searchInput);
-      return {
-        category: catEl && catEl.value ? [catEl.value] : [],
-        min_salary: salEl && salEl.value ? [salEl.value] : [],
-        job_experience: expEl && expEl.value ? [expEl.value] : [],
-        job_type: typEl && typEl.value ? [typEl.value] : [],
-        work_mode: wmEl && wmEl.value ? [wmEl.value] : [],
-        job_city: cityEl && cityEl.value ? [cityEl.value] : [],
-        q: qEl && qEl.value ? qEl.value.trim() : "",
-      };
-    }
-
-    // Apply filters from current select values (called by გაფილტრე button)
+    // ── Apply filters button ──
     function applyFiltersFromButton() {
-      var params = getFiltersFromSelects();
+      var params = getFiltersFromUI();
+      closeAllPanels();
       updateUrl(params);
-      // Close mobile filter dropdown
-      var mobileFiltersDropdown = document.getElementById("mobileFiltersDropdown");
-      var filterToggleIcon = document.getElementById("filterToggleIcon");
-      if (mobileFiltersDropdown && mobileFiltersDropdown.dataset.open === "true") {
-        mobileFiltersDropdown.style.maxHeight = "0px";
-        mobileFiltersDropdown.dataset.open = "false";
-        if (filterToggleIcon) filterToggleIcon.style.transform = "rotate(0deg)";
+      if (window.innerWidth < 768 && filtersSection && filtersSection.dataset.open === "true") {
+        filtersSection.style.overflow = "hidden";
+        filtersSection.style.maxHeight = "0px";
+        filtersSection.dataset.open = "false";
+        var icon = document.getElementById("filterToggleIcon");
+        if (icon) icon.style.transform = "rotate(0deg)";
       }
     }
 
-    var filterCountsDebounce = null;
-    function debouncedEnsureFilterCounts() {
-      if (filterCountsDebounce) clearTimeout(filterCountsDebounce);
-      filterCountsDebounce = setTimeout(function () {
-        filterCountsDebounce = null;
-        ensureFilterCountsLoaded();
-      }, 200);
-    }
-
-    // Handle filter changes (mobile + desktop, sync both) – no apply until გაფილტრე
-    function onFilterChange(setParam, mEl, dEl) {
-      return function () {
-        var v = this.value;
-        if (mEl && mEl !== this) mEl.value = v;
-        if (dEl && dEl !== this) dEl.value = v;
-        debouncedEnsureFilterCounts();
-      };
-    }
-    [categoryFilter, categoryFilterDesktop].forEach(function (el) {
-      if (el)
-        el.addEventListener(
-          "change",
-          onFilterChange(
-            function (p, v) {
-              p.category = v ? [v] : [];
-            },
-            categoryFilter,
-            categoryFilterDesktop,
-          ),
-        );
-    });
-    [salaryFilter, salaryFilterDesktop].forEach(function (el) {
-      if (el)
-        el.addEventListener(
-          "change",
-          onFilterChange(
-            function (p, v) {
-              p.min_salary = v ? [v] : [];
-            },
-            salaryFilter,
-            salaryFilterDesktop,
-          ),
-        );
-    });
-    [experienceFilter, experienceFilterDesktop].forEach(function (el) {
-      if (el)
-        el.addEventListener(
-          "change",
-          onFilterChange(
-            function (p, v) {
-              p.job_experience = v ? [v] : [];
-            },
-            experienceFilter,
-            experienceFilterDesktop,
-          ),
-        );
-    });
-    [jobTypeFilter, jobTypeFilterDesktop].forEach(function (el) {
-      if (el)
-        el.addEventListener(
-          "change",
-          onFilterChange(
-            function (p, v) {
-              p.job_type = v ? [v] : [];
-            },
-            jobTypeFilter,
-            jobTypeFilterDesktop,
-          ),
-        );
-    });
-    [workModeFilter, workModeFilterDesktop].forEach(function (el) {
-      if (el)
-        el.addEventListener(
-          "change",
-          onFilterChange(
-            function (p, v) {
-              p.work_mode = v ? [v] : [];
-            },
-            workModeFilter,
-            workModeFilterDesktop,
-          ),
-        );
-    });
-    [cityFilter, cityFilterDesktop].forEach(function (el) {
-      if (el)
-        el.addEventListener(
-          "change",
-          onFilterChange(
-            function (p, v) {
-              p.job_city = v ? [v] : [];
-            },
-            cityFilter,
-            cityFilterDesktop,
-          ),
-        );
-    });
-
-    // Search: apply on Enter or click search icon – applies all filters (same as გაფილტრე)
+    // ── Search handlers ──
     function applySearch() {
       if (searchInput && searchInputDesktop) {
-        searchInputDesktop.value = searchInput.value;
-        searchInput.value = searchInputDesktop.value;
+        if (window.innerWidth >= 768) searchInput.value = searchInputDesktop.value;
+        else searchInputDesktop.value = searchInput.value;
       }
       applyFiltersFromButton();
     }
+
     if (searchInput) {
-      searchInput.addEventListener("keydown", function (e) {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          applySearch();
-        }
-      });
-      searchInput.addEventListener("input", function () {
-        if (searchInputDesktop) searchInputDesktop.value = this.value;
-      });
+      searchInput.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); applySearch(); } });
+      searchInput.addEventListener("input", function () { if (searchInputDesktop) searchInputDesktop.value = this.value; });
     }
     if (searchInputDesktop) {
-      searchInputDesktop.addEventListener("keydown", function (e) {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          applySearch();
-        }
-      });
-      searchInputDesktop.addEventListener("input", function () {
-        if (searchInput) searchInput.value = this.value;
-      });
+      searchInputDesktop.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); applySearch(); } });
+      searchInputDesktop.addEventListener("input", function () { if (searchInput) searchInput.value = this.value; });
     }
     if (searchSubmitBtn) searchSubmitBtn.addEventListener("click", applySearch);
-    if (searchSubmitBtnDesktop)
-      searchSubmitBtnDesktop.addEventListener("click", applySearch);
+    if (searchSubmitBtnDesktop) searchSubmitBtnDesktop.addEventListener("click", applySearch);
 
-    clearAllFiltersBtn.addEventListener("click", clearAllFilters);
+    // ── Submit & clear buttons ──
+    var submitFilterBtn = document.getElementById("submitFilterBtn");
+    if (submitFilterBtn) submitFilterBtn.addEventListener("click", applyFiltersFromButton);
+    if (clearAllFiltersBtn) clearAllFiltersBtn.addEventListener("click", clearAllFilters);
 
-    // Back/forward: update content from current URL without full reload
+    // ── Mobile toggle ──
+    var filterToggleBtn = document.getElementById("filterToggleBtn");
+    var filterToggleIcon = document.getElementById("filterToggleIcon");
+    if (filterToggleBtn && filtersSection) {
+      filterToggleBtn.addEventListener("click", function () {
+        var isOpen = filtersSection.dataset.open === "true";
+        if (isOpen) {
+          closeAllPanels();
+          filtersSection.style.overflow = "hidden";
+          filtersSection.style.maxHeight = "0px";
+          filtersSection.dataset.open = "false";
+          if (filterToggleIcon) filterToggleIcon.style.transform = "rotate(0deg)";
+        } else {
+          filtersSection.style.overflow = "hidden";
+          filtersSection.style.maxHeight = "9999px";
+          var h = filtersSection.scrollHeight;
+          filtersSection.style.maxHeight = "0px";
+          filtersSection.offsetHeight;
+          filtersSection.style.maxHeight = h + "px";
+          filtersSection.dataset.open = "true";
+          if (filterToggleIcon) filterToggleIcon.style.transform = "rotate(180deg)";
+          setTimeout(function () {
+            if (filtersSection.dataset.open === "true") filtersSection.style.overflow = "visible";
+          }, 310);
+          ensureFilterCountsLoaded();
+        }
+      });
+    }
+
+    // ── Back/forward (popstate) ──
     window.addEventListener("popstate", function () {
       if (sessionStorage.getItem("jobListScrollPosition")) return;
       var url = window.location.pathname + (window.location.search || "");
       fetch(url, { headers: { Accept: "text/html" } })
-        .then(function (res) {
-          return res.text();
-        })
+        .then(function (res) { return res.text(); })
         .then(function (html) {
           var parser = new DOMParser();
           var doc = parser.parseFromString(html, "text/html");
@@ -1090,16 +731,10 @@
           var currentJobsArea = document.getElementById("jobs-area");
           if (fetchedJobsArea && currentJobsArea) {
             currentJobsArea.innerHTML = fetchedJobsArea.innerHTML;
-            currentJobsArea.dataset.currentPage =
-              fetchedJobsArea.dataset.currentPage || "1";
-            currentJobsArea.dataset.totalPages =
-              fetchedJobsArea.dataset.totalPages || "1";
+            currentJobsArea.dataset.currentPage = fetchedJobsArea.dataset.currentPage || "1";
+            currentJobsArea.dataset.totalPages = fetchedJobsArea.dataset.totalPages || "1";
             if (localStorage.getItem("enlisted_fb")) {
-              currentJobsArea
-                .querySelectorAll("[data-fb-promo]")
-                .forEach(function (el) {
-                  el.style.display = "none";
-                });
+              currentJobsArea.querySelectorAll("[data-fb-promo]").forEach(function (el) { el.style.display = "none"; });
             }
           }
           setFiltersFromUrl();
@@ -1108,72 +743,13 @@
           updateTopSalarySliderVisibility();
           window.scrollTo(0, 0);
         })
-        .catch(function () {
-          window.location.reload();
-        });
+        .catch(function () { window.location.reload(); });
     });
 
-    // Initialize: set dropdowns from URL, render active filters, load counts for dropdown labels
+    // ── Init ──
     setFiltersFromUrl();
     renderActiveFilters();
     updateTopSalarySliderVisibility();
     ensureFilterCountsLoaded();
-
-    [
-      categoryFilter,
-      salaryFilter,
-      experienceFilter,
-      jobTypeFilter,
-      workModeFilter,
-      cityFilter,
-      categoryFilterDesktop,
-      salaryFilterDesktop,
-      experienceFilterDesktop,
-      jobTypeFilterDesktop,
-      workModeFilterDesktop,
-      cityFilterDesktop,
-    ].forEach(function (el) {
-      if (el) {
-        el.addEventListener("focus", ensureFilterCountsLoaded, {
-          passive: true,
-        });
-        el.addEventListener("pointerdown", ensureFilterCountsLoaded, {
-          passive: true,
-        });
-      }
-    });
-
-    // Mobile filter toggle
-    var filterToggleBtn = document.getElementById("filterToggleBtn");
-    var mobileFiltersDropdown = document.getElementById(
-      "mobileFiltersDropdown",
-    );
-    var filterToggleIcon = document.getElementById("filterToggleIcon");
-    if (filterToggleBtn && mobileFiltersDropdown) {
-      filterToggleBtn.addEventListener("click", function () {
-        var isOpen = mobileFiltersDropdown.dataset.open === "true";
-        if (isOpen) {
-          mobileFiltersDropdown.style.maxHeight = "0px";
-          mobileFiltersDropdown.dataset.open = "false";
-          if (filterToggleIcon)
-            filterToggleIcon.style.transform = "rotate(0deg)";
-        } else {
-          mobileFiltersDropdown.style.maxHeight = "9999px";
-          var h = mobileFiltersDropdown.scrollHeight;
-          mobileFiltersDropdown.style.maxHeight = "0px";
-          mobileFiltersDropdown.offsetHeight;
-          mobileFiltersDropdown.style.maxHeight = h + "px";
-          mobileFiltersDropdown.dataset.open = "true";
-          if (filterToggleIcon)
-            filterToggleIcon.style.transform = "rotate(180deg)";
-          ensureFilterCountsLoaded();
-        }
-      });
-    }
-
-    var submitFilterBtnMobile = document.getElementById("submitFilterBtnMobile");
-    var submitFilterBtnDesktop = document.getElementById("submitFilterBtnDesktop");
-    if (submitFilterBtnMobile) submitFilterBtnMobile.addEventListener("click", applyFiltersFromButton);
-    if (submitFilterBtnDesktop) submitFilterBtnDesktop.addEventListener("click", applyFiltersFromButton);
   })();
 </script>
