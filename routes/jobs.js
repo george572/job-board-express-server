@@ -2519,6 +2519,7 @@ router.getEmailQueueDetails = async () => {
              SELECT id, "jobName" as job_name, "companyName" as company_name FROM jobs
              WHERE LOWER(company_email) = s.company_email_lower
              AND jobs.${sentFlagCol} = true
+             ORDER BY id DESC
              LIMIT 1
            ) j ON true
            WHERE s.sent_at > now() - interval '7 days'
@@ -2536,7 +2537,12 @@ router.getEmailQueueDetails = async () => {
       email_type: "new_job",
     }));
 
-    const sent = [...sentFollowups, ...sentFromTracking];
+    // Avoid duplicate job_ids: sentFromTracking can pick a job already in sentFollowups
+    const sentFollowupJobIds = new Set(sentFollowups.map((s) => s.job_id).filter(Boolean));
+    const sentFromTrackingDeduped = sentFromTracking.filter(
+      (r) => !r.job_id || !sentFollowupJobIds.has(r.job_id),
+    );
+    const sent = [...sentFollowups, ...sentFromTrackingDeduped];
 
     return {
       pending,
@@ -2545,7 +2551,7 @@ router.getEmailQueueDetails = async () => {
         queued: pending.length,
         sent: sent.length,
         sent_followups: sentFollowups.length,
-        sent_new_job: sentFromTracking.length,
+        sent_new_job: sentFromTrackingDeduped.length,
         queue_table_total: queueTableTotal,
         pending_by_type: pendingByType,
       },
