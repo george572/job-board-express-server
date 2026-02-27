@@ -9,17 +9,38 @@ module.exports = function (db) {
     return db("users").where("user_uid", uid).first();
   };
 
-  router.get("/", (req, res) => {
-    db("users")
-      .select("*")
-      .orderBy("created_at", "desc")
-      .then((rows) => {
-        if (!rows) {
-          return res.status(404).json({ error: "Users not found" });
-        }
-        res.json(rows);
-      })
-      .catch((err) => res.status(500).json({ error: err.message }));
+  router.get("/", async (req, res) => {
+    try {
+      const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+      const pageSizeRaw = parseInt(req.query.pageSize, 10);
+      const pageSize = Math.min(
+        200,
+        Math.max(1, isNaN(pageSizeRaw) ? 50 : pageSizeRaw)
+      );
+      const offset = (page - 1) * pageSize;
+
+      const [rows, countResult] = await Promise.all([
+        db("users")
+          .select("*")
+          .orderBy("created_at", "desc")
+          .limit(pageSize)
+          .offset(offset),
+        db("users").count("* as count").first(),
+      ]);
+
+      const total = Number(countResult?.count || 0);
+      const hasMore = offset + rows.length < total;
+
+      res.json({
+        items: rows,
+        page,
+        pageSize,
+        total,
+        hasMore,
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message || "Failed to load users" });
+    }
   });
 
   router.get("/:id/top-jobs", async (req, res) => {
