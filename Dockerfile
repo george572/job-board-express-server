@@ -61,6 +61,7 @@ RUN apt-get update -qq && \
       libnspr4 \
       libnss3 \
       libpango-1.0-0 \
+      libgbm1 \
       libx11-6 \
       libx11-xcb1 \
       libxcb1 \
