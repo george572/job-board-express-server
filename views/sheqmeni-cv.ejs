@@ -227,7 +227,7 @@
     </div>
   </main>
   <% } else { %>
-  <p class="text-sm text-gray-600 mb-4 max-w-[600px] p-4">ხელ.ინტელექტი დაუშვებს შეცდომებს, ამიტომ შეუსწორეთ. შეგიძლიათ მიუთითეთ რომ შეცვალოს ინფორმაცია ნებისმიერ სექციაში სადაც არ მოგწონთ დაგენერირებული ინფორმაცია.</p>
+  <p class="text-sm text-gray-600 mb-4 max-w-[600px] p-4">ხელ.ინტელექტი დაუშვებს შეცდომებს, ამიტომ შეუსწორეთ. შეგიძლიათ მიუთითოთ, რომ შეცვალოს ინფორმაცია ნებისმიერ სექციაში, სადაც არ მოგწონთ დაგენერირებული ინფორმაცია.</p>
   <div class="sheqmeni-page">
     <main class="sheqmeni-main" id="sheqmeniMain">
       <div class="sheqmeni-box" id="sheqmeniBox">
@@ -253,11 +253,17 @@
       <div class="sheqmeni-preview">
         <div class="sheqmeni-preview-header" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
           <span>აქ გამოჩნდება თქვენი რეზიუმე</span>
-          <% if (user && user.user_type === 'user') { %>
-          <button id="saveResumeBtn" style="font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid #4b5563;background:#315EFF;color:#fff;cursor:pointer;white-space:nowrap;">
-            რეზიუმეს დამახსოვრება
-          </button>
-          <% } %>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <button id="changeColorBtn" type="button" style="font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid #4b5563;background:#F9FAFB;color:#111827;cursor:pointer;white-space:nowrap;">
+              CV ფერის ცვლილება
+            </button>
+            <input id="cvColorPicker" type="color" value="#8fbc8f" style="width:32px;height:32px;border-radius:6px;border:1px solid #D1D5DB;padding:0;background:#fff;cursor:pointer;" />
+            <% if (user && user.user_type === 'user') { %>
+            <button id="saveResumeBtn" style="font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid #4b5563;background:#315EFF;color:#fff;cursor:pointer;white-space:nowrap;">
+              რეზიუმეს დამახსოვრება
+            </button>
+            <% } %>
+          </div>
         </div>
         <iframe id="cvPreviewFrame" class="sheqmeni-preview-frame"></iframe>
       </div>
@@ -279,6 +285,8 @@
       var cvData = { name: '', surname: '', email: '', phone: '', education: '', experience: '', skills: '', summary: '', profession: '', themeColor: '', jobs: [] };
       var currentUserUid = "<%= user && user.uid ? user.uid : '' %>";
       var existingCvHtml = <%- JSON.stringify(typeof existingCvHtml !== 'undefined' ? existingCvHtml : '') %>;
+      var changeColorBtn = document.getElementById('changeColorBtn');
+      var cvColorPicker = document.getElementById('cvColorPicker');
 
       // If user already has a generated CV, show it in the preview iframe
       if (existingCvHtml && cvPreviewFrame) {
@@ -288,6 +296,21 @@
           docInit.write(existingCvHtml);
           docInit.close();
         }
+      }
+
+      // Initialize theme color from picker into cvData
+      if (cvColorPicker) {
+        cvData.themeColor = cvColorPicker.value || '#8fbc8f';
+        cvColorPicker.addEventListener('change', function() {
+          cvData.themeColor = cvColorPicker.value || '#8fbc8f';
+          updateCvPreview();
+        });
+      }
+      if (changeColorBtn && cvColorPicker) {
+        changeColorBtn.addEventListener('click', function() {
+          cvColorPicker.focus();
+          cvColorPicker.click();
+        });
       }
 
       // Seed cvMessages with the initial AI message from HTML

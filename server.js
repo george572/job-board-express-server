@@ -1876,6 +1876,13 @@ app.get("/sheqmeni-cv", async (req, res) => {
     const user = req.session?.user || null;
     let existingCvHtml = null;
 
+    // On page load/refresh always reset in-memory CV creator state
+    if (req.session) {
+      req.session.cvCreatorHistory = [];
+      req.session.cvCreatorCvData = {};
+      req.session.cvCreatorHasExisting = false;
+    }
+
     if (user && user.user_type === "user") {
       const resume = await db("resumes")
         .where("user_id", String(user.uid))
@@ -1952,25 +1959,85 @@ app.post("/api/sheqmeni-cv/chat", async (req, res) => {
       return res.json({ reply: fallback });
     }
 
-    const systemPrompt =
-      "You are a helpful CV-building assistant for Samushao.ge, speaking ONLY Georgian (ქართული ენა)." +
-      " People you talk to often have little experience; improvise professional skills for them." +
-      " Must collect: full name (სახელი გვარი), email, phone. When they mention work, improvise typical duties and ask: company name, position, start date, end date." +
-      " for the general skills of the user, you should never ask them if they want it to be incliuded, you must automatically assume and generate it, and only change it if they ask it to do so." +
-      " you must automatically generate/update Professional Summary section, without user asking for it, be proactive." +
-      "  don't stop asking questions unless you have all the information, like name, email, phone, education work experience." +
-      "  don't ask them whether they want certain information included or not, include it yourself, and only make changes if they explicitly ask for it." +
-      "when users ask you to change any info there is so far, do it, re-send the response with the updated user-provided data. " +
-      "never write the chat response for users more than 10-15 words, ( this does not apply to json object ).  " +
-      " Immediately after the very first onboarding question you receive in the transcript (\"მე რამდენიმე კითხვას დაგისვამ...\"), your NEXT question to the user MUST be to ask for their favourite color for the CV (themeColor). Always store it in the JSON as \"themeColor\" (valid CSS color or hex, e.g. \"#315EFF\")." +
-      " If the user says their favourite color is white, you must still make sure there is NEVER white text on white background – in that case always set text color to black." +
-      " CRITICAL: In every reply, unless you already have ALL required info (name, surname, email, phone, education, work experience, at least one job, skills, summary, profession, and themeColor), you MUST end the natural-language part with a question that clearly asks for the next missing piece of information." +
-      " CRITICAL: End EVERY message with a JSON block containing current CV data. Format exactly:\n" +
-      " never fucking send in the chat texts like this : თქვენი მოვალეობები სავარაუდოდ მოიცავდა:.... motherfucking piece of shit i said dont do anything that you are not instructed to do." +
-      "```json\n{\"cv\":{\"name\":\"\",\"surname\":\"\",\"email\":\"\",\"phone\":\"\",\"education\":\"\",\"experience\":[],\"skills\":\"\",\"summary\":\"\",\"profession\":\"\",\"themeColor\":\"\",\"jobs\":[{\"company\":\"\",\"position\":\"\",\"start_date\":\"\",\"end_date\":\"\",\"summary\":\"\",\"duties\":\"\"}]}}\n```\n" +
-      "IMPORTANT: 'experience' must be either an empty array or an array of job objects. Never put [object Object] or text there. 'jobs' must always be an array of objects with keys company, position, start_date, end_date, summary, duties. 'themeColor' must always be a valid CSS color or hex (e.g. \"#315EFF\", \"blue\", \"#ffffff\")." +
-      " dont write long texts to users, every job's summary must be directly send as json ojbect, don't asks questions like : 'we should incliude this duties, right?...' "+
-      " Do NOT switch languages.";
+    const systemPrompt = `
+    You are a CV-building assistant for Samushao.ge.
+    
+    LANGUAGE RULE:
+    - You MUST speak ONLY Georgian (ქართული ენა).
+    - Never switch languages.
+    
+    GOAL:
+    You are collecting structured CV data step-by-step.
+    You must continue asking questions until ALL required fields are filled.
+    
+    REQUIRED FIELDS:
+    - name
+    - surname
+    - email
+    - phone
+    - education
+    - job experience (company, position, start_date, end_date) ( if they dont have job experience, its alright)
+    - profession
+    
+    QUESTION FLOW RULES:
+    - Ask for name, surname, email, and phone in ONE message.
+    - Ask for work experience (position, company, start_date, end_date) in ONE message.
+    - Never ask whether to include skills. Automatically generate skills.
+    - Automatically generate and update Professional Summary every time.
+    - Never ask user if something should be included.
+    - If user requests change, update data and resend full CV state.
+    - Never stop asking questions until ALL required data exists.
+
+    RESPONSE LENGTH RULE:
+    - Natural-language response must never exceed 15 words.
+    - This rule does NOT apply to JSON.
+    - Always end natural-language response with a clear question
+      asking for the next missing required field.
+    
+    THINGS YOU SHOULD GENERATE WITHOUT BEING ASKED, AFTER YOU HAVE JOB EXPERIENCE INFO:
+    - Professional Summary
+    - Skills
+    - Job duties description for each job experience.
+    
+    STATE & JSON RULE (CRITICAL):
+    - The backend always sends you the FULL current CV JSON.
+    - You MUST NOT rewrite or regenerate the entire CV object.
+    - You MUST ONLY return the specific fields that need to change.
+    - Do NOT include untouched fields in JSON.
+    - "experience" must be an array if you change it.
+    - "jobs" must always be an array of objects if you change it.
+    - Never output [object Object].
+    
+    JSON FORMAT (STRICT):
+    - At the end of every reply, output ONLY this JSON shape ( never show this to users ):
+    
+    \`\`\`json
+    {
+      "updatedFields": {
+        "name": "",
+        "surname": "",
+        "email": "",
+        "phone": "",
+        "education": "",
+        "experience": [],
+        "skills": "",
+        "summary": "",
+        "profession": "",
+        "jobs": [
+          {
+            "company": "",
+            "position": "",
+            "start_date": "",
+            "end_date": "",
+            "summary": "",
+            "duties": ""
+          }
+        ]
+      }
+    }
+    \`\`\`
+    `;
+
 
     const transcript = history
       .map((m) =>
@@ -1980,16 +2047,26 @@ app.post("/api/sheqmeni-cv/chat", async (req, res) => {
       )
       .join("\n");
 
+    const currentCvJson = JSON.stringify(req.session.cvCreatorCvData || {}, null, 2);
+
     const prompt = `${systemPrompt}
+
+ამჟამინდელი CV JSON (მხოლოდ შენთვის, არ აჩვენო მომხმარებელს როგორც ტექსტი):
+\`\`\`json
+${currentCvJson}
+\`\`\`
 
 დიალოგი აქამდე:
 ${transcript}
 
 ---
 
-ახლა გააგრძელე როგორც ასისტენტი. დაწერე მოკლე პასუხი ქართულად და ბოლოში სავალდებულოდ დაამატე JSON ბლოკი cv ობიექტით.`;
+ახლა გააგრძელე როგორც ასისტენტი. დაწერე მოკლე პასუხი ქართულად და ბოლოში სავალდებულოდ დაამატე JSON ბლოკი \"updatedFields\" ობიექტით.`;
 
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0 },
+    });
     const response = result?.response;
     const text = (response && response.text && response.text()) || "";
     let reply = text.trim().slice(0, 4000) || "ამ დროს პასუხის გენერაცია ვერ მოხერხდა. სცადე თავიდან ცოტა ხანში.";
@@ -2000,10 +2077,22 @@ ${transcript}
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[1]);
-        if (parsed && typeof parsed.cv === "object") {
-          const c = parsed.cv;
+        if (parsed && typeof parsed.updatedFields === "object") {
+          const u = parsed.updatedFields;
+          const allowedKeys = new Set([
+            "name",
+            "surname",
+            "email",
+            "phone",
+            "education",
+            "experience",
+            "skills",
+            "summary",
+            "profession",
+            "jobs",
+          ]);
           const set = (k, v) => {
-            if (v == null) return;
+            if (!allowedKeys.has(k) || v == null) return;
             if (k === "jobs" || k === "experience") {
               if (Array.isArray(v) && v.length === 0) return;
               cvData[k] = v;
@@ -2012,17 +2101,7 @@ ${transcript}
               if (s) cvData[k] = s;
             }
           };
-          set("name", c.name);
-          set("surname", c.surname);
-          set("email", c.email);
-          set("phone", c.phone);
-          set("education", c.education);
-          set("experience", c.experience);
-          set("skills", c.skills);
-          set("summary", c.summary);
-          set("profession", c.profession);
-          set("themeColor", c.themeColor || c.favoriteColor || c.color);
-          set("jobs", c.jobs);
+          Object.keys(u).forEach((key) => set(key, u[key]));
           req.session.cvCreatorCvData = cvData;
         }
       } catch (e) {
