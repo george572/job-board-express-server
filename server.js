@@ -3373,10 +3373,19 @@ app.use("/users", require("./routes/users")(db));
 app.get("/api/users/:userId/resume", async (req, res) => {
   try {
     const { userId } = req.params;
+    let resolvedUserUid = String(userId);
     let resume = await db("resumes")
       .where("user_id", userId)
       .orderBy("updated_at", "desc")
-      .select("id", "user_id", "file_url", "file_name", "created_at", "updated_at")
+      .select(
+        "id",
+        "user_id",
+        "file_url",
+        "file_name",
+        "created_at",
+        "updated_at",
+        "created_cv_on_samushao_ge"
+      )
       .first();
     // If not found, userId might be users.id (numeric) – resolve to user_uid only when it's a safe 32-bit int
     if (!resume) {
@@ -3386,10 +3395,19 @@ app.get("/api/users/:userId/resume", async (req, res) => {
       if (isValidIntId) {
         const user = await db("users").where("id", numericId).select("user_uid").first();
         if (user) {
+          resolvedUserUid = String(user.user_uid);
           resume = await db("resumes")
             .where("user_id", user.user_uid)
             .orderBy("updated_at", "desc")
-            .select("id", "user_id", "file_url", "file_name", "created_at", "updated_at")
+            .select(
+              "id",
+              "user_id",
+              "file_url",
+              "file_name",
+              "created_at",
+              "updated_at",
+              "created_cv_on_samushao_ge"
+            )
             .first();
         }
       }
@@ -3397,7 +3415,17 @@ app.get("/api/users/:userId/resume", async (req, res) => {
     if (!resume) {
       return res.status(404).json({ error: "Resume not found" });
     }
-    res.json(resume);
+    const aiRow = await db("resumes")
+      .where("user_id", resolvedUserUid)
+      .andWhere(function () {
+        this.where("created_cv_on_samushao_ge", true).orWhereNotNull("cv_html");
+      })
+      .first();
+
+    res.json({
+      ...resume,
+      has_samushao_cv: !!aiRow,
+    });
   } catch (err) {
     console.error("api/users/:userId/resume error:", err);
     res.status(500).json({ error: err.message });

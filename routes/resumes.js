@@ -18,26 +18,34 @@ module.exports = function (db) {
 
   const upload = multer({ storage });
 
-  router.get("/:id", (req, res) => {
+  router.get("/:id", async (req, res) => {
     const { id } = req.params;
+    try {
+      const [row, aiRow] = await Promise.all([
+        db("resumes").where("user_id", id).orderBy("updated_at", "desc").first(),
+        db("resumes")
+          .where("user_id", id)
+          .andWhere(function () {
+            this.where("created_cv_on_samushao_ge", true).orWhereNotNull("cv_html");
+          })
+          .first(),
+      ]);
 
-    db("resumes")
-      .where("user_id", id)
-      .orderBy("updated_at", "desc")
-      .first()
-      .then((row) => {
-        if (!row) {
-          return res.status(404).json({ error: "Resume not found" });
-        }
-        return res.json({
-          file_url: row.file_url,
-          user_id: row.user_id,
-          created_at: row.created_at,
-          file_name: row.file_name ? row.file_name : "",
-          created_cv_on_samushao_ge: row.created_cv_on_samushao_ge === true,
-        });
-      })
-      .catch((err) => res.status(500).json({ error: err.message }));
+      if (!row) {
+        return res.status(404).json({ error: "Resume not found" });
+      }
+
+      return res.json({
+        file_url: row.file_url,
+        user_id: row.user_id,
+        created_at: row.created_at,
+        file_name: row.file_name ? row.file_name : "",
+        created_cv_on_samushao_ge: row.created_cv_on_samushao_ge === true,
+        has_samushao_cv: !!aiRow,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
   });
 
   router.post("/", upload.single("resume"), async (req, res) => {
