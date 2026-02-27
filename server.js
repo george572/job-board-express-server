@@ -2276,6 +2276,31 @@ ${transcript}
     history.push({ role: "assistant", content: reply });
     req.session.cvCreatorHistory = history;
 
+    // Temporary logging of CV creator chat + resulting CV snapshot
+    try {
+      const sessionId = req.session.id || req.sessionID || null;
+      const userId =
+        req.session.user && req.session.user.uid
+          ? String(req.session.user.uid)
+          : null;
+      const turnIndex = history.filter((m) => m.role === "assistant").length - 1;
+
+      await db("cv_creator_chat_logs").insert({
+        session_id: sessionId,
+        user_id: userId,
+        turn_index: isNaN(turnIndex) || turnIndex < 0 ? 0 : turnIndex,
+        had_existing_cv: hadExistingCv,
+        user_message: rawMessage,
+        assistant_reply: reply,
+        cv_data: cvData || null,
+      });
+    } catch (e) {
+      console.warn(
+        "[CV creator log] failed to insert chat log:",
+        e?.message || e
+      );
+    }
+
     res.json({ reply, cvData });
   } catch (err) {
     console.error("[Gemini] CV creator chat error:", err?.message || err);
@@ -3467,6 +3492,32 @@ app.post("/api/visitors/record-duration", async (req, res) => {
   } catch (err) {
     console.error("visitors/record-duration error:", err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Temporary: inspect CV creator chat logs (Gemini CV creator)
+app.get("/tmp/cv-creator-logs", async (req, res) => {
+  try {
+    const rows = await db("cv_creator_chat_logs as l")
+      .leftJoin("users as u", "l.user_id", "u.user_uid")
+      .select(
+        "l.id",
+        "l.session_id",
+        "l.user_id",
+        "u.user_name",
+        "l.turn_index",
+        "l.had_existing_cv",
+        "l.user_message",
+        "l.assistant_reply",
+        "l.cv_data",
+        "l.created_at"
+      )
+      .orderBy("l.created_at", "desc");
+
+    res.json({ items: rows });
+  } catch (err) {
+    console.error("tmp cv-creator-logs error:", err);
+    res.status(500).json({ error: err.message || "Failed to load logs" });
   }
 });
 
