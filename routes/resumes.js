@@ -33,7 +33,8 @@ module.exports = function (db) {
           file_url: row.file_url,
           user_id: row.user_id,
           created_at: row.created_at,
-          file_name: row.file_name ? row.file_name : ''
+          file_name: row.file_name ? row.file_name : "",
+          created_cv_on_samushao_ge: row.created_cv_on_samushao_ge === true,
         });
       })
       .catch((err) => res.status(500).json({ error: err.message }));
