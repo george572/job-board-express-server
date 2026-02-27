@@ -2415,6 +2415,12 @@ app.post("/api/sheqmeni-cv/save", async (req, res) => {
             await db("resumes").insert(basePayload);
           }
 
+          const { indexCandidateFromCvUrl } = require("./services/pineconeCandidates");
+          const { invalidate } = require("./services/cvFitCache");
+          indexCandidateFromCvUrl(String(userUid), downloadUrl, fileName)
+            .then(() => invalidate(String(userUid)))
+            .catch((err) => console.warn("[Pinecone] Failed to index CV for user", userUid, err.message));
+
           res.json({ ok: 1 });
         } catch (err) {
           console.error("Failed to upsert resume:", err?.message || err);
