@@ -9,6 +9,8 @@ const knex = require("knex");
 const knexfile = require("./knexfile");
 const environment = process.env.NODE_ENV || "development";
 const db = knex(knexfile[environment]);
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const puppeteer = require("puppeteer");
 const { slugify, extractIdFromSlug } = require("./utils/slugify");
 const { JOBS_LIST_COLUMNS } = require("./utils/jobColumns");
 const { parseJobIdsFromCookie } = require("./utils/formSubmittedCookie");
@@ -34,6 +36,250 @@ const TODAY_IN_GEORGIA = `(NOW() AT TIME ZONE '${TZ_GEORGIA}')::date`;
 let lastPremiumExpiryCleanup = 0;
 let lastPineconeExpiredJobsCleanup = 0;
 const PREMIUM_EXPIRY_CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 min
+
+// Gemini model for CV creator chat (lazy-initialized)
+let cvCreatorModel = null;
+function getCvCreatorModel() {
+  if (cvCreatorModel) return cvCreatorModel;
+  const apiKey =
+    process.env.GEMINI_CV_READER_API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "GEMINI_CV_READER_API_KEY or GEMINI_API_KEY is missing in .env"
+    );
+  }
+  const genAI = new GoogleGenerativeAI(apiKey);
+  cvCreatorModel = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash-lite",
+  });
+  return cvCreatorModel;
+}
+
+/** Build full HTML resume page from cvData (used for server-side PDF) */
+function buildCvHtmlFromData(cvData = {}) {
+  const escapeHtml = (s) =>
+    String(s ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+
+  const fullName =
+    ((cvData.name || "") + " " + (cvData.surname || "")).trim() || "";
+  const summary = cvData.summary || "";
+  const education = cvData.education || "";
+  const rawExperience = cvData.experience;
+  const experienceText =
+    typeof rawExperience === "string" ? rawExperience : "";
+  const skillsArray = String(cvData.skills || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const skillsHtml = skillsArray
+    .map((s) => `<div class="skill-item">${escapeHtml(s)}</div>`)
+    .join("");
+
+  const jobsSource = Array.isArray(cvData.jobs)
+    ? cvData.jobs
+    : Array.isArray(cvData.experience)
+      ? cvData.experience
+      : null;
+  let jobsHtml = "";
+  if (jobsSource && jobsSource.length) {
+    jobsHtml = jobsSource
+      .map((j) => {
+        j = j || {};
+        const company = j.company || "";
+        const position = j.position || "";
+        const start = j.start_date || "";
+        const end = j.end_date || "";
+        const jobSummary = j.summary || "";
+        let duties = j.duties;
+        let dutySource = "";
+        if (Array.isArray(duties)) dutySource = duties.join("\n");
+        else if (typeof duties === "string") dutySource = duties;
+        else if (duties != null) dutySource = String(duties);
+        let dutyLines = (dutySource || "")
+          .split(/\r?\n/)
+          .map((t) => t.trim())
+          .filter(Boolean);
+        if (!dutyLines.length && jobSummary) dutyLines = [jobSummary];
+        let bullets = dutyLines
+          .map((line) => `<li>${escapeHtml(line)}</li>`)
+          .join("");
+        if (!bullets && experienceText) {
+          bullets = `<li>${escapeHtml(experienceText)}</li>`;
+        }
+        const dateRange =
+          start || end
+            ? `${escapeHtml(start)}${
+                end ? " — " + escapeHtml(end) : ""
+              }`
+            : "";
+        return `
+          <div class="job">
+            <div class="job-header">
+              <span class="job-company">${escapeHtml(
+                company || "კომპანია"
+              )}</span>
+              <span class="job-location"></span>
+            </div>
+            <div class="job-sub">
+              <span class="job-title">${escapeHtml(position || "")}</span>
+              <span class="job-dates">${dateRange}</span>
+            </div>
+            <ul class="job-bullets">${bullets}</ul>
+          </div>
+        `;
+      })
+      .join("");
+  } else if (experienceText) {
+    jobsHtml = `
+      <div class="job">
+        <div class="job-header">
+          <span class="job-company">გამოცდილება</span>
+          <span class="job-location"></span>
+        </div>
+        <div class="job-sub">
+          <span class="job-title"></span>
+          <span class="job-dates"></span>
+        </div>
+        <ul class="job-bullets"><li>${escapeHtml(
+          experienceText
+        )}</li></ul>
+      </div>
+    `;
+  }
+
+  const primaryPosition =
+    jobsSource &&
+    jobsSource[0] &&
+    typeof jobsSource[0] === "object" &&
+    jobsSource[0].position
+      ? jobsSource[0].position
+      : "";
+  const profession = cvData.profession || "";
+  const badgeText =
+    profession || primaryPosition || (summary ? summary.slice(0, 80) : "პროფესიული რეზიუმე");
+
+  // Theme color (user favorite); fall back to default green
+  let themeColor = (cvData.themeColor || cvData.favoriteColor || cvData.color || "#8fbc8f").trim();
+  const lower = themeColor.toLowerCase();
+  if (!themeColor) themeColor = "#8fbc8f";
+  const badgeTextColor =
+    lower === "#ffffff" || lower === "#fff" || lower === "white" ? "#111111" : "#ffffff";
+
+  return (
+    "<!DOCTYPE html>" +
+    '<html lang="ka">' +
+    "<head>" +
+    '<meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+    `<title>${escapeHtml(fullName || "რეზიუმე")}</title>` +
+    '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Georgian:wght@400;600;700&family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">' +
+    "<style>" +
+    "*{margin:0;padding:0;box-sizing:border-box;}" +
+    "body{font-family:'Raleway','Noto Sans Georgian',sans-serif;background:#ffffff;margin:0;padding:0;}" +
+    ".page{background:#fff;width:100%;min-height:100vh;display:flex;}" +
+    ".sidebar{width:260px;min-width:260px;background:#f7f7f7;padding:40px 28px;border-right:1px solid #eee;}" +
+    ".sidebar-section{margin-bottom:36px;}" +
+    ".sidebar-title{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#2d2d2d;margin-bottom:18px;}" +
+    `.icon-box{width:32px;height:32px;background:${themeColor};border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}` +
+    ".icon-box svg{width:16px;height:16px;fill:#fff;}" +
+    ".contact-item{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;font-size:13px;color:" + themeColor + ";line-height:1.4;}" +
+    `.contact-item svg{width:16px;height:16px;fill:${themeColor};flex-shrink:0;margin-top:1px;}` +
+    ".skill-item{display:flex;align-items:center;gap:8px;font-size:13px;color:#444;margin-bottom:10px;}" +
+    '.skill-item::before{content:"•";color:#5a8a5a;font-size:16px;}' +
+    ".main{flex:1;padding:40px 44px;}" +
+    ".name{font-size:42px;font-weight:800;color:#1a1a1a;letter-spacing:-1px;line-height:1;margin-bottom:16px;text-transform:capitalize;}" +
+    `.title-badge{display:inline-block;background:${themeColor};color:${badgeTextColor};font-family:'Noto Sans Georgian',sans-serif;font-size:14px;font-weight:600;padding:10px 24px;border-radius:6px;margin-bottom:36px;width:100%;text-align:left;}` +
+    ".section{margin-bottom:34px;}" +
+    ".section-header{display:flex;align-items:center;gap:12px;margin-bottom:14px;border-bottom:1px solid #eee;padding-bottom:10px;}" +
+    `.section-icon{width:34px;height:34px;background:${themeColor};border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}` +
+    ".section-icon svg{width:18px;height:18px;fill:#fff;}" +
+    ".section-title{font-size:14px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#1a1a1a;}" +
+    ".summary-text{font-size:13.5px;color:#444;line-height:1.7;}" +
+    ".job{margin-bottom:18px;}" +
+    ".job-header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;}" +
+    ".job-company{font-family:'Noto Sans Georgian',sans-serif;font-weight:700;font-size:14px;color:#2d2d2d;}" +
+    ".job-location{font-family:'Noto Sans Georgian',sans-serif;font-size:13px;color:#666;}" +
+    ".job-sub{display:flex;justify-content:space-between;margin-bottom:10px;}" +
+    ".job-title{font-family:'Noto Sans Georgian',sans-serif;font-size:13px;color:#555;}" +
+    ".job-dates{font-size:13px;color:#666;}" +
+    ".job-bullets{list-style:none;padding:0;}" +
+    ".job-bullets li{font-size:13.5px;color:#444;line-height:1.6;padding-left:16px;position:relative;margin-bottom:6px;}" +
+    '.job-bullets li::before{content:"•";position:absolute;left:0;color:#5a8a5a;font-size:16px;line-height:1.4;}' +
+    ".edu-school{font-family:'Noto Sans Georgian',sans-serif;font-weight:700;font-size:14px;color:#2d2d2d;}" +
+    "</style>" +
+    "</head>" +
+    "<body>" +
+    '<div class="page">' +
+    '  <div class="sidebar">' +
+    '    <div class="sidebar-section">' +
+    '      <div class="sidebar-title">' +
+    '        <div class="icon-box">' +
+    '          <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>' +
+    "        </div>" +
+    "        Contacts" +
+    "      </div>" +
+    '      <div class="contact-item">' +
+    '        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5 14.5 7.62 14.5 9 13.38 11.5 12 11.5z"/></svg>' +
+    "        თბილისი, საქართველო" +
+    "      </div>" +
+    '      <div class="contact-item">' +
+    '        <svg viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>' +
+    `        ${escapeHtml(cvData.phone || "")}` +
+    "      </div>" +
+    '      <div class="contact-item">' +
+    '        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>' +
+    `        ${escapeHtml(cvData.email || "")}` +
+    "      </div>" +
+    "    </div>" +
+    '    <div class="sidebar-section">' +
+    '      <div class="sidebar-title">' +
+    '        <div class="icon-box">' +
+    '          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>' +
+    "        </div>" +
+    "        Skills" +
+    "      </div>" +
+    skillsHtml +
+    "    </div>" +
+    "  </div>" +
+    '  <div class="main">' +
+    `    <h1 class="name">${escapeHtml(fullName || "")}</h1>` +
+    `    <div class="title-badge">${escapeHtml(badgeText || "")}</div>` +
+    '    <div class="section">' +
+    '      <div class="section-header">' +
+    '        <div class="section-icon">' +
+    '          <svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>' +
+    "        </div>" +
+    '        <span class="section-title">Professional Summary</span>' +
+    "      </div>" +
+    `      <p class="summary-text">${escapeHtml(summary || "")}</p>` +
+    "    </div>" +
+    '    <div class="section">' +
+    '      <div class="section-header">' +
+    '        <div class="section-icon">' +
+    '          <svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.07-.44.18-.88.18-1.34C18 2.54 15.96.5 13.46.5c-1.36 0-2.5.56-3.46 1.44C9.04 1.06 7.9.5 6.54.5 4.04.5 2 2.54 2 4.66c0 .46.11.9.18 1.34H0v14c0 1.1.9 2 2 2h20c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-7.46-3.5c1.29 0 2.46 1.06 2.46 2.16 0 .44-.07.88-.18 1.34H12V4.68c.29-.94.84-2.18 2.54-2.18.37 0 .93.11.93.11zM7 2.5c1.7 0 2.25 1.24 2.54 2.18V6.5H6.18c-.11-.46-.18-.9-.18-1.34C6 3.56 7.04 2.5 7.04 2.5H7zM2 8h20v4H2V8zm0 12v-6h8v2h4v-2h8v6H2z"/></svg>' +
+    "        </div>" +
+    '        <span class="section-title">Work Experience</span>' +
+    "      </div>" +
+    jobsHtml +
+    "    </div>" +
+    '    <div class="section">' +
+    '      <div class="section-header">' +
+    '        <div class="section-icon">' +
+    '          <svg viewBox="0 0 24 24"><path d="M12 3L1 9l4 2.18V15c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-3.82L23 9 12 3zm6 12H6v-3.27l6 3.27 6-3.27V15zm-6-5.18L4.53 9 12 5.18 19.47 9 12 9.82z"/></svg>' +
+    "        </div>" +
+    '        <span class="section-title">Education</span>' +
+    "      </div>" +
+    `      <div class="edu-school">${escapeHtml(education || "")}</div>` +
+    "    </div>" +
+    "  </div>" +
+    "</div>" +
+    "</body></html>"
+  );
+}
 
 /** Today's date in Georgia (YYYY-MM-DD) for premium expiry. 0 days left = expired. */
 function getTodayGeorgiaYYYYMMDD() {
@@ -1624,6 +1870,278 @@ app.get("/pricing", (req, res) => {
   });
 });
 
+// CV creator (sheqmeni-cv) – same look as main index, AI chat to build CV
+app.get("/sheqmeni-cv", async (req, res) => {
+  try {
+    const user = req.session?.user || null;
+    let existingCvHtml = null;
+
+    if (user && user.user_type === "user") {
+      const resume = await db("resumes")
+        .where("user_id", String(user.uid))
+        .andWhere("created_cv_on_samushao_ge", true)
+        .orderBy("updated_at", "desc")
+        .first();
+      if (resume && resume.cv_html) {
+        existingCvHtml = resume.cv_html;
+        if (req.session) req.session.cvCreatorHasExisting = true;
+      } else if (req.session) {
+        req.session.cvCreatorHasExisting = false;
+      }
+    } else if (req.session) {
+      req.session.cvCreatorHasExisting = false;
+    }
+
+    res.render("sheqmeni-cv", {
+      seo: {
+        title: "შევქმნათ CV | Samushao.ge",
+        description: "AI-ს დახმარებით შექმენი შენი CV.",
+        canonical: "https://samushao.ge/sheqmeni-cv",
+      },
+      user,
+      existingCvHtml,
+    });
+  } catch (err) {
+    console.error("/sheqmeni-cv error:", err?.message || err);
+    res.status(500).send("Error loading CV creator");
+  }
+});
+
+// API: CV creator chat – backed by Gemini
+app.post("/api/sheqmeni-cv/chat", async (req, res) => {
+  try {
+    const body = req.body || {};
+    const isInitial = body.initial === true;
+    const rawMessage = (body.message || "").trim();
+
+    if (!req.session) {
+      return res.status(500).json({ error: "session unavailable" });
+    }
+    if (!Array.isArray(req.session.cvCreatorHistory)) {
+      req.session.cvCreatorHistory = [];
+    }
+    const history = req.session.cvCreatorHistory;
+
+    // First message: fixed onboarding question (deterministic)
+    const hadExistingCv = !!req.session?.cvCreatorHasExisting;
+    const FIRST_QUESTION = hadExistingCv
+      ? "რა გინდა რომ შევცვალოთ შენს რეზიუმეში?"
+      : "მე რამდენიმე კითხვას დაგისვამ, და შემდეგ გაგიკეთებ რეზიუმეს შენი პასუხების მიხედვით. დავიწყოთ?";
+    if (isInitial && history.length === 0) {
+      const reply = FIRST_QUESTION;
+      history.push({ role: "assistant", content: reply });
+      req.session.cvCreatorHistory = history;
+      return res.json({ reply });
+    }
+
+    if (!rawMessage) {
+      return res.status(400).json({ error: "message required" });
+    }
+
+    history.push({ role: "user", content: rawMessage });
+
+    let model;
+    try {
+      model = getCvCreatorModel();
+    } catch (e) {
+      console.error("[Gemini] CV creator init failed:", e?.message || e);
+      const fallback =
+        "ამ დროს AI მოდელი დროებით მიუწვდომელია. შეგიძლია მაინც მომწერო შენი განათლება, სამუშაო გამოცდილება და უნარები, და sistemashi shevinaxavt.";
+      history.push({ role: "assistant", content: fallback });
+      req.session.cvCreatorHistory = history;
+      return res.json({ reply: fallback });
+    }
+
+    const systemPrompt =
+      "You are a helpful CV-building assistant for Samushao.ge, speaking ONLY Georgian (ქართული ენა)." +
+      " People you talk to often have little experience; improvise professional skills for them." +
+      " Must collect: full name (სახელი გვარი), email, phone. When they mention work, improvise typical duties and ask: company name, position, start date, end date." +
+      " for the general skills of the user, you should never ask them if they want it to be incliuded, you must automatically assume and generate it, and only change it if they ask it to do so." +
+      " you must automatically generate/update Professional Summary section, without user asking for it, be proactive." +
+      "  don't stop asking questions unless you have all the information, like name, email, phone, education work experience." +
+      "  don't ask them whether they want certain information included or not, include it yourself, and only make changes if they explicitly ask for it." +
+      "when users ask you to change any info there is so far, do it, re-send the response with the updated user-provided data. " +
+      "never write the chat response for users more than 10-15 words, ( this does not apply to json object ).  " +
+      " Immediately after the very first onboarding question you receive in the transcript (\"მე რამდენიმე კითხვას დაგისვამ...\"), your NEXT question to the user MUST be to ask for their favourite color for the CV (themeColor). Always store it in the JSON as \"themeColor\" (valid CSS color or hex, e.g. \"#315EFF\")." +
+      " If the user says their favourite color is white, you must still make sure there is NEVER white text on white background – in that case always set text color to black." +
+      " CRITICAL: In every reply, unless you already have ALL required info (name, surname, email, phone, education, work experience, at least one job, skills, summary, profession, and themeColor), you MUST end the natural-language part with a question that clearly asks for the next missing piece of information." +
+      " CRITICAL: End EVERY message with a JSON block containing current CV data. Format exactly:\n" +
+      " never fucking send in the chat texts like this : თქვენი მოვალეობები სავარაუდოდ მოიცავდა:.... motherfucking piece of shit i said dont do anything that you are not instructed to do." +
+      "```json\n{\"cv\":{\"name\":\"\",\"surname\":\"\",\"email\":\"\",\"phone\":\"\",\"education\":\"\",\"experience\":[],\"skills\":\"\",\"summary\":\"\",\"profession\":\"\",\"themeColor\":\"\",\"jobs\":[{\"company\":\"\",\"position\":\"\",\"start_date\":\"\",\"end_date\":\"\",\"summary\":\"\",\"duties\":\"\"}]}}\n```\n" +
+      "IMPORTANT: 'experience' must be either an empty array or an array of job objects. Never put [object Object] or text there. 'jobs' must always be an array of objects with keys company, position, start_date, end_date, summary, duties. 'themeColor' must always be a valid CSS color or hex (e.g. \"#315EFF\", \"blue\", \"#ffffff\")." +
+      " dont write long texts to users, every job's summary must be directly send as json ojbect, don't asks questions like : 'we should incliude this duties, right?...' "+
+      " Do NOT switch languages.";
+
+    const transcript = history
+      .map((m) =>
+        m.role === "user"
+          ? `მომხმარებელი: ${m.content}`
+          : `ასისტენტი: ${m.content}`
+      )
+      .join("\n");
+
+    const prompt = `${systemPrompt}
+
+დიალოგი აქამდე:
+${transcript}
+
+---
+
+ახლა გააგრძელე როგორც ასისტენტი. დაწერე მოკლე პასუხი ქართულად და ბოლოში სავალდებულოდ დაამატე JSON ბლოკი cv ობიექტით.`;
+
+    const result = await model.generateContent(prompt);
+    const response = result?.response;
+    const text = (response && response.text && response.text()) || "";
+    let reply = text.trim().slice(0, 4000) || "ამ დროს პასუხის გენერაცია ვერ მოხერხდა. სცადე თავიდან ცოტა ხანში.";
+
+    // Extract CV JSON block from end of reply (format: ```json\n{...}\n```)
+    let cvData = req.session.cvCreatorCvData || {};
+    const jsonMatch = reply.match(/```json\s*([\s\S]*?)\s*```/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[1]);
+        if (parsed && typeof parsed.cv === "object") {
+          const c = parsed.cv;
+          const set = (k, v) => {
+            if (v == null) return;
+            if (k === "jobs" || k === "experience") {
+              if (Array.isArray(v) && v.length === 0) return;
+              cvData[k] = v;
+            } else {
+              const s = String(v).trim();
+              if (s) cvData[k] = s;
+            }
+          };
+          set("name", c.name);
+          set("surname", c.surname);
+          set("email", c.email);
+          set("phone", c.phone);
+          set("education", c.education);
+          set("experience", c.experience);
+          set("skills", c.skills);
+          set("summary", c.summary);
+          set("profession", c.profession);
+          set("themeColor", c.themeColor || c.favoriteColor || c.color);
+          set("jobs", c.jobs);
+          req.session.cvCreatorCvData = cvData;
+        }
+      } catch (e) {
+        console.warn("[Gemini] CV JSON parse failed:", e?.message);
+      }
+      reply = reply.replace(/```json\s*[\s\S]*?\s*```/g, "").trim();
+    }
+
+    history.push({ role: "assistant", content: reply });
+    req.session.cvCreatorHistory = history;
+
+    res.json({ reply, cvData });
+  } catch (err) {
+    console.error("[Gemini] CV creator chat error:", err?.message || err);
+    res.status(500).json({
+      error: "cv_creator_gemini_failed",
+      message:
+        "ამ დროს AI მოდელი ვერ პასუხობს. სცადე რამდენიმე წუთში კიდევ ერთხელ.",
+    });
+  }
+});
+
+// Save AI-generated CV as PDF in resumes table (server-side PDF via Puppeteer)
+app.post("/api/sheqmeni-cv/save", async (req, res) => {
+  try {
+    if (!req.session?.user || req.session.user.user_type !== "user") {
+      return res.status(403).json({ error: "unauthorized" });
+    }
+    const userUid = req.session.user.uid;
+    const cv = req.body?.cv || {};
+
+    const hasAnyData = Object.values(cv || {}).some((v) =>
+      v && String(v).trim && String(v).trim()
+    );
+    if (!hasAnyData) {
+      return res.status(400).json({ error: "no cv data" });
+    }
+
+    const html = buildCvHtmlFromData(cv);
+
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0" });
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "0mm", bottom: "0mm", left: "0mm", right: "0mm" },
+    });
+    await browser.close();
+
+    const rawName =
+      cv.name || cv.surname
+        ? `${cv.name || ""} ${cv.surname || ""}`.trim()
+        : `CV-${userUid}`;
+    const fileName = `${rawName} CV.pdf`.slice(0, 190);
+
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        resource_type: "raw",
+        folder: "resumes",
+        use_filename: true,
+        unique_filename: true,
+        access_mode: "public",
+        filename_override: fileName,
+      },
+      async (error, result) => {
+        if (error) {
+          console.error("Cloudinary upload failed:", error?.message || error);
+          return res.status(500).json({ error: "upload_failed" });
+        }
+        try {
+          const downloadUrl = cloudinary.url(result.public_id, {
+            resource_type: "raw",
+            type: "upload",
+            flags: "attachment",
+          });
+
+          const basePayload = {
+            file_url: downloadUrl,
+            user_id: String(userUid),
+            file_name: fileName,
+            created_cv_on_samushao_ge: true,
+            cv_html: html,
+          };
+
+          const existing = await db("resumes")
+            .where("user_id", String(userUid))
+            .andWhere("created_cv_on_samushao_ge", true)
+            .orderBy("updated_at", "desc")
+            .first();
+
+          if (existing) {
+            await db("resumes")
+              .where("id", existing.id)
+              .update({ ...basePayload, updated_at: db.fn.now() });
+          } else {
+            await db("resumes").insert(basePayload);
+          }
+
+          res.json({ ok: 1 });
+        } catch (err) {
+          console.error("Failed to upsert resume:", err?.message || err);
+          res.status(500).json({ error: "db_upsert_failed" });
+        }
+      }
+    );
+    uploadStream.end(pdfBuffer);
+  } catch (err) {
+    console.error("/api/sheqmeni-cv/save error:", err?.message || err);
+    res.status(500).json({
+      error: "cv_save_failed",
+      message: err?.message || String(err),
+    });
+  }
+});
+
 // My applications (sent CVs) - user type only
 app.get("/my-applications", async (req, res) => {
   if (!req.session?.user) {
@@ -1687,12 +2205,20 @@ app.get("/my-cv", async (req, res) => {
     return res.redirect("/");
   }
   try {
-    const resume = await db("resumes")
-      .where("user_id", req.session.user.uid)
-      .orderBy("updated_at", "desc")
-      .first();
+    const [resume, aiResume] = await Promise.all([
+      db("resumes")
+        .where("user_id", req.session.user.uid)
+        .orderBy("updated_at", "desc")
+        .first(),
+      db("resumes")
+        .where("user_id", req.session.user.uid)
+        .whereNotNull("cv_html")
+        .orderBy("updated_at", "desc")
+        .first(),
+    ]);
     res.render("my-cv", {
       resume: resume || null,
+      hasSamushaoCv: !!aiResume,
       slugify,
       seo: {
         title: "ჩემი CV | Samushao.ge",

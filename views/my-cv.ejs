@@ -31,6 +31,19 @@
         <input type="file" id="cvUpload" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" class="hidden" />
         ატვირთვა
       </label>
+        <a href="/sheqmeni-cv" type="file" class="inline-flex px-4 py-2 rounded-lg bg-[#315EFF] text-white hover:bg-[#2a4fd9] cursor-poiner">
+        შექმენი ახალი CV
+        </a>
+      <% if (resume && resume.file_url) { %>
+      <a href="<%= resume.file_url %>" target="_blank" rel="noopener" class="inline-flex items-center justify-center px-4 py-2 rounded-lg border border-[#315EFF] text-[#315EFF] hover:bg-[#E5EDFF] cursor-pointer">
+        CV ჩამოტვირთვა
+      </a>
+      <% } %>
+      <% if (typeof hasSamushaoCv !== 'undefined' && hasSamushaoCv) { %>
+      <a href="/sheqmeni-cv" class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-[#315EFF] text-white hover:bg-[#2a4fd9] cursor-pointer">
+        CV რედაქტირება
+      </a>
+      <% } %>
     </div>
 
     <div class="bg-white rounded-lg border border-[#EBEBEB] shadow-sm overflow-hidden min-h-[400px]">
