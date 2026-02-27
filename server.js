@@ -68,6 +68,7 @@ function buildCvHtmlFromData(cvData = {}) {
     ((cvData.name || "") + " " + (cvData.surname || "")).trim() || "";
   const summary = cvData.summary || "";
   const education = cvData.education || "";
+  const city = cvData.city || "";
   const rawExperience = cvData.experience;
   const experienceText =
     typeof rawExperience === "string" ? rawExperience : "";
@@ -78,6 +79,52 @@ function buildCvHtmlFromData(cvData = {}) {
   const skillsHtml = skillsArray
     .map((s) => `<div class="skill-item">${escapeHtml(s)}</div>`)
     .join("");
+
+  const languagesArray = Array.isArray(cvData.languages)
+    ? cvData.languages.map((lang) => ({
+        name: (lang?.name || lang?.language || "").trim(),
+        level: (lang?.level || lang?.proficiency || "").trim(),
+      }))
+    : typeof cvData.languages === "string" && cvData.languages.trim()
+      ? cvData.languages
+          .split(",")
+          .map((s) => ({ name: s.trim(), level: "" }))
+      : [];
+
+  const languagesHtml = languagesArray
+    .filter((lang) => lang.name)
+    .map((lang) => {
+      let label = escapeHtml(lang.name);
+      if (lang.level) {
+        label += " — " + escapeHtml(lang.level);
+      }
+      return `<div class="skill-item">${label}</div>`;
+    })
+    .join("");
+
+  const certificatesArray = Array.isArray(cvData.certificates)
+    ? cvData.certificates
+    : [];
+
+  const certificatesHtml = certificatesArray
+    .map((certRaw) => {
+      const cert = certRaw || {};
+      const title = cert.name || cert.title || "";
+      const issuer = cert.issuer || cert.organization || "";
+      const year = cert.year || "";
+      let line = escapeHtml(title);
+      const metaParts = [];
+      if (issuer) metaParts.push(escapeHtml(issuer));
+      if (year) metaParts.push(escapeHtml(year));
+      if (metaParts.length) {
+        line += " (" + metaParts.join(", ") + ")";
+      }
+      return `<div class="skill-item">${line}</div>`;
+    })
+    .join("");
+
+  const otherInfo = cvData.otherInfo || "";
+
   const hasSummary = !!(summary && String(summary).trim());
   const hasEducation = !!(education && String(education).trim());
 
@@ -155,6 +202,9 @@ function buildCvHtmlFromData(cvData = {}) {
 
   const hasJobsSection = !!(jobsHtml && String(jobsHtml).trim());
   const hasSkills = !!(skillsHtml && String(skillsHtml).trim());
+  const hasLanguages = !!(languagesHtml && String(languagesHtml).trim());
+  const hasCertificates = !!(certificatesHtml && String(certificatesHtml).trim());
+  const hasOtherInfo = !!(otherInfo && String(otherInfo).trim());
 
   const primaryPosition =
     jobsSource &&
@@ -181,7 +231,7 @@ function buildCvHtmlFromData(cvData = {}) {
         '        <div class="section-icon">',
         '          <svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>',
         "        </div>",
-        '        <span class="section-title">Professional Summary</span>',
+        '        <span class="section-title">მოკლე აღწერა</span>',
         "      </div>",
         `      <p class="summary-text">${escapeHtml(summary || "")}</p>`,
         "    </div>",
@@ -195,7 +245,7 @@ function buildCvHtmlFromData(cvData = {}) {
         '        <div class="section-icon">',
         '          <svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.07-.44.18-.88.18-1.34C18 2.54 15.96.5 13.46.5c-1.36 0-2.5.56-3.46 1.44C9.04 1.06 7.9.5 6.54.5 4.04.5 2 2.54 2 4.66c0 .46.11.9.18 1.34H0v14c0 1.1.9 2 2 2h20c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-7.46-3.5c1.29 0 2.46 1.06 2.46 2.16 0 .44-.07.88-.18 1.34H12V4.68c.29-.94.84-2.18 2.54-2.18.37 0 .93.11.93.11zM7 2.5c1.7 0 2.25 1.24 2.54 2.18V6.5H6.18c-.11-.46-.18-.9-.18-1.34C6 3.56 7.04 2.5 7.04 2.5H7zM2 8h20v4H2V8zm0 12v-6h8v2h4v-2h8v6H2z"/></svg>',
         "        </div>",
-        '        <span class="section-title">Work Experience</span>',
+        '        <span class="section-title">სამუშაო გამოცდილება</span>',
         "      </div>",
         jobsHtml,
         "    </div>",
@@ -209,7 +259,7 @@ function buildCvHtmlFromData(cvData = {}) {
         '        <div class="section-icon">',
         '          <svg viewBox="0 0 24 24"><path d="M12 3L1 9l4 2.18V15c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-3.82L23 9 12 3zm6 12H6v-3.27l6 3.27 6-3.27V15zm-6-5.18L4.53 9 12 5.18 19.47 9 12 9.82z"/></svg>',
         "        </div>",
-        '        <span class="section-title">Education</span>',
+        '        <span class="section-title">განათლება</span>',
         "      </div>",
         `      <div class="edu-school">${escapeHtml(education || "")}</div>`,
         "    </div>",
@@ -223,9 +273,51 @@ function buildCvHtmlFromData(cvData = {}) {
         '        <div class="icon-box">',
         '          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
         "        </div>",
-        "        Skills",
+        "        უნარები",
         "      </div>",
         skillsHtml,
+        "    </div>",
+      ].join("")
+    : "";
+
+  const languagesSectionHtml = hasLanguages
+    ? [
+        '    <div class="sidebar-section">',
+        '      <div class="sidebar-title">',
+        '        <div class="icon-box">',
+        '          <svg viewBox="0 0 24 24"><path d="M4 4h16v2H5v3H3V5c0-.6.4-1 1-1zm3 5h14c.6 0 1 .4 1 1v9c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1v-9c0-.6.4-1 1-1zm7 2l-3 7h2l.6-1.5h2.8L18 18h2l-3-7h-2zm-1 4l.9-2.2L15.8 15H13z"/></svg>',
+        "        </div>",
+        "        ენები",
+        "      </div>",
+        languagesHtml,
+        "    </div>",
+      ].join("")
+    : "";
+
+  const certificatesSectionHtml = hasCertificates
+    ? [
+        '    <div class="section">',
+        '      <div class="section-header">',
+        '        <div class="section-icon">',
+        '          <svg viewBox="0 0 24 24"><path d="M12 2l3.5 7.1 7.8 1.1-5.6 5.4 1.3 7.7L12 18.8 5 21.3l1.3-7.7-5.6-5.4 7.8-1.1z"/></svg>',
+        "        </div>",
+        '        <span class="section-title">სერტიფიკატები</span>',
+        "      </div>",
+        certificatesHtml,
+        "    </div>",
+      ].join("")
+    : "";
+
+  const otherInfoSectionHtml = hasOtherInfo
+    ? [
+        '    <div class="section">',
+        '      <div class="section-header">',
+        '        <div class="section-icon">',
+        '          <svg viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 5.6 2 10c0 2.5 1.5 4.7 3.8 6.2L5 22l4.4-2.4c.8.1 1.5.2 2.3.2 5.5 0 10-3.6 10-8s-4.5-8-10-8zm1 12h-2v-2h2v2zm0-4h-2V6h2v4z"/></svg>',
+        "        </div>",
+        '        <span class="section-title">სხვა ინფორმაცია</span>',
+        "      </div>",
+        `      <p class="summary-text">${escapeHtml(otherInfo || "")}</p>`,
         "    </div>",
       ].join("")
     : "";
@@ -281,11 +373,11 @@ function buildCvHtmlFromData(cvData = {}) {
     '        <div class="icon-box">' +
     '          <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>' +
     "        </div>" +
-    "        Contacts" +
+    "        საკონტაქტო ინფორმაცია" +
     "      </div>" +
     '      <div class="contact-item">' +
     '        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5 14.5 7.62 14.5 9 13.38 11.5 12 11.5z"/></svg>' +
-    "        თბილისი, საქართველო" +
+    `        ${escapeHtml(city || "")}` +
     "      </div>" +
     '      <div class="contact-item">' +
     '        <svg viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>' +
@@ -305,37 +397,16 @@ function buildCvHtmlFromData(cvData = {}) {
     "      </div>" +
     skillsHtml +
     "    </div>" +
+    languagesSectionHtml +
     "  </div>" +
     '  <div class="main">' +
     `    <h1 class="name">${escapeHtml(fullName || "")}</h1>` +
     `    <div class="title-badge">${escapeHtml(badgeText || "")}</div>` +
-    '    <div class="section">' +
-    '      <div class="section-header">' +
-    '        <div class="section-icon">' +
-    '          <svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>' +
-    "        </div>" +
-    '        <span class="section-title">Professional Summary</span>' +
-    "      </div>" +
-    `      <p class="summary-text">${escapeHtml(summary || "")}</p>` +
-    "    </div>" +
-    '    <div class="section">' +
-    '      <div class="section-header">' +
-    '        <div class="section-icon">' +
-    '          <svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.07-.44.18-.88.18-1.34C18 2.54 15.96.5 13.46.5c-1.36 0-2.5.56-3.46 1.44C9.04 1.06 7.9.5 6.54.5 4.04.5 2 2.54 2 4.66c0 .46.11.9.18 1.34H0v14c0 1.1.9 2 2 2h20c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-7.46-3.5c1.29 0 2.46 1.06 2.46 2.16 0 .44-.07.88-.18 1.34H12V4.68c.29-.94.84-2.18 2.54-2.18.37 0 .93.11.93.11zM7 2.5c1.7 0 2.25 1.24 2.54 2.18V6.5H6.18c-.11-.46-.18-.9-.18-1.34C6 3.56 7.04 2.5 7.04 2.5H7zM2 8h20v4H2V8zm0 12v-6h8v2h4v-2h8v6H2z"/></svg>' +
-    "        </div>" +
-    '        <span class="section-title">Work Experience</span>' +
-    "      </div>" +
-    jobsHtml +
-    "    </div>" +
-    '    <div class="section">' +
-    '      <div class="section-header">' +
-    '        <div class="section-icon">' +
-    '          <svg viewBox="0 0 24 24"><path d="M12 3L1 9l4 2.18V15c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-3.82L23 9 12 3zm6 12H6v-3.27l6 3.27 6-3.27V15zm-6-5.18L4.53 9 12 5.18 19.47 9 12 9.82z"/></svg>' +
-    "        </div>" +
-    '        <span class="section-title">Education</span>' +
-    "      </div>" +
-    `      <div class="edu-school">${escapeHtml(education || "")}</div>` +
-    "    </div>" +
+    summarySectionHtml +
+    workSectionHtml +
+    educationSectionHtml +
+    certificatesSectionHtml +
+    otherInfoSectionHtml +
     "  </div>" +
     "</div>" +
     "</body></html>"
@@ -2036,9 +2107,10 @@ app.post("/api/sheqmeni-cv/chat", async (req, res) => {
     - surname
     - email
     - phone
+    - city (მოწერე შენი ქალაქი/ქვეყანა, напр: თბილისი, საქართველო)
     
     QUESTION FLOW RULES:
-    - Ask for name, surname, email, and phone in ONE message.
+    - Ask for name, surname, email, phone and city in ONE message.
     - Ask for work experience (position, company, start_date, end_date) in ONE message. ( if they dont have work experience/education, generate a generally good positive summary about them, like they are motivated etc.)
     - Never ask whether to include skills. Automatically generate skills.
     - Automatically generate and update Professional Summary every time.
@@ -2053,10 +2125,23 @@ app.post("/api/sheqmeni-cv/chat", async (req, res) => {
     - Always end natural-language response with a clear question
       asking for the next missing required field.
     
-    THINGS YOU SHOULD GENERATE WITHOUT BEING ASKED, AFTER YOU HAVE JOB EXPERIENCE INFO:
-    - Professional Summary
-    - Skills
-    - Job duties description for each job experience.
+    THINGS YOU SHOULD GENERATE WITHOUT BEING ASKED:
+    - After you have job experience info:
+      - Professional Summary
+      - Skills
+      - Job duties description for each job experience.
+    - LANGUAGES:
+      - If the user mentions any languages they know, ALWAYS ask their proficiency level for each language
+        (for example: A1–C2, beginner / intermediate / advanced, native, fluent).
+      - Store this in the \`languages\` array as objects: { "name": "<language>", "level": "<proficiency>" }.
+    - CERTIFICATES:
+      - If the user mentions any certificates, courses or trainings, ask:
+        name of certificate, issuing organization and year (if they remember).
+      - Store this in the \`certificates\` array as objects:
+        { "name": "<certificate name>", "issuer": "<organization>", "year": "<year or empty string>" }.
+    - OTHER GENERAL INFO:
+      - If the user mentions other general info such as driver's license, military service, hobbies or similar,
+        store this text in the \`otherInfo\` field (single string, you can concatenate multiple facts there).
     
     STATE & JSON RULE (CRITICAL):
     - The backend always sends you the FULL current CV JSON.
@@ -2077,6 +2162,7 @@ app.post("/api/sheqmeni-cv/chat", async (req, res) => {
         "surname": "",
         "email": "",
         "phone": "",
+        "city": "",
         "education": "",
         "experience": [],
         "skills": "",
@@ -2091,7 +2177,21 @@ app.post("/api/sheqmeni-cv/chat", async (req, res) => {
             "summary": "",
             "duties": ""
           }
-        ]
+        ],
+        "languages": [
+          {
+            "name": "",
+            "level": ""
+          }
+        ],
+        "certificates": [
+          {
+            "name": "",
+            "issuer": "",
+            "year": ""
+          }
+        ],
+        "otherInfo": ""
       }
     }
     \`\`\`
@@ -2143,16 +2243,20 @@ ${transcript}
             "surname",
             "email",
             "phone",
+            "city",
             "education",
             "experience",
             "skills",
             "summary",
             "profession",
             "jobs",
+            "languages",
+            "certificates",
+            "otherInfo",
           ]);
           const set = (k, v) => {
             if (!allowedKeys.has(k) || v == null) return;
-            if (k === "jobs" || k === "experience") {
+            if (k === "jobs" || k === "experience" || k === "languages" || k === "certificates") {
               if (Array.isArray(v) && v.length === 0) return;
               cvData[k] = v;
             } else {
