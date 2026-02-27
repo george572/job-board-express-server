@@ -19,13 +19,29 @@ module.exports = function (db) {
       );
       const offset = (page - 1) * pageSize;
 
+      const searchRaw = (req.query.search || req.query.name || "").trim();
+
+      let baseQuery = db("users");
+
+      if (searchRaw) {
+        const parts = searchRaw.split(/\s+/).filter(Boolean);
+        baseQuery = baseQuery.where(function () {
+          parts.forEach((part) => {
+            this.andWhereRaw("LOWER(user_name) LIKE ?", [
+              `%${part.toLowerCase()}%`,
+            ]);
+          });
+        });
+      }
+
       const [rows, countResult] = await Promise.all([
-        db("users")
+        baseQuery
+          .clone()
           .select("*")
           .orderBy("created_at", "desc")
           .limit(pageSize)
           .offset(offset),
-        db("users").count("* as count").first(),
+        baseQuery.clone().count("* as count").first(),
       ]);
 
       const total = Number(countResult?.count || 0);
