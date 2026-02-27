@@ -40,6 +40,44 @@ FROM base
 # Copy built application
 COPY --from=build /app /app
 
+# Install system dependencies for Chrome and download a managed Chrome binary for Puppeteer
+RUN apt-get update -qq && \
+    apt-get install --no-install-recommends -y \
+      ca-certificates \
+      fonts-liberation \
+      libasound2 \
+      libatk1.0-0 \
+      libatk-bridge2.0-0 \
+      libc6 \
+      libcairo2 \
+      libcups2 \
+      libdbus-1-3 \
+      libexpat1 \
+      libfontconfig1 \
+      libgcc1 \
+      libglib2.0-0 \
+      libgdk-pixbuf2.0-0 \
+      libgtk-3-0 \
+      libnspr4 \
+      libnss3 \
+      libpango-1.0-0 \
+      libx11-6 \
+      libx11-xcb1 \
+      libxcb1 \
+      libxcomposite1 \
+      libxcursor1 \
+      libxdamage1 \
+      libxext6 \
+      libxfixes3 \
+      libxi6 \
+      libxrandr2 \
+      libxrender1 \
+      libxss1 \
+      libxtst6 \
+      xdg-utils && \
+    rm -rf /var/lib/apt/lists/* && \
+    npx puppeteer browsers install chrome
+
 # Setup sqlite3 on a separate volume
 RUN mkdir -p /data
 VOLUME /data

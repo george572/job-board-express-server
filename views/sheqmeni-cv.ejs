@@ -264,9 +264,36 @@
                 rows="3"
                 autocomplete="off"
               ></textarea>
-              <button type="submit" class="sheqmeni-send w-full" id="sheqmeniSend">გაგზავნა</button>
+              <button type="submit" class="sheqmeni-send w-full mb-2" id="sheqmeniSend">გაგზავნა</button>
+              <button
+                type="button"
+                class="sheqmeni-send w-full bg-gray-100 text-gray-800 hover:bg-gray-200"
+                id="sheqmeniHelpBtn"
+              >
+                დამეხმარეთ, ვერ ვაკეთებ
+              </button>
             </div>
           </form>
+          <div
+            id="sheqmeniHelpPanel"
+            class="mt-3 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3 flex flex-col gap-3"
+            style="display: none; max-height: 220px; overflow-y: auto;"
+          >
+            <!-- TODO: replace with final text provided by Giorgi -->
+            <p>
+              ერთიანად არ დაწეროთ ყველაფერი, მიჰყევით სათითაოდ. ენები, განათლება, სამუშაო გამოცდილება ( ცალცალკე დაწერეთ გამოცდილების შესახებ ).
+              ნუ დაელოდებით როდის მიხვდება ხელ.ინტელექტი რამეს, თავად უბრძანეთ თუ რამე არ მოგწონთ, ან შეუსწორეთ რამე თუ ეშლება.
+            </p>
+            <div class="flex justify-end">
+              <button
+                type="button"
+                id="sheqmeniHelpOkBtn"
+                class="px-3 py-1.5 rounded-md bg-[#315EFF] text-white text-xs font-medium hover:bg-[#274bcc]"
+              >
+                კარგი, გასაგებია
+              </button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="sheqmeni-preview">
@@ -731,6 +758,27 @@
         updateCvPreview();
         scrollToEndAfterLayout();
         setTimeout(scrollToEnd, 150);
+      }
+
+      var helpBtn = document.getElementById('sheqmeniHelpBtn');
+      var helpPanel = document.getElementById('sheqmeniHelpPanel');
+      var helpOkBtn = document.getElementById('sheqmeniHelpOkBtn');
+
+      if (helpBtn && helpPanel) {
+        helpBtn.addEventListener('click', function() {
+          if (helpPanel.style.display === 'none' || !helpPanel.style.display) {
+            helpPanel.style.display = 'block';
+            scrollToEnd();
+          } else {
+            helpPanel.style.display = 'none';
+          }
+        });
+      }
+
+      if (helpOkBtn && helpPanel) {
+        helpOkBtn.addEventListener('click', function() {
+          helpPanel.style.display = 'none';
+        });
       }
 
       function showTyping(show) {
