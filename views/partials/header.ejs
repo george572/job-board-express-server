@@ -26,6 +26,12 @@
         <!-- Your custom button -->
         <button id="headerGoogleLoginBtn" class="border text-[14px] p-2 rounded-xl bg-[#2563eb] text-white cursor-pointer"> ავტორიზაცია
         </button>
+        <a
+          href="/sheqmeni-cv"
+          class="hidden sm:inline-flex items-center justify-center rounded-full text-[12px] px-3 py-2 bg-[#315EFF] text-white cursor-pointer font-medium hover:opacity-90"
+        >
+          შექმენი CV 1 წუთში
+        </a>
         <% } else { %>
         <% if (user && user.user_type === 'company') { %>
         <a href="/add-new-job" class="flex w-[48px] lg:w-[217px] justify-center rounded-full items-center text-[12px] p-3 bg-[#F5F8FF] text-primary cursor-pointer font-medium">
@@ -33,6 +39,12 @@
           <span class="hidden lg:flex">ვაკანსიის დამატება</span>
         </a>
         <% } %>
+        <a
+          href="/sheqmeni-cv"
+          class="hidden sm:inline-flex items-center justify-center rounded-full text-[12px] px-3 py-2 bg-[#315EFF] text-white cursor-pointer font-medium hover:opacity-90"
+        >
+          შექმენი CV 1 წუთში
+        </a>
         <div class="min-w-[48px] min-h-[48px] cursor-pointer bg-[#F5F8FF] rounded-full text-white uppercase flex items-center justify-center" onclick="event.stopPropagation();document.getElementById('logoutPopup').classList.toggle('hidden')">
           <%- include('./icons/user.ejs') %>
         </div>
@@ -52,6 +64,7 @@
         <div class="flex flex-col gap-4">
           <a href="/pricing" class="block font-[500] text-[#6B7280]">ფასები</a>
           <a href="/terms-of-use" class="block font-[500] text-[#6B7280]">გამოყენების წესები</a>
+          <a href="/sheqmeni-cv" class="block font-[500] text-[#315EFF]">შექმენი CV 1 წუთში</a>
         </div>
       </div>
     </div>
@@ -79,9 +92,7 @@
   </header>
 </div>
 
-<% if (typeof user === 'undefined' || !user) { %>
-  <%- include('noCvBanner') %>
-<% } %>
+<%- include('noCvBanner') %>
 <style>
   #burgerToggle.active .burger-line:nth-child(1) {
     transform: rotate(45deg) translateY(12px);

@@ -2276,27 +2276,48 @@ ${transcript}
     history.push({ role: "assistant", content: reply });
     req.session.cvCreatorHistory = history;
 
-    // Temporary logging of CV creator chat + resulting CV snapshot
+    // Accumulate chat turns in session; persist to cv_creator_chat_logs every 15 seconds (on next request after 15s)
+    const FLUSH_INTERVAL_MS = 15 * 1000;
     try {
-      const sessionId = req.session.id || req.sessionID || null;
-      const userId =
-        req.session.user && req.session.user.uid
-          ? String(req.session.user.uid)
-          : null;
+      if (!Array.isArray(req.session.cvCreatorLogTurns)) {
+        req.session.cvCreatorLogTurns = [];
+        req.session.cvCreatorLogLastFlushAt = null;
+      }
       const turnIndex = history.filter((m) => m.role === "assistant").length - 1;
-
-      await db("cv_creator_chat_logs").insert({
-        session_id: sessionId,
-        user_id: userId,
+      req.session.cvCreatorLogTurns.push({
         turn_index: isNaN(turnIndex) || turnIndex < 0 ? 0 : turnIndex,
         had_existing_cv: hadExistingCv,
         user_message: rawMessage,
         assistant_reply: reply,
-        cv_data: cvData || null,
+        cv_data: cvData ? { ...cvData } : null,
       });
+      const now = Date.now();
+      const lastFlush = req.session.cvCreatorLogLastFlushAt;
+      if (lastFlush == null || now - lastFlush >= FLUSH_INTERVAL_MS) {
+        const turns = req.session.cvCreatorLogTurns;
+        if (turns.length > 0) {
+          const sessionId = req.session.id || req.sessionID || null;
+          const userId =
+            req.session.user && req.session.user.uid
+              ? String(req.session.user.uid)
+              : null;
+          const rows = turns.map((t) => ({
+            session_id: sessionId,
+            user_id: userId,
+            turn_index: t.turn_index,
+            had_existing_cv: t.had_existing_cv,
+            user_message: t.user_message,
+            assistant_reply: t.assistant_reply,
+            cv_data: t.cv_data,
+          }));
+          await db("cv_creator_chat_logs").insert(rows);
+          req.session.cvCreatorLogTurns = [];
+        }
+        req.session.cvCreatorLogLastFlushAt = now;
+      }
     } catch (e) {
       console.warn(
-        "[CV creator log] failed to insert chat log:",
+        "[CV creator log] failed to persist chat log:",
         e?.message || e
       );
     }

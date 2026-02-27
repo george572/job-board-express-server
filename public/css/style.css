@@ -241,8 +241,8 @@
   .sticky {
     position: sticky;
   }
-  .inset-x-0 {
-    inset-inline: calc(var(--spacing) * 0);
+  .inset-0 {
+    inset: calc(var(--spacing) * 0);
   }
   .top-0 {
     top: calc(var(--spacing) * 0);
@@ -555,17 +555,11 @@
   .max-w-\[450px\] {
     max-width: 450px;
   }
-  .max-w-\[600px\] {
-    max-width: 600px;
-  }
   .max-w-\[744px\] {
     max-width: 744px;
   }
   .max-w-\[800px\] {
     max-width: 800px;
-  }
-  .max-w-\[800პხ\] {
-    max-width: 800პხ;
   }
   .max-w-\[900px\] {
     max-width: 900px;
@@ -1063,6 +1057,9 @@
   .text-\[12px\] {
     font-size: 12px;
   }
+  .text-\[13px\] {
+    font-size: 13px;
+  }
   .text-\[14px\] {
     font-size: 14px;
   }
@@ -1119,6 +1116,9 @@
   }
   .whitespace-pre-wrap {
     white-space: pre-wrap;
+  }
+  .text-\[\#4B5563\] {
+    color: #4B5563;
   }
   .text-\[\#6B7280\] {
     color: #6B7280;
@@ -1351,13 +1351,6 @@
       }
     }
   }
-  .hover\:text-gray-700 {
-    &:hover {
-      @media (hover: hover) {
-        color: var(--color-gray-700);
-      }
-    }
-  }
   .hover\:underline {
     &:hover {
       @media (hover: hover) {
@@ -1417,6 +1410,11 @@
   .sm\:inline-block {
     @media (width >= 40rem) {
       display: inline-block;
+    }
+  }
+  .sm\:inline-flex {
+    @media (width >= 40rem) {
+      display: inline-flex;
     }
   }
   .sm\:h-10 {

@@ -1,95 +1,68 @@
-<div id="noCvBanner" class="fixed inset-x-0 bottom-0 z-40 px-4 pb-4 max-h-[85vh] overflow-y-auto" style="display:none;">
-  <div class="mx-auto max-w-2xl rounded-2xl bg-white shadow-lg border border-gray-200 px-4 py-4 sm:px-6 sm:py-5">
-    <div class="flex justify-between items-start gap-2 mb-3">
-      <p class="text-sm sm:text-base font-medium text-[#151515] flex-1">
-        თუ რეზიუმე არ გაქვს, გვითხარი შენს შესახებ მოკლედ, და ჩვენ მოგიძებნით ვაკანსიებს
+<div id="cvAiBanner" class="z-40 flex items-center justify-center px-4 py-6" style="display:none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; min-height: 100vh; background: rgba(0,0,0,0.45);">
+  <div class="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl bg-white shadow-lg border border-gray-200 px-4 py-4 sm:px-6 sm:py-5">
+    <div class="flex flex-col gap-3">
+      <p class="text-sm sm:text-base font-medium text-[#151515]">
+        დაგეხმარებით ზუსტად 1 წუთში შექმნათ რეზიუმე. ხელოვნური ინტელექტი რამდენიმე კითხვას დაგისვამთ, და რეზიუმეც მზადაა.
       </p>
-      <button type="button" id="noCvBannerClose" class="flex-shrink-0 text-gray-500 hover:text-gray-700 cursor-pointer p-1" aria-label="დახურვა">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5L5 15M5 5l10 10"/></svg>
-      </button>
+      <p class="text-sm sm:text-base text-[#4B5563]">
+        რეზიუმე უფრო რესპექტაბელურად გამოგაჩენთ. გნებავთ?
+      </p>
+      <div class="flex justify-end gap-2 pt-2">
+        <button
+          type="button"
+          id="cvAiBannerNo"
+          class="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 cursor-pointer"
+        >
+          არა
+        </button>
+        <button
+          type="button"
+          id="cvAiBannerYes"
+          class="px-4 py-2 text-sm bg-[#315EFF] text-white rounded-lg hover:opacity-90 cursor-pointer"
+        >
+          კი
+        </button>
+      </div>
     </div>
-    <form id="noCvBannerForm" class="flex flex-col gap-3">
-      <div>
-        <label for="noCvName" class="block text-xs font-medium text-gray-600 mb-1">სახელი *</label>
-        <input type="text" id="noCvName" name="name" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="თქვენი სახელი">
-      </div>
-      <div>
-        <label for="noCvEmail" class="block text-xs font-medium text-gray-600 mb-1">ელ-ფოსტა (არასავალდებულო)</label>
-        <input type="email" id="noCvEmail" name="email" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="example@mail.com">
-      </div>
-      <div>
-        <label for="noCvPhone" class="block text-xs font-medium text-gray-600 mb-1">ტელეფონის ნომერი *</label>
-        <input type="tel" id="noCvPhone" name="phone" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="5XX XXX XXX">
-      </div>
-      <div>
-        <label for="noCvDesc" class="block text-xs font-medium text-gray-600 mb-1">მოკლე აღწერა – რას აკეთებთ</label>
-        <textarea id="noCvDesc" name="short_description" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="მაგ: 2 წელი გამოცდილება მოლარედ"></textarea>
-      </div>
-      <div>
-        <span class="block text-xs font-medium text-gray-600 mb-2">კატეგორიები</span>
-        <div class="flex flex-wrap gap-2">
-          <label class="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" name="categories" value="მოლარე" class="rounded">მოლარე</label>
-          <label class="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" name="categories" value="კონსულტანტი" class="rounded">კონსულტანტი</label>
-          <label class="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" name="categories" value="ადმინისტრატორი" class="rounded">ადმინისტრატორი</label>
-          <label class="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" name="categories" value="მძღოლი" class="rounded">მძღოლი</label>
-          <label class="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" name="categories" value="დისტრიბუტორი" class="rounded">დისტრიბუტორი</label>
-          <label class="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" name="categories" value="სანიტარი" class="rounded">სანიტარი</label>
-          <label class="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" name="categories" value="დიასახლისი" class="rounded">დიასახლისი</label>
-          <label class="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" name="categories" value="დაცვა" class="rounded">დაცვა</label>
-          <label class="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" name="categories" value="სხვა" id="noCvCatOther" class="rounded">სხვა</label>
-        </div>
-        <div id="noCvOtherSpecifyWrap" class="mt-2" style="display: none;">
-          <input type="text" id="noCvOtherSpecify" name="other_specify" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="მიუთითეთ რა">
-        </div>
-      </div>
-      <div class="flex gap-2 justify-end pt-2">
-        <button type="button" id="noCvBannerCancel" class="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 cursor-pointer">გაუქმება</button>
-        <button type="submit" id="noCvBannerSubmit" class="px-4 py-2 text-sm bg-[#315EFF] text-white rounded-lg hover:opacity-90 cursor-pointer">გაგზავნა</button>
-      </div>
-    </form>
   </div>
 </div>
 <script>
 (function() {
-  var banner = document.getElementById('noCvBanner');
+  var banner = document.getElementById('cvAiBanner');
   if (!banner) return;
-  if (window.location.pathname === '/' && !document.cookie.match(/\bno_cv_banner_dismissed=/)) banner.style.display = 'block';
-  var closeBtn = document.getElementById('noCvBannerClose');
-  var cancelBtn = document.getElementById('noCvBannerCancel');
-  var form = document.getElementById('noCvBannerForm');
-  var catOther = document.getElementById('noCvCatOther');
-  var otherWrap = document.getElementById('noCvOtherSpecifyWrap');
-  function dismissBanner() {
-    fetch('/api/user-without-cv/dismiss', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin' })
-      .then(function() { banner.style.display = 'none'; })
-      .catch(function() { banner.style.display = 'none'; });
+
+  var COOKIE_NAME = 'cv_ai_banner_seen';
+
+  function hasSeenBanner() {
+    return document.cookie.indexOf(COOKIE_NAME + '=1') !== -1;
   }
-  if (closeBtn) closeBtn.addEventListener('click', dismissBanner);
-  if (cancelBtn) cancelBtn.addEventListener('click', dismissBanner);
-  if (catOther) catOther.addEventListener('change', function() { otherWrap.style.display = catOther.checked ? 'block' : 'none'; });
-  if (form) form.addEventListener('submit', function(e) {
-    e.preventDefault();
-    var name = (document.getElementById('noCvName') || {}).value || '';
-    var email = (document.getElementById('noCvEmail') || {}).value || '';
-    var phone = (document.getElementById('noCvPhone') || {}).value || '';
-    var short_description = (document.getElementById('noCvDesc') || {}).value || '';
-    var other_specify = (document.getElementById('noCvOtherSpecify') || {}).value || '';
-    var cats = [];
-    form.querySelectorAll('input[name="categories"]:checked').forEach(function(cb) { cats.push(cb.value); });
-    var submitBtn = document.getElementById('noCvBannerSubmit');
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'იგზავნება...'; }
-    fetch('/api/user-without-cv', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ name: name.trim(), email: email.trim(), phone: phone.trim(), short_description: short_description.trim(), categories: cats, other_specify: other_specify.trim() })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.ok) banner.style.display = 'none';
-      else if (data.error && submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'გაგზავნა'; alert(data.error); }
-    })
-    .catch(function() { if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'გაგზავნა'; } });
-  });
+
+  function setSeenCookie() {
+    var days = 365;
+    var date = new Date();
+    date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
+    document.cookie = COOKIE_NAME + '=1; path=/; expires=' + date.toUTCString();
+  }
+
+  if (window.location.pathname === '/' && !hasSeenBanner()) {
+    banner.style.display = 'flex';
+  }
+
+  var yesBtn = document.getElementById('cvAiBannerYes');
+  var noBtn = document.getElementById('cvAiBannerNo');
+
+  if (yesBtn) {
+    yesBtn.addEventListener('click', function() {
+      setSeenCookie();
+      window.location.href = '/sheqmeni-cv';
+    });
+  }
+
+  if (noBtn) {
+    noBtn.addEventListener('click', function() {
+      setSeenCookie();
+      banner.style.display = 'none';
+    });
+  }
 })();
 </script>
