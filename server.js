@@ -78,6 +78,8 @@ function buildCvHtmlFromData(cvData = {}) {
   const skillsHtml = skillsArray
     .map((s) => `<div class="skill-item">${escapeHtml(s)}</div>`)
     .join("");
+  const hasSummary = !!(summary && String(summary).trim());
+  const hasEducation = !!(education && String(education).trim());
 
   const jobsSource = Array.isArray(cvData.jobs)
     ? cvData.jobs
@@ -151,6 +153,9 @@ function buildCvHtmlFromData(cvData = {}) {
     `;
   }
 
+  const hasJobsSection = !!(jobsHtml && String(jobsHtml).trim());
+  const hasSkills = !!(skillsHtml && String(skillsHtml).trim());
+
   const primaryPosition =
     jobsSource &&
     jobsSource[0] &&
@@ -168,6 +173,62 @@ function buildCvHtmlFromData(cvData = {}) {
   if (!themeColor) themeColor = "#8fbc8f";
   const badgeTextColor =
     lower === "#ffffff" || lower === "#fff" || lower === "white" ? "#111111" : "#ffffff";
+
+  const summarySectionHtml = hasSummary
+    ? [
+        '    <div class="section">',
+        '      <div class="section-header">',
+        '        <div class="section-icon">',
+        '          <svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>',
+        "        </div>",
+        '        <span class="section-title">Professional Summary</span>',
+        "      </div>",
+        `      <p class="summary-text">${escapeHtml(summary || "")}</p>`,
+        "    </div>",
+      ].join("")
+    : "";
+
+  const workSectionHtml = hasJobsSection
+    ? [
+        '    <div class="section">',
+        '      <div class="section-header">',
+        '        <div class="section-icon">',
+        '          <svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.07-.44.18-.88.18-1.34C18 2.54 15.96.5 13.46.5c-1.36 0-2.5.56-3.46 1.44C9.04 1.06 7.9.5 6.54.5 4.04.5 2 2.54 2 4.66c0 .46.11.9.18 1.34H0v14c0 1.1.9 2 2 2h20c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-7.46-3.5c1.29 0 2.46 1.06 2.46 2.16 0 .44-.07.88-.18 1.34H12V4.68c.29-.94.84-2.18 2.54-2.18.37 0 .93.11.93.11zM7 2.5c1.7 0 2.25 1.24 2.54 2.18V6.5H6.18c-.11-.46-.18-.9-.18-1.34C6 3.56 7.04 2.5 7.04 2.5H7zM2 8h20v4H2V8zm0 12v-6h8v2h4v-2h8v6H2z"/></svg>',
+        "        </div>",
+        '        <span class="section-title">Work Experience</span>',
+        "      </div>",
+        jobsHtml,
+        "    </div>",
+      ].join("")
+    : "";
+
+  const educationSectionHtml = hasEducation
+    ? [
+        '    <div class="section">',
+        '      <div class="section-header">',
+        '        <div class="section-icon">',
+        '          <svg viewBox="0 0 24 24"><path d="M12 3L1 9l4 2.18V15c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-3.82L23 9 12 3zm6 12H6v-3.27l6 3.27 6-3.27V15zm-6-5.18L4.53 9 12 5.18 19.47 9 12 9.82z"/></svg>',
+        "        </div>",
+        '        <span class="section-title">Education</span>',
+        "      </div>",
+        `      <div class="edu-school">${escapeHtml(education || "")}</div>`,
+        "    </div>",
+      ].join("")
+    : "";
+
+  const skillsSectionHtml = hasSkills
+    ? [
+        '    <div class="sidebar-section">',
+        '      <div class="sidebar-title">',
+        '        <div class="icon-box">',
+        '          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
+        "        </div>",
+        "        Skills",
+        "      </div>",
+        skillsHtml,
+        "    </div>",
+      ].join("")
+    : "";
 
   return (
     "<!DOCTYPE html>" +
@@ -1975,18 +2036,16 @@ app.post("/api/sheqmeni-cv/chat", async (req, res) => {
     - surname
     - email
     - phone
-    - education
-    - job experience (company, position, start_date, end_date) ( if they dont have job experience, its alright)
-    - profession
     
     QUESTION FLOW RULES:
     - Ask for name, surname, email, and phone in ONE message.
-    - Ask for work experience (position, company, start_date, end_date) in ONE message.
+    - Ask for work experience (position, company, start_date, end_date) in ONE message. ( if they dont have work experience/education, generate a generally good positive summary about them, like they are motivated etc.)
     - Never ask whether to include skills. Automatically generate skills.
     - Automatically generate and update Professional Summary every time.
     - Never ask user if something should be included.
     - If user requests change, update data and resend full CV state.
     - Never stop asking questions until ALL required data exists.
+    - don't loop questions if you dont receive answers, just say "thats your CV then".
 
     RESPONSE LENGTH RULE:
     - Natural-language response must never exceed 15 words.
@@ -2116,10 +2175,12 @@ ${transcript}
     res.json({ reply, cvData });
   } catch (err) {
     console.error("[Gemini] CV creator chat error:", err?.message || err);
+    const detail = err?.message || String(err);
     res.status(500).json({
       error: "cv_creator_gemini_failed",
       message:
-        "ამ დროს AI მოდელი ვერ პასუხობს. სცადე რამდენიმე წუთში კიდევ ერთხელ.",
+        "დაფიქსირდა შეცდომა AI სერვისიდან. ეს არ არის samushao.ge-ის პრობლემა — გთხოვთ სცადოთ თავიდან.",
+      detail: detail,
     });
   }
 });
