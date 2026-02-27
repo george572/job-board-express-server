@@ -173,7 +173,7 @@
       cursor: not-allowed;
     }
 
-    /* Mobile layout: stack chat above preview, limit chat height, zoom out CV */
+    /* Mobile layout: chat at top, CV preview below; buttons stacked */
     @media (max-width: 768px) {
       .sheqmeni-page {
         height: auto;
@@ -204,6 +204,25 @@
         height: 520px;
         transform: scale(0.8);
         transform-origin: top center;
+      }
+      .sheqmeni-preview-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+      .sheqmeni-preview-header .sheqmeni-header-actions {
+        flex-direction: column;
+        width: 100%;
+        gap: 8px;
+      }
+      .sheqmeni-preview-header .sheqmeni-header-actions button,
+      .sheqmeni-preview-header .sheqmeni-header-actions input[type="color"] {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+      .sheqmeni-preview-header .sheqmeni-header-actions input[type="color"] {
+        height: 44px;
       }
     }
   </style>
@@ -253,7 +272,7 @@
       <div class="sheqmeni-preview">
         <div class="sheqmeni-preview-header" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
           <span>აქ გამოჩნდება თქვენი რეზიუმე</span>
-          <div style="display:flex;align-items:center;gap:6px;">
+          <div class="sheqmeni-header-actions" style="display:flex;align-items:center;gap:6px;">
             <button id="changeColorBtn" type="button" style="font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid #4b5563;background:#F9FAFB;color:#111827;cursor:pointer;white-space:nowrap;">
               CV ფერის ცვლილება
             </button>
