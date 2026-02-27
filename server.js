@@ -3372,15 +3372,20 @@ app.get("/api/users/:userId/resume", async (req, res) => {
       .orderBy("updated_at", "desc")
       .select("id", "user_id", "file_url", "file_name", "created_at", "updated_at")
       .first();
-    // If not found, userId might be users.id (numeric) – resolve to user_uid
-    if (!resume && /^\d+$/.test(String(userId))) {
-      const user = await db("users").where("id", parseInt(userId, 10)).select("user_uid").first();
-      if (user) {
-        resume = await db("resumes")
-          .where("user_id", user.user_uid)
-          .orderBy("updated_at", "desc")
-          .select("id", "user_id", "file_url", "file_name", "created_at", "updated_at")
-          .first();
+    // If not found, userId might be users.id (numeric) – resolve to user_uid only when it's a safe 32-bit int
+    if (!resume) {
+      const numericId = Number(userId);
+      const isValidIntId =
+        Number.isInteger(numericId) && numericId > 0 && numericId <= 2147483647;
+      if (isValidIntId) {
+        const user = await db("users").where("id", numericId).select("user_uid").first();
+        if (user) {
+          resume = await db("resumes")
+            .where("user_id", user.user_uid)
+            .orderBy("updated_at", "desc")
+            .select("id", "user_id", "file_url", "file_name", "created_at", "updated_at")
+            .first();
+        }
       }
     }
     if (!resume) {
