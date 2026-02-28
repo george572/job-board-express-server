@@ -2926,7 +2926,7 @@ app.post("/api/jobs/:id/feedback", async (req, res) => {
       return res.status(400).json({ error: "Invalid feedback pills" });
     }
 
-    const insertPayload = { job_id: jobId, pills: validPills };
+    const insertPayload = { job_id: jobId, pills: JSON.stringify(validPills) };
     if (userId) insertPayload.user_id = userId;
     if (visitorId) insertPayload.visitor_id = visitorId;
 
