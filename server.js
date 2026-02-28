@@ -768,7 +768,7 @@ if (process.env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
 }
 
-// Session: in-memory only (no DB). Session ID is in browser cookie; no cookie = no session (e.g. incognito = no access).
+// Session: in-memory only (no DB). MUST run before HR (uses req.session) and before page cache.
 const sessionOptions = {
   resave: false,
   secret: process.env.SESSION_SECRET || "askmdaksdhjkqjqkqkkq1",
@@ -781,8 +781,24 @@ const sessionOptions = {
   },
   // No store = default MemoryStore; session data lives in server memory, not DB.
 };
+app.use(session(sessionOptions));
 
-// Fast path: serve cached HTML for anonymous visitors BEFORE session/visitor/DB middleware
+// hr.samushao.ge – serve HR app at root. MUST run before page cache (which serves cached homepage for GET /).
+// Other hosts: redirect /hr to hr.samushao.ge
+const hrRouter = require("./routes/hrDashboard")(db);
+app.use((req, res, next) => {
+  if (req.hostname === "hr.samushao.ge") {
+    return hrRouter(req, res, next);
+  }
+  if (req.path === "/hr" || req.path.startsWith("/hr/")) {
+    const path = req.path.replace(/^\/hr\/?/, "/") || "/";
+    const q = req.originalUrl.includes("?") ? "?" + req.originalUrl.split("?")[1] : "";
+    return res.redirect(301, "https://hr.samushao.ge" + path + q);
+  }
+  next();
+});
+
+// Fast path: serve cached HTML for anonymous visitors
 // Skips 3 sequential DB round-trips (~15-30ms) for every cached anonymous page view
 app.use(async (req, res, next) => {
   if (req.method !== "GET") return next();
@@ -843,10 +859,7 @@ app.use(async (req, res, next) => {
   next();
 });
 
-// Session middleware MUST come before the route
-app.use(session(sessionOptions));
-
-// Then your res.locals middleware
+// res.locals middleware
 const ENLISTED_FB_COOKIE = "enlisted_fb";
 const NO_CV_BANNER_COOKIE = "no_cv_banner_dismissed";
 function hasCookie(req, name) {
@@ -998,21 +1011,6 @@ app.use((req, res, next) => {
     if (req.path.endsWith("/") && req.path.length > 1) {
       return res.redirect(301, req.path.slice(0, -1) + (req.url.slice(req.path.length) || ""));
     }
-  }
-  next();
-});
-
-// hr.samushao.ge – serve HR app at root (no /hr prefix). Must run BEFORE main site routes.
-// Other hosts: redirect /hr to hr.samushao.ge
-const hrRouter = require("./routes/hrDashboard")(db);
-app.use((req, res, next) => {
-  if (req.hostname === "hr.samushao.ge") {
-    return hrRouter(req, res, next);
-  }
-  if (req.path === "/hr" || req.path.startsWith("/hr/")) {
-    const path = req.path.replace(/^\/hr\/?/, "/") || "/";
-    const q = req.originalUrl.includes("?") ? "?" + req.originalUrl.split("?")[1] : "";
-    return res.redirect(301, "https://hr.samushao.ge" + path + q);
   }
   next();
 });
