@@ -269,15 +269,16 @@ module.exports = function (db) {
             company_name,
             email,
             password_hash: hashPassword(password),
+            credits: 0,
           })
           .returning(["id", "email", "company_identifier", "company_name", "credits"]);
         const r = Array.isArray(inserted) ? inserted[0] : inserted;
-        const credits = r && r.credits != null ? Number(r.credits) || 100 : 100;
+        const credits = r && r.credits != null ? Number(r.credits) || 0 : 0;
         try {
           await trx("hr_credits_history").insert({
             hr_account_id: r.id,
-            delta: 100,
-            balance_after: credits,
+            delta: 0,
+            balance_after: 0,
             kind: "initial_grant",
           });
         } catch (e) {
