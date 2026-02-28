@@ -393,15 +393,26 @@ module.exports = function (db) {
     const jobDescription = (req.body.job_description || "").trim();
     const jobTitle = (req.body.job_title || req.body.jobName || "").toString().trim();
     const topK = Math.min(50, Math.max(5, parseInt(req.body.topK, 10) || 10));
-    const rawLevel = (req.body.minMatchLevel || "").toString().trim().toLowerCase();
-    const minMatchLevel = ["strong", "good", "partial"].includes(rawLevel) ? rawLevel : "strong";
-    // Each option returns only that match type: strong → STRONG only, good → GOOD only, partial → PARTIAL only
-    const allowedVerdicts = minMatchLevel === "strong"
-      ? ["STRONG_MATCH"]
-      : minMatchLevel === "good"
-        ? ["GOOD_MATCH"]
-        : ["PARTIAL_MATCH"];
-    const assessLimitMultiplier = getAssessLimitMultiplier(minMatchLevel);
+    const rawLevels = Array.isArray(req.body.minMatchLevels)
+      ? req.body.minMatchLevels
+      : req.body.minMatchLevel
+        ? [req.body.minMatchLevel]
+        : ["strong"];
+    const selectedLevels = rawLevels
+      .map((l) => String(l).trim().toLowerCase())
+      .filter((l) => ["strong", "good", "partial"].includes(l));
+    const minMatchLevels = selectedLevels.length > 0 ? selectedLevels : ["strong"];
+    const allowedVerdicts = [
+      ...new Set(
+        minMatchLevels.flatMap((l) =>
+          l === "strong" ? ["STRONG_MATCH"] : l === "good" ? ["GOOD_MATCH"] : ["PARTIAL_MATCH"]
+        )
+      ),
+    ];
+    const assessLimitMultiplier = Math.max(
+      ...minMatchLevels.map((l) => getAssessLimitMultiplier(l)),
+      4
+    );
     if (!jobDescription || jobDescription.length < 20) {
       return res.status(400).json({ ok: false, error: "განცხადების აღწერა საჭიროა (მინიმუმ 20 სიმბოლო)" });
     }
@@ -547,8 +558,8 @@ module.exports = function (db) {
           phone,
         });
       }
-      // When user chose "partial", sort by vector score only so they see a mix (not always strongest first)
-      if (minMatchLevel === "partial") {
+      // When user chose only "partial", sort by vector score only so they see a mix (not always strongest first)
+      if (minMatchLevels.length === 1 && minMatchLevels[0] === "partial") {
         candidates.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
       } else {
         const verdictOrder = { STRONG_MATCH: 0, GOOD_MATCH: 1, PARTIAL_MATCH: 2 };

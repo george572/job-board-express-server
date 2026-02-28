@@ -13,6 +13,36 @@
     }
     .hr-view { display: none; }
     .hr-view.active { display: flex; }
+    .hr-filter-cb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border: 2px solid #cbd5e1;
+      border-radius: 5px;
+      flex-shrink: 0;
+      position: relative;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      background: white;
+    }
+    .hr-filter-cb:checked {
+      background-color: #315EFF;
+      border-color: #315EFF;
+    }
+    .hr-filter-cb:checked::after {
+      content: '';
+      position: absolute;
+      left: 5px;
+      top: 1px;
+      width: 5px;
+      height: 10px;
+      border: solid white;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+    .hr-filter-cb:hover { border-color: #315EFF; }
+    .hr-filter-cb:focus-visible { outline: 2px solid #315EFF; outline-offset: 2px; }
   </style>
 </head>
 <body class="hr-dashboard font-sans text-secondary bg-[#F8FAFC] min-h-screen flex flex-col antialiased">
@@ -64,21 +94,23 @@
             autocomplete="off"
           />
           <p id="hr-job-title-status" class="hidden mt-2 text-xs text-[#6B7280] w-full max-w-2xl"></p>
-          <label for="matchLevel" class="block mt-4 text-sm font-medium text-[#374151] w-full max-w-2xl">შესაბამისობის მინიმალური დონე ( კრედიტი ძებნაში არ იხარჯება )</label>
-          <select name="matchLevel" id="matchLevel" class="mt-2 w-full max-w-2xl px-4 py-3 text-[15px] border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#315EFF] focus:border-transparent bg-white">
-            <option value="strong" selected>სრული შესაბამისობა — კანდიდატი ჯდება 2 კრედიტი</option>
-            <option value="good">კარგი შესაბამისობა — კანდიდატი ჯდება 1 კრედიტი</option>
-            <option value="partial">ნაწილობრივი შესაბამისობა — კანდიდატი ჯდება 0.5 კრედიტი</option>
-          </select>
+          <p class="block mt-4 text-sm font-medium text-[#374151] w-full max-w-2xl">შესაბამისობის დონეები ( კრედიტი ძებნაში არ იხარჯება ) — შეგიძლიათ რამდენიმე აირჩიოთ</p>
+          <div class="mt-2 w-full max-w-2xl space-y-2 px-1">
+            <label class="flex items-center gap-3 py-2 cursor-pointer hover:bg-slate-50 rounded-lg px-2 -mx-2">
+              <input type="checkbox" class="hr-filter-cb" name="matchLevels" value="strong" checked />
+              <span class="text-[15px] text-[#374151]">სრული შესაბამისობა — კანდიდატი ჯდება 2 კრედიტი</span>
+            </label>
+            <label class="flex items-center gap-3 py-2 cursor-pointer hover:bg-slate-50 rounded-lg px-2 -mx-2">
+              <input type="checkbox" class="hr-filter-cb" name="matchLevels" value="good" />
+              <span class="text-[15px] text-[#374151]">კარგი შესაბამისობა — კანდიდატი ჯდება 1 კრედიტი</span>
+            </label>
+            <label class="flex items-center gap-3 py-2 cursor-pointer hover:bg-slate-50 rounded-lg px-2 -mx-2">
+              <input type="checkbox" class="hr-filter-cb" name="matchLevels" value="partial" />
+              <span class="text-[15px] text-[#374151]">ნაწილობრივი შესაბამისობა — კანდიდატი ჯდება 0.5 კრედიტი</span>
+            </label>
+          </div>
           <label for="candidatesAmount" class="block mt-4 text-sm text-[#374151] w-full max-w-2xl">კანდიდატების რაოდენობა ( რამდენი შესაძლო ვარიანტი გაჩვენოთ )</label>
-          <select type="select" name="amount" id="candidatesAmount" class="mt-2 w-full max-w-2xl px-4 py-3 text-[15px] border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#315EFF] focus:border-transparent resize-none placeholder-[#9CA3AF] bg-white">
-            <option value="5"selected>5</option>
-            <option value="10" >10</option>
-            <option value="20">20</option>
-            <option value="30">30</option>
-            <option value="40">40</option>
-            <option value="50">50</option>
-          </select>
+          <input type="number" name="amount" id="candidatesAmount" min="5" max="50" value="5" placeholder="მაგ. 15" class="mt-2 w-full max-w-2xl px-4 py-3 text-[15px] border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#315EFF] focus:border-transparent placeholder-[#9CA3AF] bg-white" />
           <div class="flex flex-col items-center mt-4">
             <button type="button" id="hrSearchBtn" class="px-6 py-3 rounded-lg bg-[#315EFF] text-white hover:bg-[#2a4fd9] cursor-pointer font-medium disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[120px] min-h-[48px]">
               <span class="hr-search-text">ძებნა</span>
@@ -94,6 +126,7 @@
         <!-- Search results (shown after search) -->
         <div id="hr-search-results" class="hidden mt-8 w-full max-w-4xl mx-auto">
           <h2 id="hr-results-job-name" class="text-xl font-semibold text-[#0F172A] mb-4"></h2>
+          <p id="hr-results-empty" class="hidden text-[#64748B] py-6">კანდიდატები არ მოიძებნა.</p>
           <div id="hr-results-list" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-2"></div>
           <a href="/dashboard/candidates" class="inline-block mt-4 px-4 py-2 rounded-lg bg-[#315EFF] text-white hover:bg-[#2a4fd9]">კანდიდატების გვერდზე გადასვლა</a>
         </div>
@@ -360,10 +393,12 @@
             alert('გთხოვთ ჩასვათ ვაკანსიის აღწერა (მინიმუმ 20 სიმბოლო)');
             return;
           }
-          var topK = parseInt(amount && amount.value || '10', 10) || 10;
+          var topK = parseInt(amount && amount.value || '5', 10) || 5;
+          topK = Math.min(50, Math.max(5, topK));
           var jobTitle = (titleInput && titleInput.value || '').trim();
-          var matchLevelEl = document.getElementById('matchLevel');
-          var minMatchLevel = (matchLevelEl && matchLevelEl.value) ? matchLevelEl.value : 'strong';
+          var matchLevelCheckboxes = document.querySelectorAll('input[name="matchLevels"]:checked');
+          var minMatchLevels = Array.from(matchLevelCheckboxes).map(function(cb) { return cb.value; });
+          if (minMatchLevels.length === 0) minMatchLevels = ['strong'];
 
           var txtEl = searchBtn.querySelector('.hr-search-text');
           var loadEl = searchBtn.querySelector('.hr-search-loading');
@@ -377,7 +412,7 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
-            body: JSON.stringify({ job_description: desc, job_title: jobTitle, topK: topK, minMatchLevel: minMatchLevel }),
+            body: JSON.stringify({ job_description: desc, job_title: jobTitle, topK: topK, minMatchLevels: minMatchLevels }),
           })
           .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
           .then(function(r) {
@@ -387,9 +422,14 @@
               var container = document.getElementById('hr-search-results');
               var titleEl = document.getElementById('hr-results-job-name');
               var listEl = document.getElementById('hr-results-list');
+              var emptyEl = document.getElementById('hr-results-empty');
               if (titleEl) titleEl.textContent = jobName;
               if (listEl) {
                 listEl.innerHTML = '';
+                if (emptyEl) {
+                  if (candidates.length === 0) emptyEl.classList.remove('hidden');
+                  else emptyEl.classList.add('hidden');
+                }
                 candidates.forEach(function(c) {
                   var verdictLabel = verdictLabelOnly(c.verdict);
                   var verdictClass = (c.verdict === 'STRONG_MATCH') ? 'text-white bg-[#315EFF]' : (c.verdict === 'GOOD_MATCH') ? 'text-white bg-[#16a34a]' : (c.verdict === 'PARTIAL_MATCH') ? 'text-[#0F172A] bg-slate-200' : '';

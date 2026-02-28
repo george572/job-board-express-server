@@ -19,4 +19,5 @@ const shared = {
 module.exports = {
   development: shared,
   production: shared,
+  local: shared, // alias for development when NODE_ENV=local
 };
