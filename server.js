@@ -2118,6 +2118,13 @@ app.post("/api/sheqmeni-cv/chat", async (req, res) => {
     - If user requests change, update data and resend full CV state.
     - Never stop asking questions until ALL required data exists.
     - don't loop questions if you dont receive answers, just say "thats your CV then".
+    - when all the information is gathered and user is not asking anything, or the questions repeat,  tell them their resume is finished, and would they like it to be saved? tell them you can save it or they can click "save resume" to save it.
+    - if they ask where they can see this resume, tell them it's on samushao.ge/my-cv, make this a clickable link so they can click..
+
+    ACTION RULE (CRITICAL):
+    - When the user confirms they want to save the CV (e.g. "დიახ", "დიახ შეინახე", "შეგიძლია შეინახო", "yes", "yes save it", "დიახ გინდა"), add "action": "save_cv" at the top level of the JSON (alongside updatedFields).
+    - Use "action": "save_cv" ONLY when the user explicitly confirms saving. Never use it when asking, suggesting, or when user says no.
+    - If the user does not confirm saving, omit the "action" field or use "action": null.
 
     RESPONSE LENGTH RULE:
     - Natural-language response must never exceed 15 words.
@@ -2192,9 +2199,11 @@ app.post("/api/sheqmeni-cv/chat", async (req, res) => {
           }
         ],
         "otherInfo": ""
-      }
+      },
+      "action": "save_cv"
     }
     \`\`\`
+    - Include "action": "save_cv" only when user confirms saving; otherwise omit "action" or use null.
     `;
 
 
@@ -2232,6 +2241,7 @@ ${transcript}
 
     // Extract CV JSON block from end of reply (format: ```json\n{...}\n```)
     let cvData = req.session.cvCreatorCvData || {};
+    let shouldSaveCv = false;
     const jsonMatch = reply.match(/```json\s*([\s\S]*?)\s*```/);
     if (jsonMatch) {
       try {
@@ -2267,10 +2277,30 @@ ${transcript}
           Object.keys(u).forEach((key) => set(key, u[key]));
           req.session.cvCreatorCvData = cvData;
         }
+        if (parsed?.action === "save_cv") {
+          shouldSaveCv = true;
+        }
       } catch (e) {
         console.warn("[Gemini] CV JSON parse failed:", e?.message);
       }
       reply = reply.replace(/```json\s*[\s\S]*?\s*```/g, "").trim();
+    }
+
+    // Execute save when Gemini returned action: "save_cv" (user confirmed)
+    if (shouldSaveCv && req.session?.user?.user_type === "user") {
+      const userUid = req.session.user.uid;
+      const hasAnyData = Object.values(cvData || {}).some((v) =>
+        v && (Array.isArray(v) ? v.length : String(v).trim && String(v).trim())
+      );
+      if (hasAnyData) {
+        try {
+          await saveCvForUser(userUid, cvData);
+          reply = (reply || "").trim() || "შენახულია.";
+        } catch (saveErr) {
+          console.error("[CV creator] auto-save failed:", saveErr?.message || saveErr);
+          reply = (reply || "").trim() + " (შენახვა ვერ მოხერხდა — სცადე ღილაკით.)";
+        }
+      }
     }
 
     history.push({ role: "assistant", content: reply });
@@ -2335,6 +2365,83 @@ ${transcript}
   }
 });
 
+/** Save AI-generated CV to resumes table (PDF via Puppeteer + Cloudinary). Reusable for chat auto-save. */
+async function saveCvForUser(userUid, cv) {
+  const hasAnyData = Object.values(cv || {}).some((v) =>
+    v && (Array.isArray(v) ? v.length : String(v).trim && String(v).trim())
+  );
+  if (!hasAnyData) throw new Error("no cv data");
+
+  const html = buildCvHtmlFromData(cv);
+  const browser = await puppeteer.launch({
+    headless: "new",
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
+  const page = await browser.newPage();
+  await page.setContent(html, { waitUntil: "networkidle0" });
+  const pdfBuffer = await page.pdf({
+    format: "A4",
+    printBackground: true,
+    margin: { top: "0mm", bottom: "0mm", left: "0mm", right: "0mm" },
+  });
+  await browser.close();
+
+  const rawName =
+    cv.name || cv.surname
+      ? `${cv.name || ""} ${cv.surname || ""}`.trim()
+      : `CV-${userUid}`;
+  const fileName = `${rawName} CV.pdf`.slice(0, 190);
+
+  const result = await new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        resource_type: "raw",
+        folder: "resumes",
+        use_filename: true,
+        unique_filename: true,
+        access_mode: "public",
+        filename_override: fileName,
+      },
+      (error, res) => (error ? reject(error) : resolve(res))
+    );
+    uploadStream.end(pdfBuffer);
+  });
+
+  const downloadUrl = cloudinary.url(result.public_id, {
+    resource_type: "raw",
+    type: "upload",
+    flags: "attachment",
+  });
+
+  const basePayload = {
+    file_url: downloadUrl,
+    user_id: String(userUid),
+    file_name: fileName,
+    created_cv_on_samushao_ge: true,
+    cv_html: html,
+  };
+
+  const existing = await db("resumes")
+    .where("user_id", String(userUid))
+    .andWhere("created_cv_on_samushao_ge", true)
+    .orderBy("updated_at", "desc")
+    .first();
+
+  if (existing) {
+    await db("resumes")
+      .where("id", existing.id)
+      .update({ ...basePayload, updated_at: db.fn.now() });
+  } else {
+    await db("resumes").insert(basePayload);
+  }
+
+  const { indexCandidateFromCvUrl } = require("./services/pineconeCandidates");
+  const { invalidate } = require("./services/cvFitCache");
+  indexCandidateFromCvUrl(String(userUid), downloadUrl, fileName)
+    .then(() => invalidate(String(userUid)))
+    .catch((err) => console.warn("[Pinecone] Failed to index CV for user", userUid, err.message));
+}
+
 // Save AI-generated CV as PDF in resumes table (server-side PDF via Puppeteer)
 app.post("/api/sheqmeni-cv/save", async (req, res) => {
   try {
@@ -2351,84 +2458,8 @@ app.post("/api/sheqmeni-cv/save", async (req, res) => {
       return res.status(400).json({ error: "no cv data" });
     }
 
-    const html = buildCvHtmlFromData(cv);
-
-    const browser = await puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
-    const pdfBuffer = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      margin: { top: "0mm", bottom: "0mm", left: "0mm", right: "0mm" },
-    });
-    await browser.close();
-
-    const rawName =
-      cv.name || cv.surname
-        ? `${cv.name || ""} ${cv.surname || ""}`.trim()
-        : `CV-${userUid}`;
-    const fileName = `${rawName} CV.pdf`.slice(0, 190);
-
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        resource_type: "raw",
-        folder: "resumes",
-        use_filename: true,
-        unique_filename: true,
-        access_mode: "public",
-        filename_override: fileName,
-      },
-      async (error, result) => {
-        if (error) {
-          console.error("Cloudinary upload failed:", error?.message || error);
-          return res.status(500).json({ error: "upload_failed" });
-        }
-        try {
-          const downloadUrl = cloudinary.url(result.public_id, {
-            resource_type: "raw",
-            type: "upload",
-            flags: "attachment",
-          });
-
-          const basePayload = {
-            file_url: downloadUrl,
-            user_id: String(userUid),
-            file_name: fileName,
-            created_cv_on_samushao_ge: true,
-            cv_html: html,
-          };
-
-          const existing = await db("resumes")
-            .where("user_id", String(userUid))
-            .andWhere("created_cv_on_samushao_ge", true)
-            .orderBy("updated_at", "desc")
-            .first();
-
-          if (existing) {
-            await db("resumes")
-              .where("id", existing.id)
-              .update({ ...basePayload, updated_at: db.fn.now() });
-          } else {
-            await db("resumes").insert(basePayload);
-          }
-
-          const { indexCandidateFromCvUrl } = require("./services/pineconeCandidates");
-          const { invalidate } = require("./services/cvFitCache");
-          indexCandidateFromCvUrl(String(userUid), downloadUrl, fileName)
-            .then(() => invalidate(String(userUid)))
-            .catch((err) => console.warn("[Pinecone] Failed to index CV for user", userUid, err.message));
-
-          res.json({ ok: 1 });
-        } catch (err) {
-          console.error("Failed to upsert resume:", err?.message || err);
-          res.status(500).json({ error: "db_upsert_failed" });
-        }
-      }
-    );
-    uploadStream.end(pdfBuffer);
+    await saveCvForUser(userUid, cv);
+    res.json({ ok: 1 });
   } catch (err) {
     console.error("/api/sheqmeni-cv/save error:", err?.message || err);
     res.status(500).json({
