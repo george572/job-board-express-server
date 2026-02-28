@@ -54,21 +54,21 @@ module.exports = function (db) {
     ]);
   }
 
-  // GET /hr – default: redirect to auth or dashboard (or dashboard if HR_SKIP_AUTH)
+  // GET / – default: redirect to auth or dashboard (or dashboard if HR_SKIP_AUTH)
   router.get("/", (req, res) => {
-    if (SKIP_HR_AUTH || req.session.hrUser) return res.redirect("/hr/dashboard");
-    res.redirect("/hr/auth");
+    if (SKIP_HR_AUTH || req.session.hrUser) return res.redirect("/dashboard");
+    res.redirect("/auth");
   });
 
-  // GET /hr/auth/back – clear company, go back to step 1 (enter new identification number)
+  // GET /auth/back – clear company, go back to step 1 (enter new identification number)
   router.get("/auth/back", (req, res) => {
     delete req.session.hrRegistration;
-    res.redirect("/hr/auth");
+    res.redirect("/auth");
   });
 
-  // GET /hr/auth – signin (email+password first), step 1 (company ID), step login (password only), or step register (email + passwords)
+  // GET /auth – signin (email+password first), step 1 (company ID), step login (password only), or step register (email + passwords)
   router.get("/auth", async (req, res) => {
-    if (SKIP_HR_AUTH || req.session.hrUser) return res.redirect("/hr/dashboard");
+    if (SKIP_HR_AUTH || req.session.hrUser) return res.redirect("/dashboard");
     const companyIdentifier = req.session.hrRegistration?.company_identifier;
     if (companyIdentifier) {
       const existing = await db("hr_accounts")
@@ -119,7 +119,7 @@ module.exports = function (db) {
 
   const COMPANY_ALREADY_REGISTERED_MSG = "ეს კომპანია უკვე დარეგისტრირებულია";
 
-  // POST /hr/auth/validate-company – rs.ge lookup; on success save session and return ok
+  // POST /auth/validate-company – rs.ge lookup; on success save session and return ok
   router.post("/auth/validate-company", async (req, res) => {
     const company_identifier = (req.body.company_identifier || "").trim();
     if (!company_identifier) {
@@ -159,12 +159,12 @@ module.exports = function (db) {
     res.status(200).json({ ok: true, existing: false });
   });
 
-  // POST /hr/auth/step1 – save company identifier, show login or register (fallback for no-JS)
+  // POST /auth/step1 – save company identifier, show login or register (fallback for no-JS)
   router.post("/auth/step1", async (req, res) => {
     const company_identifier = (req.body.company_identifier || "").trim();
     if (!company_identifier) {
       req.session.hrRegistration = { error: "კომპანიის საიდენტიფიკაციო აუცილებელია." };
-      return res.redirect("/hr/auth");
+      return res.redirect("/auth");
     }
     const companyData = await getCompanyByTaxId(company_identifier);
     const isValid =
@@ -175,7 +175,7 @@ module.exports = function (db) {
       (companyData[0].FullName || companyData[0].Status || companyData[0].RegisteredSubject);
     if (!isValid) {
       req.session.hrRegistration = { error: COMPANY_NOT_FOUND_MSG };
-      return res.redirect("/hr/auth");
+      return res.redirect("/auth");
     }
     const existing = await db("hr_accounts")
       .where({ company_identifier })
@@ -183,16 +183,16 @@ module.exports = function (db) {
       .first();
     if (existing) {
       req.session.hrRegistration = { error: COMPANY_ALREADY_REGISTERED_MSG };
-      return res.redirect("/hr/auth");
+      return res.redirect("/auth");
     }
     const company_name =
       (companyData[0] && (companyData[0].FullName || companyData[0].RegisteredSubject)) || company_identifier;
     req.session.hrRegistration = { company_identifier, company_name };
     delete req.session.hrRegistration?.error;
-    res.redirect("/hr/auth");
+    res.redirect("/auth");
   });
 
-  // POST /hr/auth/login – sign in by email+password or company_identifier+password
+  // POST /auth/login – sign in by email+password or company_identifier+password
   router.post("/auth/login", async (req, res) => {
     const email = (req.body.email || "").trim().toLowerCase();
     const company_identifier =
@@ -202,7 +202,7 @@ module.exports = function (db) {
     const password = req.body.password;
     if (!password || password.length < 6) {
       req.session.hrRegistration = { ...req.session.hrRegistration, error: "პაროლი მინიმუმ 6 სიმბოლო." };
-      return res.redirect("/hr/auth");
+      return res.redirect("/auth");
     }
     const byEmail = !!email;
     const account = byEmail
@@ -216,11 +216,11 @@ module.exports = function (db) {
           .first();
     if (!byEmail && !company_identifier) {
       req.session.hrRegistration = { error: "კომპანიის საიდენტიფიკაციო აუცილებელია." };
-      return res.redirect("/hr/auth");
+      return res.redirect("/auth");
     }
     if (!account || !verifyPassword(password, account.password_hash)) {
       req.session.hrRegistration = { ...req.session.hrRegistration, error: "არასწორი პაროლი." };
-      return res.redirect("/hr/auth");
+      return res.redirect("/auth");
     }
     req.session.hrUser = {
       id: account.id,
@@ -229,10 +229,10 @@ module.exports = function (db) {
       company_name: account.company_name || account.company_identifier,
     };
     delete req.session.hrRegistration;
-    return res.redirect("/hr/dashboard");
+    return res.redirect("/dashboard");
   });
 
-  // POST /hr/auth/register – new company: email + password, save to hr_accounts (company_name + company_identifier), redirect to dashboard
+  // POST /auth/register – new company: email + password, save to hr_accounts (company_name + company_identifier), redirect to dashboard
   router.post("/auth/register", async (req, res) => {
     const company_identifier =
       (req.body.company_identifier || "").trim() ||
@@ -242,7 +242,7 @@ module.exports = function (db) {
       (req.session.hrRegistration?.company_name || "").trim() || company_identifier;
     if (!company_identifier) {
       req.session.hrRegistration = { error: "პირველად შეიყვანეთ კომპანიის საიდენტიფიკაციო." };
-      return res.redirect("/hr/auth");
+      return res.redirect("/auth");
     }
     const email = (req.body.email || "").trim().toLowerCase();
     const password = req.body.password;
@@ -250,15 +250,15 @@ module.exports = function (db) {
 
     if (!email) {
       req.session.hrRegistration = { ...req.session.hrRegistration, error: "ელფოსტა აუცილებელია." };
-      return res.redirect("/hr/auth");
+      return res.redirect("/auth");
     }
     if (!password || password.length < 6) {
       req.session.hrRegistration = { ...req.session.hrRegistration, error: "პაროლი მინიმუმ 6 სიმბოლო." };
-      return res.redirect("/hr/auth");
+      return res.redirect("/auth");
     }
     if (password !== repeat_password) {
       req.session.hrRegistration = { ...req.session.hrRegistration, error: "პაროლები არ ემთხვევა." };
-      return res.redirect("/hr/auth");
+      return res.redirect("/auth");
     }
 
     try {
@@ -292,7 +292,7 @@ module.exports = function (db) {
         company_name: row?.company_name ?? company_name,
       };
       delete req.session.hrRegistration;
-      return res.redirect("/hr/dashboard");
+      return res.redirect("/dashboard");
     } catch (err) {
       if (err.code === "23505") {
         req.session.hrRegistration = { ...req.session.hrRegistration, error: "ამ საიდენტიფიკაციო ნომრით უკვე დარეგისტრირებულია." };
@@ -300,7 +300,7 @@ module.exports = function (db) {
         console.error("hr/register error:", err);
         req.session.hrRegistration = { ...req.session.hrRegistration, error: "შეცდომა. სცადეთ თავიდან." };
       }
-      return res.redirect("/hr/auth");
+      return res.redirect("/auth");
     }
   });
 
@@ -317,9 +317,9 @@ module.exports = function (db) {
   ];
   const LOCATIONS = ["თბილისი", "ქუთაისი", "ბათუმი", "ზუგდიდი", "გორი", "რუსთავი", "მცხეთა", "თელავი", "მესტია", "ფოთი", "ჭიათურა", "ზესტაფონი", "მარნეული"];
 
-  // GET /hr/dashboard – actual dashboard (logged-in only; skip auth when HR_SKIP_AUTH=1 for dev)
+  // GET /dashboard – actual dashboard (logged-in only; skip auth when HR_SKIP_AUTH=1 for dev)
   router.get("/dashboard", async (req, res) => {
-    if (!SKIP_HR_AUTH && !req.session.hrUser) return res.redirect("/hr/auth");
+    if (!SKIP_HR_AUTH && !req.session.hrUser) return res.redirect("/auth");
     const hrUser = req.session.hrUser || { company_name: "Dev (no auth)", company_identifier: "-" };
     let company_name = hrUser.company_name || hrUser.company_identifier;
     if (!SKIP_HR_AUTH) {
@@ -353,7 +353,7 @@ module.exports = function (db) {
     });
   });
 
-  // POST /hr/dashboard/job-title – Gemini: extract/guess job title from description
+  // POST /dashboard/job-title – Gemini: extract/guess job title from description
   router.post("/dashboard/job-title", async (req, res) => {
     if (!SKIP_HR_AUTH && !req.session.hrUser) {
       return res.status(401).json({ ok: false, error: "ავტორიზაცია საჭიროა" });
@@ -376,7 +376,7 @@ module.exports = function (db) {
     }
   });
 
-  // POST /hr/dashboard/search – run Pinecone + Gemini, store in session, return redirect
+  // POST /dashboard/search – run Pinecone + Gemini, store in session, return redirect
   const VECTOR_MIN_SCORE = 0.4;
   const FETCH_MULTIPLIER = 6;
   // Assess more candidates when user wants lower match levels so we get actual variety (not just top vector = strong)
@@ -578,7 +578,7 @@ module.exports = function (db) {
     return row ? row.id : null;
   }
 
-  // GET /hr/dashboard/credits/history – credits spend/gain history list
+  // GET /dashboard/credits/history – credits spend/gain history list
   router.get("/dashboard/credits/history", async (req, res) => {
     if (!SKIP_HR_AUTH && !req.session.hrUser) {
       return res.status(401).json({ ok: false, error: "ავტორიზაცია საჭიროა" });
@@ -622,7 +622,7 @@ module.exports = function (db) {
     return null;
   }
 
-  // POST /hr/dashboard/candidates/check – check if HR already has this candidate (no charge, no duplicate)
+  // POST /dashboard/candidates/check – check if HR already has this candidate (no charge, no duplicate)
   router.post("/dashboard/candidates/check", async (req, res) => {
     if (!SKIP_HR_AUTH && !req.session.hrUser) {
       return res.status(401).json({ ok: false, error: "ავტორიზაცია საჭიროა" });
@@ -646,7 +646,7 @@ module.exports = function (db) {
     }
   });
 
-  // POST /hr/dashboard/candidates/request – save requested resume (when user clicks "მიიღე რეზიუმე")
+  // POST /dashboard/candidates/request – save requested resume (when user clicks "მიიღე რეზიუმე")
   router.post("/dashboard/candidates/request", async (req, res) => {
     if (!SKIP_HR_AUTH && !req.session.hrUser) {
       return res.status(401).json({ ok: false, error: "ავტორიზაცია საჭიროა" });
@@ -749,7 +749,7 @@ module.exports = function (db) {
     return res.json({ ok: true, credits: outcome?.credits });
   });
 
-  // GET /hr/dashboard/candidates/cv-preview – proxy CV for inline display (iframe; Cloudinary attachment URLs force download)
+  // GET /dashboard/candidates/cv-preview – proxy CV for inline display (iframe; Cloudinary attachment URLs force download)
   router.get("/dashboard/candidates/cv-preview", async (req, res) => {
     if (!SKIP_HR_AUTH && !req.session.hrUser) return res.status(401).send("Unauthorized");
     const hrAccountId = await resolveHrAccountId(req);
@@ -782,7 +782,7 @@ module.exports = function (db) {
     }
   });
 
-  // POST /hr/dashboard/candidates/remove – remove a candidate from the list (confirm on frontend)
+  // POST /dashboard/candidates/remove – remove a candidate from the list (confirm on frontend)
   router.post("/dashboard/candidates/remove", async (req, res) => {
     if (!SKIP_HR_AUTH && !req.session.hrUser) {
       return res.status(401).json({ ok: false, error: "ავტორიზაცია საჭიროა" });
@@ -805,9 +805,9 @@ module.exports = function (db) {
     }
   });
 
-  // GET /hr/dashboard/candidates – show resumes requested via "მიიღე რეზიუმე", grouped by job name
+  // GET /dashboard/candidates – show resumes requested via "მიიღე რეზიუმე", grouped by job name
   router.get("/dashboard/candidates", async (req, res) => {
-    if (!SKIP_HR_AUTH && !req.session.hrUser) return res.redirect("/hr/auth");
+    if (!SKIP_HR_AUTH && !req.session.hrUser) return res.redirect("/auth");
     let jobsWithResumes = [];
     const hrUser = req.session.hrUser || { company_name: "Dev (no auth)", company_identifier: "-" };
     const hrAccountId = await resolveHrAccountId(req);
@@ -910,7 +910,7 @@ module.exports = function (db) {
         })
       : null;
 
-  // POST /hr/dashboard/credits/request – submit credits purchase request, send email to giorgi@samushao.ge
+  // POST /dashboard/credits/request – submit credits purchase request, send email to giorgi@samushao.ge
   router.post("/dashboard/credits/request", async (req, res) => {
     if (!SKIP_HR_AUTH && !req.session.hrUser) {
       return res.status(401).json({ ok: false, error: "ავტორიზაცია საჭიროა" });
@@ -963,9 +963,9 @@ module.exports = function (db) {
     return res.json({ ok: true });
   });
 
-  // GET /hr/dashboard/credits – buy credits page
+  // GET /dashboard/credits – buy credits page
   router.get("/dashboard/credits", async (req, res) => {
-    if (!SKIP_HR_AUTH && !req.session.hrUser) return res.redirect("/hr/auth");
+    if (!SKIP_HR_AUTH && !req.session.hrUser) return res.redirect("/auth");
     const hrUser = req.session.hrUser || { company_name: "Dev (no auth)", company_identifier: "-" };
     const hrAccountId = await resolveHrAccountId(req);
     let credits = null;
@@ -989,9 +989,9 @@ module.exports = function (db) {
     });
   });
 
-  // GET /hr/dashboard/credits-return – information about when we refund credits
+  // GET /dashboard/credits-return – information about when we refund credits
   router.get("/dashboard/credits-return", async (req, res) => {
-    if (!SKIP_HR_AUTH && !req.session.hrUser) return res.redirect("/hr/auth");
+    if (!SKIP_HR_AUTH && !req.session.hrUser) return res.redirect("/auth");
     const hrUser = req.session.hrUser || { company_name: "Dev (no auth)", company_identifier: "-" };
     const hrAccountId = await resolveHrAccountId(req);
     let credits = null;
@@ -1024,13 +1024,13 @@ module.exports = function (db) {
     });
   });
 
-  // POST /hr/dashboard/logout
+  // POST /dashboard/logout
   router.post("/dashboard/logout", (req, res) => {
     req.session.destroy((err) => {
       if (err) {
         console.error("hr logout session.destroy error:", err);
       }
-      res.redirect("/hr/auth");
+      res.redirect("/auth");
     });
   });
 

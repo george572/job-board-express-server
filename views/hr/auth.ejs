@@ -16,7 +16,7 @@
       <% } %>
 
       <% if (step === 'signin') { %>
-        <form action="/hr/auth/login" method="POST" class="space-y-4 max-w-[450px] w-full">
+        <form action="/auth/login" method="POST" class="space-y-4 max-w-[450px] w-full">
           <div>
             <label for="signin_email" class="block text-sm font-medium text-[#151515] mb-1">ელფოსტა</label>
             <input type="email" id="signin_email" name="email" required
@@ -30,16 +30,16 @@
               placeholder="პაროლი" autocomplete="current-password" />
           </div>
           <button type="submit" class="w-full max-w-[450px] px-4 py-3 rounded-lg bg-[#315EFF] text-white font-medium hover:bg-[#2a4fd9]">შესვლა</button>
-          <a href="/hr/auth?step=step1" class="block w-full max-w-[450px] px-4 py-3 rounded-lg border border-[#EBEBEB] text-[#151515] font-medium hover:bg-gray-50 text-center">რეგისტრაცია</a>
+          <a href="/auth?step=step1" class="block w-full max-w-[450px] px-4 py-3 rounded-lg border border-[#EBEBEB] text-[#151515] font-medium hover:bg-gray-50 text-center">რეგისტრაცია</a>
         </form>
       <% } %>
 
       <% if (step === 'step1') { %>
         <div class="mb-4 max-w-[450px]">
-          <a href="/hr/auth" class="text-sm text-[#315EFF] hover:underline">← შესვლის გვერდზე დაბრუნება</a>
+          <a href="/auth" class="text-sm text-[#315EFF] hover:underline">← შესვლის გვერდზე დაბრუნება</a>
         </div>
         <div id="company_error" class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm max-w-[450px] hidden" role="alert"></div>
-        <form id="company_form" action="/hr/auth/step1" method="POST" class="space-y-4 max-w-[450px] w-full">
+        <form id="company_form" action="/auth/step1" method="POST" class="space-y-4 max-w-[450px] w-full">
           <div>
             <label for="company_identifier" class="block text-sm font-medium text-[#151515] mb-1">კომპანიის საიდენტიფიკაციო</label>
             <input type="text" id="company_identifier" name="company_identifier" required
@@ -77,7 +77,7 @@
               if (btnLoading) btnLoading.classList.remove('hidden');
               submitBtn.disabled = true;
 
-              fetch('/hr/auth/validate-company', {
+              fetch('/auth/validate-company', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -86,7 +86,7 @@
                 .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
                 .then(function(result) {
                   if (result.data && result.data.ok) {
-                    window.location.href = '/hr/auth';
+                    window.location.href = '/auth';
                     return;
                   }
                   if (errEl) {
@@ -109,10 +109,10 @@
 
       <% if (step === 'login') { %>
         <div class="mb-4 flex items-center gap-3 max-w-[450px]">
-          <a href="/hr/auth/back" class="flex items-center justify-center w-10 h-10 rounded-lg border border-[#EBEBEB] text-gray-600 hover:bg-gray-50 hover:text-[#151515]" title="სხვა ნომრის შეყვანა">←</a>
+          <a href="/auth/back" class="flex items-center justify-center w-10 h-10 rounded-lg border border-[#EBEBEB] text-gray-600 hover:bg-gray-50 hover:text-[#151515]" title="სხვა ნომრის შეყვანა">←</a>
           <p class="text-sm text-gray-600">კომპანია: <strong><%= typeof company_name !== 'undefined' ? company_name : company_identifier %></strong></p>
         </div>
-        <form action="/hr/auth/login" method="POST" class="space-y-4 max-w-[450px]">
+        <form action="/auth/login" method="POST" class="space-y-4 max-w-[450px]">
           <input type="hidden" name="company_identifier" value="<%= company_identifier %>" />
           <div>
             <label for="login_password" class="block text-sm font-medium text-[#151515] mb-1">პაროლი</label>
@@ -126,10 +126,10 @@
 
       <% if (step === 'register') { %>
         <div class="mb-4 flex items-center gap-3 max-w-[450px]">
-          <a href="/hr/auth/back" class="flex items-center justify-center w-10 h-10 rounded-lg border border-[#EBEBEB] text-gray-600 hover:bg-gray-50 hover:text-[#151515]" title="სხვა ნომრის შეყვანა">←</a>
+          <a href="/auth/back" class="flex items-center justify-center w-10 h-10 rounded-lg border border-[#EBEBEB] text-gray-600 hover:bg-gray-50 hover:text-[#151515]" title="სხვა ნომრის შეყვანა">←</a>
           <p class="text-sm text-gray-600">კომპანია: <strong><%= typeof company_name !== 'undefined' ? company_name : company_identifier %></strong></p>
         </div>
-        <form action="/hr/auth/register" method="POST" class="space-y-4 max-w-[450px]">
+        <form action="/auth/register" method="POST" class="space-y-4 max-w-[450px]">
           <input type="hidden" name="company_identifier" value="<%= company_identifier %>" />
           <div>
             <label for="email" class="block text-sm font-medium text-[#151515] mb-1">ელფოსტა</label>

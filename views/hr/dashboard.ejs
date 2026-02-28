@@ -20,7 +20,7 @@
   <header class="border-b border-[#E5E7EB] bg-white shadow-sm">
     <div class="w-full px-4">
       <div class="flex justify-between items-center h-16">
-        <a href="/hr/dashboard" class="flex items-center">
+        <a href="/dashboard" class="flex items-center">
           <img src="/images/logo.svg" alt="Samushao.ge" class="h-8" />
         </a>
         <div class="flex items-center gap-4">
@@ -28,9 +28,9 @@
             <span class="font-medium">კრედიტები:</span>
             <span id="hr-credits-value"><%= (hrUser && hrUser.creditsDisplay != null) ? hrUser.creditsDisplay : '' %></span>
           </span>
-          <a href="/hr/dashboard/credits" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 font-medium hidden sm:inline-flex hover:bg-emerald-200 transition-colors">იყიდე კრედიტები</a>
+          <a href="/dashboard/credits" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 font-medium hidden sm:inline-flex hover:bg-emerald-200 transition-colors">იყიდე კრედიტები</a>
           <span class="text-sm text-[#6B7280] hidden sm:inline"><%= hrUser.company_name || hrUser.company_identifier %></span>
-          <form action="/hr/dashboard/logout" method="POST" class="inline">
+          <form action="/dashboard/logout" method="POST" class="inline">
             <button type="submit" class="text-sm px-4 py-2 rounded-lg text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#1F2937] transition-colors">გასვლა</button>
           </form>
         </div>
@@ -95,7 +95,7 @@
         <div id="hr-search-results" class="hidden mt-8 w-full max-w-4xl mx-auto">
           <h2 id="hr-results-job-name" class="text-xl font-semibold text-[#0F172A] mb-4"></h2>
           <div id="hr-results-list" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-2"></div>
-          <a href="/hr/dashboard/candidates" class="inline-block mt-4 px-4 py-2 rounded-lg bg-[#315EFF] text-white hover:bg-[#2a4fd9]">კანდიდატების გვერდზე გადასვლა</a>
+          <a href="/dashboard/candidates" class="inline-block mt-4 px-4 py-2 rounded-lg bg-[#315EFF] text-white hover:bg-[#2a4fd9]">კანდიდატების გვერდზე გადასვლა</a>
         </div>
       </section>
 
@@ -107,7 +107,7 @@
               <h1 class="text-2xl font-semibold text-[#0F172A] tracking-tight">ისტორია</h1>
               <p class="mt-2 text-[#64748B]">კრედიტების ხარჯვის და დამატების ისტორია.</p>
             </div>
-            <a href="/hr/dashboard/candidates" class="shrink-0 px-4 py-2 rounded-lg border border-slate-200 text-[#374151] hover:bg-slate-50">გახსნილი კანდიდატები</a>
+            <a href="/dashboard/candidates" class="shrink-0 px-4 py-2 rounded-lg border border-slate-200 text-[#374151] hover:bg-slate-50">გახსნილი კანდიდატები</a>
           </div>
 
           <div class="mt-6 bg-white rounded-xl border border-slate-200 shadow-sm">
@@ -229,7 +229,7 @@
       }
 
       function loadCreditsHistory() {
-        return fetch('/hr/dashboard/credits/history', {
+        return fetch('/dashboard/credits/history', {
           method: 'GET',
           credentials: 'same-origin'
         })
@@ -280,7 +280,7 @@
 
         btn.disabled = true;
         btn.textContent = '...';
-        fetch('/hr/dashboard/candidates/check', {
+        fetch('/dashboard/candidates/check', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
@@ -317,7 +317,7 @@
             aiSummary: (card.getAttribute('data-ai-summary') || '').trim(),
             verdict: verdict
           };
-          return fetch('/hr/dashboard/candidates/request', {
+          return fetch('/dashboard/candidates/request', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
@@ -373,7 +373,7 @@
           if (statusEl) statusEl.classList.remove('hidden');
           searchBtn.disabled = true;
 
-          fetch('/hr/dashboard/search', {
+          fetch('/dashboard/search', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
@@ -476,7 +476,7 @@
           inflightController = new AbortController();
 
           setStatus('ვაკანსიის დასახელების დადგენა...');
-          fetch('/hr/dashboard/job-title', {
+          fetch('/dashboard/job-title', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',

@@ -18,7 +18,7 @@
   <header class="border-b border-[#E5E7EB] bg-white shadow-sm">
     <div class="w-full px-4">
       <div class="flex justify-between items-center h-16">
-        <a href="/hr/dashboard" class="flex items-center">
+        <a href="/dashboard" class="flex items-center">
           <img src="/images/logo.svg" alt="Samushao.ge" class="h-8" />
         </a>
         <div class="flex items-center gap-4">
@@ -26,9 +26,9 @@
             <span class="font-medium">კრედიტები:</span>
             <span><%= (hrUser && hrUser.creditsDisplay != null) ? hrUser.creditsDisplay : '0' %></span>
           </span>
-          <a href="/hr/dashboard/credits" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 font-medium hidden sm:inline-flex hover:bg-emerald-200 transition-colors">იყიდე კრედიტები</a>
+          <a href="/dashboard/credits" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 font-medium hidden sm:inline-flex hover:bg-emerald-200 transition-colors">იყიდე კრედიტები</a>
           <span class="text-sm text-[#6B7280] hidden sm:inline"><%= hrUser.company_name || hrUser.company_identifier %></span>
-          <form action="/hr/dashboard/logout" method="POST" class="inline">
+          <form action="/dashboard/logout" method="POST" class="inline">
             <button type="submit" class="text-sm px-4 py-2 rounded-lg text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#1F2937] transition-colors">გასვლა</button>
           </form>
         </div>
@@ -44,7 +44,7 @@
         <h1 class="text-2xl font-semibold text-[#0F172A] tracking-tight mb-6">რეზიუმეები</h1>
         <% if (!jobsWithResumes || jobsWithResumes.length === 0) { %>
         <p class="text-[#64748B]">ჯერ არც ერთი რეზიუმე არ გაქვთ მიღებული. ძებნის შედეგებში დააწკაპუნეთ «მიიღე რეზიუმე».</p>
-        <a href="/hr/dashboard" class="inline-block mt-4 px-4 py-2 rounded-lg bg-[#315EFF] text-white hover:bg-[#2a4fd9]">ძებნაში გადასვლა</a>
+        <a href="/dashboard" class="inline-block mt-4 px-4 py-2 rounded-lg bg-[#315EFF] text-white hover:bg-[#2a4fd9]">ძებნაში გადასვლა</a>
         <% } else { %>
         <% jobsWithResumes.forEach(function(group) { %>
         <section class="mb-10">
@@ -59,7 +59,7 @@
                 <% if (r.cv_url) { %>
                 <div class="mt-2 flex flex-wrap gap-2">
                   <a href="<%= r.cv_url %>" target="_blank" rel="noopener" download class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-[#374151] border border-slate-200 hover:bg-[#2a4fd9] hover:text-white transition-colors cursor-pointer">CV გადმოწერა</a>
-                  <button type="button" class="hr-cv-preview-btn inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-white border border-slate-200 text-[#374151] hover:bg-[#2a4fd9] hover:text-white transition-colors cursor-pointer" data-preview-url="/hr/dashboard/candidates/cv-preview?jobName=<%= encodeURIComponent(group.jobName || '') %>&candidateId=<%= encodeURIComponent(r.candidate_id || '') %>">CV სწრაფი ნახავა</button>
+                  <button type="button" class="hr-cv-preview-btn inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-white border border-slate-200 text-[#374151] hover:bg-[#2a4fd9] hover:text-white transition-colors cursor-pointer" data-preview-url="/dashboard/candidates/cv-preview?jobName=<%= encodeURIComponent(group.jobName || '') %>&candidateId=<%= encodeURIComponent(r.candidate_id || '') %>">CV სწრაფი ნახავა</button>
                 </div>
                 <% } %>
                 <p class="mt-1 text-sm text-[#64748B]">ბოლო ვიზიტი საიტზე: <%= r.last_visit || 'უცნობია' %></p>
@@ -71,7 +71,7 @@
           </div>
         </section>
         <% }); %>
-        <a href="/hr/dashboard" class="inline-block mt-6 px-4 py-2 rounded-lg border border-slate-200 text-[#374151] hover:bg-slate-50">ახალი ძებნა</a>
+        <a href="/dashboard" class="inline-block mt-6 px-4 py-2 rounded-lg border border-slate-200 text-[#374151] hover:bg-slate-50">ახალი ძებნა</a>
         <% } %>
       </div>
     </main>
@@ -143,7 +143,7 @@
         if (!confirm('დარწმუნებული ხართ, რომ გსურთ „' + name + '“ სიიდან წაშლა?')) return;
         btn.disabled = true;
         btn.textContent = '...';
-        fetch('/hr/dashboard/candidates/remove', {
+        fetch('/dashboard/candidates/remove', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',

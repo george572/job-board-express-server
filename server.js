@@ -3472,14 +3472,19 @@ app.use("/send-cv", require("./routes/sendCv")(db));
 // Job form submission (alternative to CV)
 app.use("/submit-job-form", require("./routes/jobFormSubmit")(db));
 
-// HR dashboard – always redirect to hr.samushao.ge (HR lives there)
-app.use("/hr", (req, res, next) => {
-  if (req.hostname !== "hr.samushao.ge") {
-    return res.redirect(301, "https://hr.samushao.ge" + req.originalUrl);
+// hr.samushao.ge – serve HR app at root (no /hr prefix). Other hosts: redirect /hr to hr.samushao.ge
+const hrRouter = require("./routes/hrDashboard")(db);
+app.use((req, res, next) => {
+  if (req.hostname === "hr.samushao.ge") {
+    return hrRouter(req, res, next);
+  }
+  if (req.path === "/hr" || req.path.startsWith("/hr/")) {
+    const path = req.path.replace(/^\/hr\/?/, "/") || "/";
+    const q = req.originalUrl.includes("?") ? "?" + req.originalUrl.split("?")[1] : "";
+    return res.redirect(301, "https://hr.samushao.ge" + path + q);
   }
   next();
 });
-app.use("/hr", require("./routes/hrDashboard")(db));
 
 // User without CV banner: submit form (saves to DB, sets cookie)
 app.post("/api/user-without-cv", async (req, res) => {
