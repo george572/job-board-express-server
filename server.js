@@ -3472,7 +3472,13 @@ app.use("/send-cv", require("./routes/sendCv")(db));
 // Job form submission (alternative to CV)
 app.use("/submit-job-form", require("./routes/jobFormSubmit")(db));
 
-// HR dashboard (auth + session)
+// HR dashboard – always redirect to app.samushao.ge (HR lives there)
+app.use("/hr", (req, res, next) => {
+  if (req.hostname !== "app.samushao.ge") {
+    return res.redirect(301, "https://app.samushao.ge" + req.originalUrl);
+  }
+  next();
+});
 app.use("/hr", require("./routes/hrDashboard")(db));
 
 // User without CV banner: submit form (saves to DB, sets cookie)
