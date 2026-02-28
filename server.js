@@ -2892,6 +2892,22 @@ const JOB_FEEDBACK_PILLS = new Set([
   "vague_description", "unrealistic_requirements", "salary_not_visible", "too_many_responsibilities", "unattractive_benefits"
 ]);
 
+const { getJobFeedback } = require("./services/getJobFeedback");
+
+// Admin: get aggregated feedback for a job (what people voted for)
+app.get("/api/admin/jobs/:id/feedback", async (req, res) => {
+  try {
+    const jobId = parseInt(req.params.id, 10);
+    if (!jobId || isNaN(jobId)) return res.status(400).json({ error: "Invalid job ID" });
+    const feedback = await getJobFeedback(db, jobId);
+    if (!feedback) return res.status(404).json({ error: "Job not found" });
+    return res.json(feedback);
+  } catch (err) {
+    console.error("get job feedback error:", err);
+    return res.status(500).json({ error: err.message || "Internal error" });
+  }
+});
+
 app.post("/api/jobs/:id/feedback", async (req, res) => {
   try {
     const jobId = parseInt(req.params.id, 10);
