@@ -26,7 +26,7 @@
         <div class="flex items-center gap-4">
           <span id="hr-credits-pill" class="text-xs px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 hidden sm:inline-flex items-center gap-2">
             <span class="font-medium">კრედიტები:</span>
-            <span id="hr-credits-value"><%= (hrUser && typeof hrUser.credits === 'number') ? hrUser.credits : '' %></span>
+            <span id="hr-credits-value"><%= (hrUser && hrUser.creditsDisplay != null) ? hrUser.creditsDisplay : '' %></span>
           </span>
           <a href="/hr/dashboard/credits" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 font-medium hidden sm:inline-flex hover:bg-emerald-200 transition-colors">იყიდე კრედიტები</a>
           <span class="text-sm text-[#6B7280] hidden sm:inline"><%= hrUser.company_name || hrUser.company_identifier %></span>
@@ -140,8 +140,9 @@
         var pill = document.getElementById('hr-credits-pill');
         var val = document.getElementById('hr-credits-value');
         if (!pill || !val) return;
-        if (typeof v === 'number' && isFinite(v)) {
-          val.textContent = String(v);
+        var n = Number(v);
+        if (typeof v !== 'undefined' && v !== null && isFinite(n)) {
+          val.textContent = (n % 1 === 0) ? String(n) : n.toFixed(1);
           pill.classList.remove('hidden');
         }
       }
@@ -327,11 +328,11 @@
             if (reqData && reqData.ok) {
               btn.textContent = 'დამატებულია';
               btn.classList.add('bg-green-100', 'text-green-800');
-              if (typeof reqData.credits === 'number') setCreditsValue(reqData.credits);
+              if (reqData.credits != null && (typeof reqData.credits === 'number' || typeof reqData.credits === 'string')) setCreditsValue(reqData.credits);
             } else {
               btn.disabled = false;
               btn.textContent = 'მიიღე რეზიუმე';
-              if (typeof reqData.credits === 'number') setCreditsValue(reqData.credits);
+              if (reqData.credits != null && (typeof reqData.credits === 'number' || typeof reqData.credits === 'string')) setCreditsValue(reqData.credits);
               alert(reqData && reqData.error || 'შეცდომა');
             }
           });
@@ -530,8 +531,9 @@
       (function() {
         try {
           var vEl = document.getElementById('hr-credits-value');
-          var initial = vEl ? parseInt((vEl.textContent || '').trim(), 10) : NaN;
-          if (!isNaN(initial)) setCreditsValue(initial);
+          var raw = (vEl && vEl.textContent) ? (vEl.textContent.trim() || '') : '';
+          var initial = raw === '' ? NaN : parseFloat(raw);
+          if (!isNaN(initial) && isFinite(initial)) setCreditsValue(initial);
         } catch (e) {}
 
         var refreshBtn = document.getElementById('hr-history-refresh');

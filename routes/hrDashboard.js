@@ -33,6 +33,17 @@ function verifyPassword(password, stored) {
 
 const SKIP_HR_AUTH = process.env.HR_SKIP_AUTH === "1";
 
+function formatCreditsForDisplay(val) {
+  if (val == null || val === "") return "0";
+  // Preserve string from DB (e.g. "94.5") and handle pg Decimal-like objects
+  const str = typeof val === "object" && val !== null && typeof val.toString === "function"
+    ? val.toString()
+    : String(val);
+  const n = parseFloat(str);
+  if (Number.isNaN(n)) return "0";
+  return n % 1 === 0 ? String(Math.round(n)) : n.toFixed(1);
+}
+
 module.exports = function (db) {
   function withTimeout(promise, ms, label) {
     return Promise.race([
@@ -319,10 +330,14 @@ module.exports = function (db) {
     }
     const hrAccountId = await resolveHrAccountId(req);
     let credits = null;
+    let creditsRaw = null;
     if (hrAccountId) {
       try {
-        const row = await db("hr_accounts").where({ id: hrAccountId }).select("credits").first();
-        credits = row && row.credits != null ? Number(row.credits) : null;
+        const row = await db("hr_accounts").where({ id: hrAccountId }).select("credits", db.raw("credits::text as credits_text")).first();
+        if (row) {
+          creditsRaw = row.credits_text != null ? row.credits_text : row.credits;
+          credits = row.credits != null ? Number(row.credits) : null;
+        }
       } catch (e) {
         credits = null;
       }
@@ -331,7 +346,7 @@ module.exports = function (db) {
     const sidebarActive = req.query.view === "history" ? "history" : "search";
     return res.render("hr/dashboard", {
       seo: { title: "HR Dashboard - Samushao.ge", description: "HR dashboard" },
-      hrUser: { ...hrUser, company_name, credits },
+      hrUser: { ...hrUser, company_name, credits, creditsDisplay: formatCreditsForDisplay(creditsRaw != null ? creditsRaw : credits) },
       professions: PROFESSIONS,
       locations: LOCATIONS,
       sidebarActive,
@@ -600,6 +615,13 @@ module.exports = function (db) {
     return null;
   }
 
+  function verdictDisplay(verdict) {
+    if (verdict === "STRONG_MATCH") return { label: "სრული შესაბამისობა", class: "text-white bg-[#315EFF]" };
+    if (verdict === "GOOD_MATCH") return { label: "კარგი შესაბამისობა", class: "text-white bg-[#16a34a]" };
+    if (verdict === "PARTIAL_MATCH") return { label: "ნაწილობრივი შესაბამისობა", class: "text-[#0F172A] bg-slate-200" };
+    return null;
+  }
+
   // POST /hr/dashboard/candidates/check – check if HR already has this candidate (no charge, no duplicate)
   router.post("/dashboard/candidates/check", async (req, res) => {
     if (!SKIP_HR_AUTH && !req.session.hrUser) {
@@ -705,6 +727,7 @@ module.exports = function (db) {
             email,
             cv_url: cvUrl,
             ai_summary: aiSummary,
+            match_verdict: ["STRONG_MATCH", "GOOD_MATCH", "PARTIAL_MATCH"].includes(matchVerdict) ? matchVerdict : null,
           });
 
           return { ok: true, credits: newBalance };
@@ -724,6 +747,39 @@ module.exports = function (db) {
       return res.status(500).json({ ok: false, error: err.message || "შეცდომა" });
     }
     return res.json({ ok: true, credits: outcome?.credits });
+  });
+
+  // GET /hr/dashboard/candidates/cv-preview – proxy CV for inline display (iframe; Cloudinary attachment URLs force download)
+  router.get("/dashboard/candidates/cv-preview", async (req, res) => {
+    if (!SKIP_HR_AUTH && !req.session.hrUser) return res.status(401).send("Unauthorized");
+    const hrAccountId = await resolveHrAccountId(req);
+    if (!hrAccountId) return res.status(401).send("Unauthorized");
+    const jobName = (req.query.jobName || req.query.job_name || "").trim().slice(0, 255);
+    const candidateId = String(req.query.candidateId || req.query.candidate_id || "").trim().slice(0, 64);
+    if (!jobName || !candidateId) return res.status(400).send("Missing jobName or candidateId");
+    try {
+      const row = await db("hr_requested_resumes")
+        .where({ hr_account_id: hrAccountId, job_name: jobName, candidate_id: candidateId })
+        .select("cv_url")
+        .first();
+      if (!row?.cv_url) return res.status(404).send("CV not found");
+      const url = String(row.cv_url).trim();
+      if (!url.startsWith("http://") && !url.startsWith("https://")) return res.status(400).send("Invalid URL");
+      const ext = (url.split("?")[0] || "").toLowerCase().match(/\.(pdf|doc|docx|jpg|jpeg|png|gif|webp)(\?|$)/)?.[1] || "pdf";
+      const mime = { pdf: "application/pdf", doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp" }[ext] || "application/octet-stream";
+      const fetchRes = await fetch(url);
+      if (!fetchRes.ok) return res.status(502).send("Failed to fetch CV");
+      const buf = Buffer.from(await fetchRes.arrayBuffer());
+      if (ext === "pdf" && buf.length >= 5 && buf.subarray(0, 5).toString() !== "%PDF-") {
+        return res.status(502).send("Invalid CV file");
+      }
+      res.set("Content-Type", mime);
+      res.set("Content-Disposition", "inline");
+      res.send(buf);
+    } catch (err) {
+      console.error("hr/dashboard/candidates/cv-preview error:", err);
+      res.status(500).send("Error loading CV");
+    }
   });
 
   // POST /hr/dashboard/candidates/remove – remove a candidate from the list (confirm on frontend)
@@ -756,15 +812,19 @@ module.exports = function (db) {
     const hrUser = req.session.hrUser || { company_name: "Dev (no auth)", company_identifier: "-" };
     const hrAccountId = await resolveHrAccountId(req);
     let credits = null;
+    let creditsRaw = null;
     if (hrAccountId) {
       try {
-        const row = await db("hr_accounts").where({ id: hrAccountId }).select("credits").first();
-        credits = row && row.credits != null ? Number(row.credits) : null;
+        const row = await db("hr_accounts").where({ id: hrAccountId }).select("credits", db.raw("credits::text as credits_text")).first();
+        if (row) {
+          creditsRaw = row.credits_text != null ? row.credits_text : row.credits;
+          credits = row.credits != null ? Number(row.credits) : null;
+        }
       } catch (e) {
         credits = null;
       }
     }
-    const hrUserWithCredits = { ...hrUser, company_name: hrUser.company_name || hrUser.company_identifier, credits };
+    const hrUserWithCredits = { ...hrUser, company_name: hrUser.company_name || hrUser.company_identifier, credits, creditsDisplay: formatCreditsForDisplay(creditsRaw != null ? creditsRaw : credits) };
     if (!hrAccountId) {
       return res.render("hr/candidates", {
         seo: { title: "კანდიდატები - Samushao.ge", description: "HR კანდიდატების შედეგები" },
@@ -778,7 +838,7 @@ module.exports = function (db) {
           .where("hr_account_id", hrAccountId)
           .orderBy("job_name")
           .orderBy("created_at", "desc")
-          .select("job_name", "candidate_id", "full_name", "email", "cv_url", "ai_summary"),
+          .select("job_name", "candidate_id", "full_name", "email", "cv_url", "ai_summary", "match_verdict"),
         2500,
         "load requested resumes"
       );
@@ -813,6 +873,7 @@ module.exports = function (db) {
       for (const r of rows) {
         if (!byJob[r.job_name]) byJob[r.job_name] = [];
         const lastSeen = lastSeenByCandidate[r.candidate_id] || null;
+        const vd = verdictDisplay(r.match_verdict);
         byJob[r.job_name].push({
           candidate_id: r.candidate_id,
           full_name: r.full_name,
@@ -820,6 +881,9 @@ module.exports = function (db) {
           cv_url: r.cv_url,
           ai_summary: r.ai_summary,
           last_visit: lastSeen ? formatLastSeen(lastSeen) : null,
+          match_verdict: r.match_verdict || null,
+          match_verdict_label: vd ? vd.label : null,
+          match_verdict_class: vd ? vd.class : null,
         });
       }
       jobsWithResumes = Object.entries(byJob).map(([jobName, resumes]) => ({ jobName, resumes }));
@@ -828,7 +892,7 @@ module.exports = function (db) {
     }
     return res.render("hr/candidates", {
       seo: { title: "კანდიდატები - Samushao.ge", description: "HR კანდიდატების შედეგები" },
-      hrUser: hrUserWithCredits,
+      hrUser: { ...hrUserWithCredits, creditsDisplay: formatCreditsForDisplay(creditsRaw != null ? creditsRaw : credits) },
       jobsWithResumes,
     });
   });
@@ -905,11 +969,13 @@ module.exports = function (db) {
     const hrUser = req.session.hrUser || { company_name: "Dev (no auth)", company_identifier: "-" };
     const hrAccountId = await resolveHrAccountId(req);
     let credits = null;
+    let creditsRaw = null;
     let accountEmail = hrUser.email || "";
     if (hrAccountId) {
       try {
-        const row = await db("hr_accounts").where({ id: hrAccountId }).select("credits", "email").first();
+        const row = await db("hr_accounts").where({ id: hrAccountId }).select("credits", "email", db.raw("credits::text as credits_text")).first();
         if (row) {
+          creditsRaw = row.credits_text != null ? row.credits_text : row.credits;
           credits = row.credits != null ? Number(row.credits) : null;
           if (row.email) accountEmail = row.email;
         }
@@ -919,7 +985,42 @@ module.exports = function (db) {
     }
     return res.render("hr/credits", {
       seo: { title: "კრედიტების ყიდვა - Samushao.ge", description: "კრედიტების შეძენა" },
-      hrUser: { ...hrUser, company_name: hrUser.company_name || hrUser.company_identifier, credits, email: accountEmail },
+      hrUser: { ...hrUser, company_name: hrUser.company_name || hrUser.company_identifier, credits, creditsDisplay: formatCreditsForDisplay(creditsRaw != null ? creditsRaw : credits), email: accountEmail },
+    });
+  });
+
+  // GET /hr/dashboard/credits-return – information about when we refund credits
+  router.get("/dashboard/credits-return", async (req, res) => {
+    if (!SKIP_HR_AUTH && !req.session.hrUser) return res.redirect("/hr/auth");
+    const hrUser = req.session.hrUser || { company_name: "Dev (no auth)", company_identifier: "-" };
+    const hrAccountId = await resolveHrAccountId(req);
+    let credits = null;
+    let creditsRaw = null;
+    if (hrAccountId) {
+      try {
+        const row = await db("hr_accounts")
+          .where({ id: hrAccountId })
+          .select("credits", db.raw("credits::text as credits_text"))
+          .first();
+        if (row) {
+          creditsRaw = row.credits_text != null ? row.credits_text : row.credits;
+          credits = row.credits != null ? Number(row.credits) : null;
+        }
+      } catch (e) {
+        credits = null;
+      }
+    }
+    return res.render("hr/credits-return", {
+      seo: {
+        title: "რა შემთხვევაში ვაბრუნებთ კრედიტებს - Samushao.ge",
+        description: "ინფორმაცია HR კრედიტების დაბრუნების წესებზე",
+      },
+      hrUser: {
+        ...hrUser,
+        company_name: hrUser.company_name || hrUser.company_identifier,
+        credits,
+        creditsDisplay: formatCreditsForDisplay(creditsRaw != null ? creditsRaw : credits),
+      },
     });
   });
 
