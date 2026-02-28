@@ -14,6 +14,7 @@ const puppeteer = require("puppeteer");
 const { slugify, extractIdFromSlug } = require("./utils/slugify");
 const { JOBS_LIST_COLUMNS } = require("./utils/jobColumns");
 const { parseJobIdsFromCookie } = require("./utils/formSubmittedCookie");
+const { parseJobFeedbackIdsFromCookie, setJobFeedbackCookie } = require("./utils/jobFeedbackCookie");
 const NodeCache = require("node-cache");
 
 const compression = require("compression");
@@ -2884,6 +2885,83 @@ app.get("/api/jobs/:id/description", async (req, res) => {
 });
 
 app.get("/api/ping", (req, res) => res.json({ ok: 1 }));
+
+// Valid pill codes for job feedback
+const JOB_FEEDBACK_PILLS = new Set([
+  "competitive_salary", "interesting_benefits", "flexible_schedule", "clear_requirements", "good_reputation",
+  "vague_description", "unrealistic_requirements", "salary_not_visible", "too_many_responsibilities", "unattractive_benefits"
+]);
+
+app.post("/api/jobs/:id/feedback", async (req, res) => {
+  try {
+    const jobId = parseInt(req.params.id, 10);
+    if (!jobId || isNaN(jobId)) return res.status(400).json({ error: "Invalid job ID" });
+    const job = await db("jobs").where({ id: jobId, job_status: "approved" }).first();
+    if (!job) return res.status(404).json({ error: "Job not found" });
+
+    // Cookie: fast first-line check (same browser)
+    const ids = parseJobFeedbackIdsFromCookie(req);
+    if (ids.has(jobId)) {
+      return res.status(400).json({ error: "თქვენ უკვე გაგზავნეთ უკუკავშირი ამ ვაკანსიაზე" });
+    }
+
+    // DB: same person (user or visitor) cannot vote twice
+    const userId = req.session?.user?.uid || null;
+    const visitorId = req.visitorId || null;
+    const existingQb = db("job_feedback").where("job_id", jobId);
+    if (userId) {
+      const existing = await existingQb.clone().where("user_id", userId).first();
+      if (existing) return res.status(400).json({ error: "თქვენ უკვე გაგზავნეთ უკუკავშირი ამ ვაკანსიაზე" });
+    } else if (visitorId) {
+      const existing = await existingQb.clone().where("visitor_id", visitorId).first();
+      if (existing) return res.status(400).json({ error: "თქვენ უკვე გაგზავნეთ უკუკავშირი ამ ვაკანსიაზე" });
+    }
+
+    const pills = Array.isArray(req.body?.pills) ? req.body.pills : [];
+    if (pills.length === 0 || pills.length > 3) {
+      return res.status(400).json({ error: "აირჩიეთ 1–3 პუნქტი" });
+    }
+    const validPills = pills.filter((p) => JOB_FEEDBACK_PILLS.has(String(p)));
+    if (validPills.length === 0) {
+      return res.status(400).json({ error: "Invalid feedback pills" });
+    }
+
+    const insertPayload = { job_id: jobId, pills: validPills };
+    if (userId) insertPayload.user_id = userId;
+    if (visitorId) insertPayload.visitor_id = visitorId;
+
+    await db("job_feedback").insert(insertPayload);
+    setJobFeedbackCookie(res, ids, jobId);
+
+    return res.json({ ok: true, message: "მადლობა, თქვენი აზრი მნიშვნელოვანია!" });
+  } catch (err) {
+    console.error("job feedback error:", err);
+    res.status(500).json({ error: err.message || "An error occurred" });
+  }
+});
+
+// Cron: send feedback emails to HRs every 2 days (called by external cron-job.org)
+// POST /api/cron/send-feedback-emails with header: Authorization: Bearer <CRON_SECRET>
+const { sendFeedbackEmails } = require("./services/sendFeedbackEmails");
+app.post("/api/cron/send-feedback-emails", async (req, res) => {
+  const secret = process.env.CRON_SECRET;
+  const auth = req.headers.authorization || "";
+  const token = auth.replace(/^Bearer\s+/i, "").trim();
+  if (!secret || token !== secret) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const testEmail = (req.query.test_email || "").trim();
+    const result = await sendFeedbackEmails(db, testEmail ? { testEmail } : {});
+    if (!result.ok) {
+      return res.status(500).json(result);
+    }
+    return res.json(result);
+  } catch (err) {
+    console.error("send-feedback-emails cron error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 app.get("/api/jobs/:id/related", async (req, res) => {
   try {
