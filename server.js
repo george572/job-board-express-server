@@ -3472,10 +3472,10 @@ app.use("/send-cv", require("./routes/sendCv")(db));
 // Job form submission (alternative to CV)
 app.use("/submit-job-form", require("./routes/jobFormSubmit")(db));
 
-// HR dashboard – always redirect to app.samushao.ge (HR lives there)
+// HR dashboard – always redirect to hr.samushao.ge (HR lives there)
 app.use("/hr", (req, res, next) => {
-  if (req.hostname !== "app.samushao.ge") {
-    return res.redirect(301, "https://app.samushao.ge" + req.originalUrl);
+  if (req.hostname !== "hr.samushao.ge") {
+    return res.redirect(301, "https://hr.samushao.ge" + req.originalUrl);
   }
   next();
 });
