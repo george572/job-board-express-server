@@ -40,4 +40,10 @@
     }
 }
 
+/* HR dashboard: use site font at all viewport sizes */
+.hr-dashboard,
+.hr-dashboard * {
+    font-family: 'Noto Sans Georgian', 'Noto Sans Georgian Fallback', ui-sans-serif, system-ui, sans-serif;
+}
+
 @source "../../views";
