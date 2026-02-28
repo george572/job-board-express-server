@@ -778,10 +778,15 @@ const sessionOptions = {
     httpOnly: true,
     maxAge: 365 * 24 * 60 * 60 * 1000,
     sameSite: "lax",
+    domain: process.env.NODE_ENV === "production" ? ".samushao.ge" : undefined,
   },
   // No store = default MemoryStore; session data lives in server memory, not DB.
 };
 app.use(session(sessionOptions));
+
+// Body parsers – MUST run before HR router (login/register POST need req.body)
+app.use(express.json({ limit: "5mb" }));
+app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 
 // hr.samushao.ge – serve HR app at root. MUST run before page cache (which serves cached homepage for GET /).
 // Other hosts: redirect /hr to hr.samushao.ge
@@ -979,18 +984,16 @@ app.use(async (req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: "5mb" }));
-app.use(express.urlencoded({ extended: true, limit: "5mb" }));
-
 app.use(
   cors({
     origin: [
       "http://localhost:4000",
       "http://localhost:4001",
+      "http://hr.samushao.ge:4000",
       "https://samushao.ge",
+      "https://hr.samushao.ge",
       "https://samushao-admin.web.app",
       "http://localhost:3000",
-      "https://hr.samushao.ge",
     ],
     credentials: true,
   }),
