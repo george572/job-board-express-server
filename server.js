@@ -23,6 +23,7 @@ const pageCache = new NodeCache({ stdTTL: 86400 }); // 24 hours
 app.locals.pageCache = pageCache;
 const port = process.env.PORT || 4000;
 const session = require("express-session");
+const pgSession = require("connect-pg-simple")(session);
 
 // Base URL for SEO (sitemap, robots, canonicals)
 const SITE_BASE_URL = process.env.SITE_BASE_URL || "https://samushao.ge";
@@ -768,8 +769,23 @@ if (process.env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
 }
 
-// Session: in-memory only (no DB). MUST run before HR (uses req.session) and before page cache.
+// Session: Postgres store so sessions work across multiple machines (load balancer). MUST run before HR (uses req.session) and before page cache.
+const knexConfig = knexfile[environment];
+const sessionStore = process.env.DATABASE_URL
+  ? new pgSession({
+      conString: process.env.DATABASE_URL,
+      tableName: "session",
+      createTableIfMissing: true,
+    })
+  : knexConfig?.connection
+    ? new pgSession({
+        conObject: knexConfig.connection,
+        tableName: "session",
+        createTableIfMissing: true,
+      })
+    : undefined;
 const sessionOptions = {
+  store: sessionStore,
   resave: false,
   secret: process.env.SESSION_SECRET || "askmdaksdhjkqjqkqkkq1",
   saveUninitialized: false,
@@ -780,7 +796,6 @@ const sessionOptions = {
     sameSite: "lax",
     domain: process.env.NODE_ENV === "production" ? ".samushao.ge" : undefined,
   },
-  // No store = default MemoryStore; session data lives in server memory, not DB.
 };
 app.use(session(sessionOptions));
 
