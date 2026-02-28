@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <%- include('../partials/head-meta', { seo }) %>
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    .hr-sidebar-item:hover,
+    .hr-sidebar-item.active {
+      background: rgba(59, 130, 246, 0.08);
+      color: rgba(37, 99, 235, 0.95);
+    }
+    .credits-option {
+      cursor: pointer;
+    }
+    .credits-option.credits-option-selected {
+      border-color: #315EFF;
+      background: rgba(49, 94, 255, 0.06);
+      box-shadow: 0 0 0 2px rgba(49, 94, 255, 0.2);
+    }
+  </style>
+</head>
+<body class="font-sans text-secondary bg-[#F8FAFC] min-h-screen flex flex-col antialiased">
+  <%- include('../partials/gtm-noscript') %>
+  <header class="border-b border-[#E5E7EB] bg-white shadow-sm">
+    <div class="w-full px-4">
+      <div class="flex justify-between items-center h-16">
+        <a href="/hr/dashboard" class="flex items-center">
+          <img src="/images/logo.svg" alt="Samushao.ge" class="h-8" />
+        </a>
+        <div class="flex items-center gap-4">
+          <span class="text-xs px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 hidden sm:inline-flex items-center gap-2">
+            <span class="font-medium">კრედიტები:</span>
+            <span><%= (hrUser && typeof hrUser.credits === 'number') ? hrUser.credits : '0' %></span>
+          </span>
+          <a href="/hr/dashboard/credits" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 font-medium hidden sm:inline-flex hover:bg-emerald-200 transition-colors">იყიდე კრედიტები</a>
+          <span class="text-sm text-[#6B7280] hidden sm:inline"><%= hrUser.company_name || hrUser.company_identifier %></span>
+          <form action="/hr/dashboard/logout" method="POST" class="inline">
+            <button type="submit" class="text-sm px-4 py-2 rounded-lg text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#1F2937] transition-colors">გასვლა</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex flex-1 w-full">
+    <%- include('partials/sidebar', { active: 'credits' }) %>
+
+    <main class="flex-1 p-8 bg-[#F8FAFC] overflow-auto">
+      <div class="w-full max-w-2xl mx-auto">
+        <h1 class="text-2xl font-semibold text-[#0F172A] tracking-tight mb-2">კრედიტების ყიდვა</h1>
+        <p class="text-[#64748B] mb-8">აირჩიეთ კრედიტების პაკეტი ან შეიყვანეთ საკუთარი რაოდენობა.</p>
+
+        <div class="space-y-4" id="credits-options">
+          <div role="button" tabindex="0" class="credits-option block w-full bg-white rounded-xl border border-slate-200 shadow-sm p-5 hover:border-[#315EFF] hover:shadow-md transition-all text-left" data-credits="10" data-price="500">
+            <div class="flex justify-between items-center">
+              <span class="font-medium text-[#0F172A]">10 კრედიტი</span>
+              <span class="text-lg font-semibold text-[#0F172A]">500 ₾</span>
+            </div>
+          </div>
+          <div role="button" tabindex="0" class="credits-option block w-full bg-white rounded-xl border border-slate-200 shadow-sm p-5 hover:border-[#315EFF] hover:shadow-md transition-all text-left" data-credits="20" data-price="900">
+            <div class="flex justify-between items-center flex-wrap gap-2">
+              <span class="font-medium text-[#0F172A]">20 კრედიტი <span class="text-emerald-600 text-sm font-normal">(2 საჩუქრად)</span></span>
+              <span class="text-lg font-semibold text-[#0F172A]">900 ₾</span>
+            </div>
+          </div>
+          <div role="button" tabindex="0" class="credits-option block w-full bg-white rounded-xl border border-slate-200 shadow-sm p-5 hover:border-[#315EFF] hover:shadow-md transition-all text-left" data-credits="30" data-price="1400">
+            <div class="flex justify-between items-center flex-wrap gap-2">
+              <span class="font-medium text-[#0F172A]">30 კრედიტი <span class="text-emerald-600 text-sm font-normal">(2 საჩუქრად)</span></span>
+              <span class="text-lg font-semibold text-[#0F172A]">1 400 ₾</span>
+            </div>
+          </div>
+          <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <label for="credits-custom" class="block font-medium text-[#0F172A] mb-3">ან მიუთითეთ რაოდენობა</label>
+            <div class="flex gap-3 items-center flex-wrap">
+              <input type="number" id="credits-custom" min="1" max="999" placeholder="კრედიტების რაოდენობა" class="flex-1 min-w-[140px] px-4 py-3 text-[15px] border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#315EFF] focus:border-transparent" />
+              <span class="text-[#6B7280]">=</span>
+              <span id="credits-custom-price" class="font-semibold text-[#0F172A]">0 ₾</span>
+            </div>
+            <p class="mt-2 text-xs text-[#6B7280]" id="credits-custom-hint">1 კრედიტი = 50 ₾. 20 და მეტი კრედიტზე 2 საჩუქრად.</p>
+          </div>
+        </div>
+
+        <button type="button" id="credits-buy-btn" class="mt-6 px-6 py-3 rounded-lg bg-[#315EFF] text-white hover:bg-[#2a4fd9] font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer" disabled>ყიდვა</button>
+        <div id="credits-success-msg" class="hidden mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-medium">ინვოისს გამოგიგზავნით რამდენიმე წუთში თქვენს მეილზე (<%= (hrUser && hrUser.email) ? hrUser.email : '' %>).</div>
+
+      </div>
+    </main>
+  </div>
+  <script>
+    (function() {
+      var customInput = document.getElementById('credits-custom');
+      var customPrice = document.getElementById('credits-custom-price');
+      var buyBtn = document.getElementById('credits-buy-btn');
+      var successMsg = document.getElementById('credits-success-msg');
+      var optionsContainer = document.getElementById('credits-options');
+      var selectedPreset = null;
+
+      function customPriceForCredits(n) {
+        if (n <= 0) return 0;
+        if (n >= 20) return (n - 2) * 50;
+        return n * 50;
+      }
+      function updateCustomPrice() {
+        var n = parseInt(customInput.value, 10) || 0;
+        var price = customPriceForCredits(n);
+        customPrice.textContent = price + ' ₾';
+        if (n >= 1) {
+          selectedPreset = null;
+          optionsContainer.querySelectorAll('.credits-option').forEach(function(el) { el.classList.remove('credits-option-selected'); });
+        }
+        updateBuyButton();
+      }
+      function updateBuyButton() {
+        var customVal = parseInt(customInput.value, 10) || 0;
+        var hasSelection = selectedPreset !== null || customVal >= 1;
+        buyBtn.disabled = !hasSelection;
+      }
+      function selectPreset(el) {
+        optionsContainer.querySelectorAll('.credits-option').forEach(function(o) { o.classList.remove('credits-option-selected'); });
+        el.classList.add('credits-option-selected');
+        selectedPreset = { credits: parseInt(el.getAttribute('data-credits'), 10), price: el.getAttribute('data-price') };
+        customInput.value = '';
+        customPrice.textContent = '0 ₾';
+        updateBuyButton();
+      }
+      optionsContainer.querySelectorAll('.credits-option').forEach(function(el) {
+        el.addEventListener('click', function() { selectPreset(el); });
+        el.addEventListener('keydown', function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectPreset(el); } });
+      });
+      customInput.addEventListener('input', updateCustomPrice);
+      customInput.addEventListener('change', updateCustomPrice);
+      buyBtn.addEventListener('click', function() {
+        var credits = selectedPreset ? selectedPreset.credits : (parseInt(customInput.value, 10) || 0);
+        if (credits < 1) return;
+        buyBtn.disabled = true;
+        fetch('/hr/dashboard/credits/request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credits: credits }),
+          credentials: 'same-origin'
+        })
+        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+        .then(function(r) {
+          buyBtn.disabled = false;
+          if (r.ok && r.data && r.data.ok) {
+            successMsg.classList.remove('hidden');
+            successMsg.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          } else {
+            alert(r.data && r.data.error ? r.data.error : 'შეცდომა მოხდა.');
+          }
+        })
+        .catch(function() {
+          buyBtn.disabled = false;
+          alert('შეცდომა მოხდა.');
+        });
+      });
+      updateBuyButton();
+    })();
+  </script>
+</body>
+</html>

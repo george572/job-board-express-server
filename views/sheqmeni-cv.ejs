@@ -432,8 +432,12 @@
       function updateCvPreview() {
         if (!cvPreviewFrame) return;
 
-        var hasAnyData = Object.values(cvData).some(function(v) {
-          return v && String(v).trim();
+        var hasAnyData = Object.keys(cvData).some(function(k) {
+          var v = cvData[k];
+          if (v == null) return false;
+          if (Array.isArray(v)) return v.length > 0;
+          if (typeof v === 'string') return v.trim().length > 0;
+          return true;
         });
         if (!hasAnyData) return;
 
@@ -502,8 +506,9 @@
         var hasOtherInfo = !!(otherInfo && String(otherInfo).trim());
 
         var jobsHtml = '';
-        var jobsSource = Array.isArray(cvData.jobs) ? cvData.jobs
-          : (Array.isArray(cvData.experience) ? cvData.experience : null);
+        var jobsSource = (Array.isArray(cvData.jobs) && cvData.jobs.length) ? cvData.jobs
+          : (Array.isArray(cvData.experience) && cvData.experience.length) ? cvData.experience
+          : null;
         if (jobsSource && jobsSource.length) {
           jobsHtml = jobsSource.map(function(j) {
             j = j || {};

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <%- include('../partials/head-meta', { seo }) %>
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    .hr-sidebar-item:hover,
+    .hr-sidebar-item.active {
+      background: rgba(59, 130, 246, 0.08);
+      color: rgba(37, 99, 235, 0.95);
+    }
+  </style>
+</head>
+<body class="font-sans text-secondary bg-[#F8FAFC] min-h-screen flex flex-col antialiased">
+  <%- include('../partials/gtm-noscript') %>
+  <header class="border-b border-[#E5E7EB] bg-white shadow-sm">
+    <div class="w-full px-4">
+      <div class="flex justify-between items-center h-16">
+        <a href="/hr/dashboard" class="flex items-center">
+          <img src="/images/logo.svg" alt="Samushao.ge" class="h-8" />
+        </a>
+        <div class="flex items-center gap-4">
+          <span class="text-xs px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 hidden sm:inline-flex items-center gap-2">
+            <span class="font-medium">კრედიტები:</span>
+            <span><%= (hrUser && typeof hrUser.credits === 'number') ? hrUser.credits : '0' %></span>
+          </span>
+          <a href="/hr/dashboard/credits" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 font-medium hidden sm:inline-flex hover:bg-emerald-200 transition-colors">იყიდე კრედიტები</a>
+          <span class="text-sm text-[#6B7280] hidden sm:inline"><%= hrUser.company_name || hrUser.company_identifier %></span>
+          <form action="/hr/dashboard/logout" method="POST" class="inline">
+            <button type="submit" class="text-sm px-4 py-2 rounded-lg text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#1F2937] transition-colors">გასვლა</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex flex-1 w-full">
+    <%- include('partials/sidebar', { active: 'candidates' }) %>
+
+    <main class="flex-1 p-8 bg-[#F8FAFC] overflow-auto">
+      <div class="w-full max-w-4xl mx-auto">
+        <h1 class="text-2xl font-semibold text-[#0F172A] tracking-tight mb-6">რეზიუმეები</h1>
+        <% if (!jobsWithResumes || jobsWithResumes.length === 0) { %>
+        <p class="text-[#64748B]">ჯერ არც ერთი რეზიუმე არ გაქვთ მიღებული. ძებნის შედეგებში დააწკაპუნეთ «მიიღე რეზიუმე».</p>
+        <a href="/hr/dashboard" class="inline-block mt-4 px-4 py-2 rounded-lg bg-[#315EFF] text-white hover:bg-[#2a4fd9]">ძებნაში გადასვლა</a>
+        <% } else { %>
+        <% jobsWithResumes.forEach(function(group) { %>
+        <section class="mb-10">
+          <h2 class="text-lg font-semibold text-[#0F172A] mb-4"><%= group.jobName %></h2>
+          <div class="space-y-4">
+            <% (group.resumes || []).forEach(function(r) { %>
+            <div class="hr-candidate-row w-full bg-white rounded-xl border border-slate-200 shadow-md p-5 flex flex-wrap items-start justify-between gap-4" data-job-name="<%= (group.jobName || '').replace(/"/g, '&quot;') %>" data-candidate-id="<%= (r.candidate_id || '').replace(/"/g, '&quot;') %>">
+              <div class="min-w-0 flex-1">
+                <p class="font-medium text-[#1F2937] text-base"><%= r.full_name || 'უცნობი' %></p>
+                <% if (r.email) { %><p class="mt-1 text-sm text-[#6B7280]">ელფოსტა: <a href="mailto:<%= r.email %>" class="text-[#315EFF] hover:underline"><%= r.email %></a></p><% } %>
+                <% if (r.cv_url) { %><p class="mt-1 text-sm text-[#6B7280]">CV: <a href="<%= r.cv_url %>" target="_blank" rel="noopener" class="text-[#315EFF] underline break-all"><%= r.cv_url %></a></p><% } %>
+                <p class="mt-1 text-sm text-[#64748B]">ბოლო ვიზიტი საიტზე: <%= r.last_visit || '—' %></p>
+                <% if (r.ai_summary) { %><p class="mt-2 text-sm text-[#4B5563] leading-relaxed"><%= r.ai_summary %></p><% } %>
+              </div>
+              <button type="button" class="hr-remove-candidate shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium bg-white border border-slate-200 text-[#374151] hover:bg-red-500 hover:text-white hover:border-red-500 transition-colors cursor-pointer">წაშლა</button>
+            </div>
+            <% }); %>
+          </div>
+        </section>
+        <% }); %>
+        <a href="/hr/dashboard" class="inline-block mt-6 px-4 py-2 rounded-lg border border-slate-200 text-[#374151] hover:bg-slate-50">ახალი ძებნა</a>
+        <% } %>
+      </div>
+    </main>
+  </div>
+  <% if (jobsWithResumes && jobsWithResumes.length > 0) { %>
+  <script>
+    (function() {
+      document.addEventListener('click', function(e) {
+        var btn = e.target && e.target.closest && e.target.closest('.hr-remove-candidate');
+        if (!btn || btn.disabled) return;
+        var row = btn.closest('.hr-candidate-row');
+        if (!row) return;
+        var jobName = (row.getAttribute('data-job-name') || '').trim();
+        var candidateId = (row.getAttribute('data-candidate-id') || '').trim();
+        if (!jobName || !candidateId) return;
+        var name = (row.querySelector('p.font-medium') && row.querySelector('p.font-medium').textContent || '').trim() || 'კანდიდატი';
+        if (!confirm('დარწმუნებული ხართ, რომ გსურთ „' + name + '“ სიიდან წაშლა?')) return;
+        btn.disabled = true;
+        btn.textContent = '...';
+        fetch('/hr/dashboard/candidates/remove', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ jobName: jobName, candidateId: candidateId })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data && data.ok) {
+            row.remove();
+          } else {
+            btn.disabled = false;
+            btn.textContent = 'წაშლა';
+            alert(data && data.error || 'შეცდომა');
+          }
+        })
+        .catch(function() {
+          btn.disabled = false;
+          btn.textContent = 'წაშლა';
+          alert('შეცდომა');
+        });
+      });
+    })();
+  </script>
+  <% } %>
+</body>
+</html>

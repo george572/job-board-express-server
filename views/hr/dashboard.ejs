@@ -5,21 +5,543 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <%- include('../partials/head-meta', { seo }) %>
   <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    .hr-sidebar-item:hover,
+    .hr-sidebar-item.active {
+      background: rgba(59, 130, 246, 0.08);
+      color: rgba(37, 99, 235, 0.95);
+    }
+    .hr-view { display: none; }
+    .hr-view.active { display: flex; }
+  </style>
 </head>
-<body class="font-sans text-secondary bg-[#F8F9FA] min-h-screen flex flex-col">
+<body class="font-sans text-secondary bg-[#F8FAFC] min-h-screen flex flex-col antialiased">
   <%- include('../partials/gtm-noscript') %>
-  <header class="border-b border-[#EBEBEB] bg-white">
-    <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+  <header class="border-b border-[#E5E7EB] bg-white shadow-sm">
+    <div class="w-full px-4">
+      <div class="flex justify-between items-center h-16">
+        <a href="/hr/dashboard" class="flex items-center">
+          <img src="/images/logo.svg" alt="Samushao.ge" class="h-8" />
+        </a>
+        <div class="flex items-center gap-4">
+          <span id="hr-credits-pill" class="text-xs px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 hidden sm:inline-flex items-center gap-2">
+            <span class="font-medium">კრედიტები:</span>
+            <span id="hr-credits-value"><%= (hrUser && typeof hrUser.credits === 'number') ? hrUser.credits : '' %></span>
+          </span>
+          <a href="/hr/dashboard/credits" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 font-medium hidden sm:inline-flex hover:bg-emerald-200 transition-colors">იყიდე კრედიტები</a>
+          <span class="text-sm text-[#6B7280] hidden sm:inline"><%= hrUser.company_name || hrUser.company_identifier %></span>
+          <form action="/hr/dashboard/logout" method="POST" class="inline">
+            <button type="submit" class="text-sm px-4 py-2 rounded-lg text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#1F2937] transition-colors">გასვლა</button>
+          </form>
+        </div>
+      </div>
     </div>
   </header>
 
-  <main class="flex-1 max-w-md mx-auto w-full px-4 py-12">
-    <h1 class="text-2xl font-medium text-[#151515] mb-4">HR Dashboard</h1>
-    <p class="text-gray-600 mb-2">შესული ხართ როგორც <strong><%= hrUser.email %></strong></p>
-    <p class="text-sm text-gray-500 mb-6">კომპანია: <%= hrUser.company_identifier %></p>
-    <form action="/hr/dashboard/logout" method="POST">
-      <button type="submit" class="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300">გასვლა</button>
-    </form>
-  </main>
+  <div class="flex flex-1 w-full">
+    <%- include('partials/sidebar', { active: typeof sidebarActive !== 'undefined' ? sidebarActive : 'search' }) %>
+
+    <!-- Main content -->
+    <main class="flex-1 p-8 bg-[#F8FAFC] overflow-auto flex flex-col">
+      <!-- Search view (default) -->
+      <section id="hr-view-search" class="hr-view flex-1 flex flex-col w-full <%= (typeof sidebarActive !== 'undefined' && sidebarActive === 'history') ? '' : 'active' %>">
+        <div id="hr-search-form" class="w-full max-w-2xl flex flex-col items-center justify-center mx-auto">
+          <label for="hr-job-description" class="block text-sm font-medium text-[#374151] mb-2 w-full max-w-2xl">ჩასვი ვაკანსიის აღწერა</label>
+          <textarea
+            id="hr-job-description"
+            name="job_description"
+            rows="6"
+            placeholder="ჩასვი აქ "
+            class="w-full max-w-2xl px-4 py-3 text-[15px] border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#315EFF] focus:border-transparent resize-none placeholder-[#9CA3AF] bg-white"
+          ></textarea>
+          <label for="hr-job-title" class="block mt-4 text-sm font-medium text-[#374151] w-full max-w-2xl">ვაკანსიის დასახელება</label>
+          <input
+            id="hr-job-title"
+            name="job_title"
+            type="text"
+            placeholder="AI დააგენერირებს ავტომატურად, შეასწორეთ თუ არასწორია"
+            class="mt-2 w-full max-w-2xl px-4 py-3 text-[15px] border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#315EFF] focus:border-transparent placeholder-[#9CA3AF] bg-white"
+            autocomplete="off"
+          />
+          <p id="hr-job-title-status" class="hidden mt-2 text-xs text-[#6B7280] w-full max-w-2xl"></p>
+          <label for="matchLevel" class="block mt-4 text-sm font-medium text-[#374151] w-full max-w-2xl">შესაბამისობის მინიმალური დონე ( კრედიტი ძებნაში არ იხარჯება )</label>
+          <select name="matchLevel" id="matchLevel" class="mt-2 w-full max-w-2xl px-4 py-3 text-[15px] border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#315EFF] focus:border-transparent bg-white">
+            <option value="strong" selected>სრული შესაბამისობა — კანდიდატი ჯდება 2 კრედიტი</option>
+            <option value="good">კარგი შესაბამისობა — კანდიდატი ჯდება 1 კრედიტი</option>
+            <option value="partial">ნაწილობრივი შესაბამისობა — კანდიდატი ჯდება 0.5 კრედიტი</option>
+          </select>
+          <label for="candidatesAmount" class="block mt-4 text-sm text-[#374151] w-full max-w-2xl">კანდიდატების რაოდენობა ( რამდენი შესაძლო ვარიანტი გაჩვენოთ )</label>
+          <select type="select" name="amount" id="candidatesAmount" class="mt-2 w-full max-w-2xl px-4 py-3 text-[15px] border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#315EFF] focus:border-transparent resize-none placeholder-[#9CA3AF] bg-white">
+            <option value="5"selected>5</option>
+            <option value="10" >10</option>
+            <option value="20">20</option>
+            <option value="30">30</option>
+            <option value="40">40</option>
+            <option value="50">50</option>
+          </select>
+          <div class="flex flex-col items-center mt-4">
+            <button type="button" id="hrSearchBtn" class="px-6 py-3 rounded-lg bg-[#315EFF] text-white hover:bg-[#2a4fd9] cursor-pointer font-medium disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[120px] min-h-[48px]">
+              <span class="hr-search-text">ძებნა</span>
+              <span class="hr-search-loading hidden flex items-center justify-center">
+                <svg class="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="32" stroke-dashoffset="12" stroke-linecap="round"></circle>
+                </svg>
+              </span>
+            </button>
+            <p class="hr-search-status hidden mt-2 text-sm text-[#6B7280] text-center">ბაზაში ბევრი რეზიუმეა, დრო დასჭირდება.. დაელოდეთ</p>
+          </div>
+        </div>
+        <!-- Search results (shown after search) -->
+        <div id="hr-search-results" class="hidden mt-8 w-full max-w-4xl mx-auto">
+          <h2 id="hr-results-job-name" class="text-xl font-semibold text-[#0F172A] mb-4"></h2>
+          <div id="hr-results-list" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-2"></div>
+          <a href="/hr/dashboard/candidates" class="inline-block mt-4 px-4 py-2 rounded-lg bg-[#315EFF] text-white hover:bg-[#2a4fd9]">კანდიდატების გვერდზე გადასვლა</a>
+        </div>
+      </section>
+
+      <!-- History view -->
+      <section id="hr-view-history" class="hr-view flex-1 flex flex-col w-full <%= (typeof sidebarActive !== 'undefined' && sidebarActive === 'history') ? 'active' : '' %>">
+        <div class="w-full max-w-4xl mx-auto">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <h1 class="text-2xl font-semibold text-[#0F172A] tracking-tight">ისტორია</h1>
+              <p class="mt-2 text-[#64748B]">კრედიტების ხარჯვის და დამატების ისტორია.</p>
+            </div>
+            <a href="/hr/dashboard/candidates" class="shrink-0 px-4 py-2 rounded-lg border border-slate-200 text-[#374151] hover:bg-slate-50">გახსნილი კანდიდატები</a>
+          </div>
+
+          <div class="mt-6 bg-white rounded-xl border border-slate-200 shadow-sm">
+            <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+              <p class="font-medium text-[#0F172A]">კრედიტების ისტორია</p>
+              <button type="button" id="hr-history-refresh" class="text-sm px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200">განახლება</button>
+            </div>
+            <div id="hr-credits-history" class="divide-y divide-slate-200">
+              <div class="px-5 py-6 text-sm text-[#64748B]" id="hr-history-empty">იტვირთება...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (function() {
+      function escapeHtml(s) {
+        if (!s) return '';
+        var div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+      }
+
+      var sidebarItems = document.querySelectorAll('.hr-sidebar-item');
+      var views = document.querySelectorAll('.hr-view');
+
+      function setCreditsValue(v) {
+        var pill = document.getElementById('hr-credits-pill');
+        var val = document.getElementById('hr-credits-value');
+        if (!pill || !val) return;
+        if (typeof v === 'number' && isFinite(v)) {
+          val.textContent = String(v);
+          pill.classList.remove('hidden');
+        }
+      }
+
+      function creditsCostForVerdict(verdict) {
+        if (verdict === 'STRONG_MATCH') return 2;
+        if (verdict === 'GOOD_MATCH') return 1;
+        if (verdict === 'PARTIAL_MATCH') return 0.5;
+        return null;
+      }
+
+      // Label only (no credit cost) – used in result cards
+      function verdictLabelOnly(verdict) {
+        if (verdict === 'STRONG_MATCH') return 'სრული შესაბამისობა';
+        if (verdict === 'GOOD_MATCH') return 'კარგი შესაბამისობა';
+        if (verdict === 'PARTIAL_MATCH') return 'ნაწილობრივი შესაბამისობა';
+        return '';
+      }
+
+      function pluralCredits(n) {
+        return (n === 1) ? 'კრედიტი' : 'კრედიტი';
+      }
+
+      function formatDate(iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) return '';
+        var dd = String(d.getDate()).padStart(2, '0');
+        var mm = String(d.getMonth() + 1).padStart(2, '0');
+        var yyyy = String(d.getFullYear());
+        var hh = String(d.getHours()).padStart(2, '0');
+        var mi = String(d.getMinutes()).padStart(2, '0');
+        return dd + '.' + mm + '.' + yyyy + ' ' + hh + ':' + mi;
+      }
+
+      function renderCreditsHistory(items) {
+        var wrap = document.getElementById('hr-credits-history');
+        if (!wrap) return;
+        wrap.innerHTML = '';
+        if (!items || !items.length) {
+          var empty = document.createElement('div');
+          empty.className = 'px-5 py-6 text-sm text-[#64748B]';
+          empty.textContent = 'ისტორია ცარიელია.';
+          wrap.appendChild(empty);
+          return;
+        }
+        items.forEach(function(it) {
+          var row = document.createElement('div');
+          row.className = 'px-5 py-4 flex items-start justify-between gap-4';
+
+          var left = document.createElement('div');
+          left.className = 'min-w-0';
+          var delta = (typeof it.delta === 'number' ? it.delta : parseFloat(it.delta)) || 0;
+          var isSpend = delta < 0;
+          var abs = Math.abs(delta);
+
+          var title = document.createElement('p');
+          title.className = 'text-sm font-medium text-[#0F172A]';
+          if (isSpend) {
+            var job = (it.job_name || '').trim();
+            title.textContent = 'დახარჯეთ ' + abs + ' ' + pluralCredits(abs) + (job ? (' „' + job + '“ ვაკანსიაზე') : '');
+          } else {
+            title.textContent = 'დაგემატათ ' + abs + ' ' + pluralCredits(abs);
+          }
+
+          var meta = document.createElement('p');
+          meta.className = 'mt-1 text-xs text-[#64748B]';
+          var date = formatDate(it.created_at);
+          var balNum = (typeof it.balance_after === 'number' ? it.balance_after : parseFloat(it.balance_after));
+          var bal = (balNum !== undefined && !isNaN(balNum)) ? (' · ბალანსი: ' + balNum) : '';
+          meta.textContent = (date ? (date) : '') + bal;
+
+          left.appendChild(title);
+          left.appendChild(meta);
+
+          var badge = document.createElement('span');
+          badge.className = 'shrink-0 mt-0.5 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ' + (isSpend ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700');
+          badge.textContent = (isSpend ? '-' : '+') + (Number.isInteger(abs) ? abs : abs.toFixed(2));
+
+          row.appendChild(left);
+          row.appendChild(badge);
+          wrap.appendChild(row);
+        });
+      }
+
+      function loadCreditsHistory() {
+        return fetch('/hr/dashboard/credits/history', {
+          method: 'GET',
+          credentials: 'same-origin'
+        })
+        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+        .then(function(r) {
+          if (r.ok && r.data && r.data.ok) {
+            renderCreditsHistory(r.data.history || []);
+          } else {
+            renderCreditsHistory([]);
+          }
+        })
+        .catch(function() {
+          renderCreditsHistory([]);
+        });
+      }
+
+      sidebarItems.forEach(function(item) {
+        item.addEventListener('click', function(e) {
+          var viewId = item.getAttribute('data-view');
+          var href = (item.getAttribute('href') || '').trim();
+          if (viewId && href === '#') {
+            e.preventDefault();
+            sidebarItems.forEach(function(i) { i.classList.remove('active'); });
+            item.classList.add('active');
+            views.forEach(function(v) {
+              v.classList.remove('active');
+              if (v.id === 'hr-view-' + viewId) v.classList.add('active');
+            });
+            if (viewId === 'history') loadCreditsHistory();
+          }
+        });
+      });
+
+      document.addEventListener('click', function(e) {
+        var btn = e.target && e.target.closest && e.target.closest('.hr-unlock-btn');
+        if (!btn || btn.disabled) return;
+        var card = btn.closest('.hr-candidate-card');
+        if (!card) return;
+        var jobName = (card.getAttribute('data-job-name') || '').trim();
+        var candidateId = (card.getAttribute('data-candidate-id') || '').trim();
+        if (!candidateId) return;
+        var verdict = (card.getAttribute('data-verdict') || '').trim();
+        var cost = creditsCostForVerdict(verdict);
+        if (cost === undefined || cost === null) {
+          alert('შეცდომა: კრედიტის ღირებულება ვერ დადგინდა');
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = '...';
+        fetch('/hr/dashboard/candidates/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ jobName: jobName, candidateId: candidateId })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data || !data.ok) {
+            btn.disabled = false;
+            btn.textContent = 'მიიღე რეზიუმე';
+            alert(data && data.error || 'შეცდომა');
+            return;
+          }
+          if (data.already) {
+            btn.disabled = false;
+            btn.textContent = 'მიიღე რეზიუმე';
+            alert('ეს კანდიდატი უკვე გაქვთ მიღებული კანდიდატების სიაში. გადახედეთ გვერდს „კანდიდატები“.');
+            return;
+          }
+          var confirmMsg = cost === 0
+            ? 'ამ კანდიდატის გახსნა უფასოა. დარწმუნებული ხართ?'
+            : 'ეს ქმედება დაგიჯდებათ ' + cost + ' ' + pluralCredits(cost) + '. დარწმუნებული ხართ, რომ გსურთ ამ კანდიდატის გახსნა?';
+          var ok = confirm(confirmMsg);
+          if (!ok) {
+            btn.disabled = false;
+            btn.textContent = 'მიიღე რეზიუმე';
+            return;
+          }
+          var candidate = {
+            id: candidateId,
+            fullName: (card.getAttribute('data-full-name') || '').trim(),
+            email: (card.getAttribute('data-email') || '').trim(),
+            cvUrl: (card.getAttribute('data-cv-url') || '').trim(),
+            aiSummary: (card.getAttribute('data-ai-summary') || '').trim(),
+            verdict: verdict
+          };
+          return fetch('/hr/dashboard/candidates/request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ jobName: jobName, candidate: candidate })
+          })
+          .then(function(r) { return r.json(); })
+          .then(function(reqData) {
+            if (reqData && reqData.ok) {
+              btn.textContent = 'დამატებულია';
+              btn.classList.add('bg-green-100', 'text-green-800');
+              if (typeof reqData.credits === 'number') setCreditsValue(reqData.credits);
+            } else {
+              btn.disabled = false;
+              btn.textContent = 'მიიღე რეზიუმე';
+              if (typeof reqData.credits === 'number') setCreditsValue(reqData.credits);
+              alert(reqData && reqData.error || 'შეცდომა');
+            }
+          });
+        })
+        .catch(function() {
+          btn.disabled = false;
+          btn.textContent = 'მიიღე რეზიუმე';
+          alert('შეცდომა');
+        });
+      });
+
+      var searchBtn = document.getElementById('hrSearchBtn');
+      if (searchBtn) {
+        searchBtn.addEventListener('click', function() {
+          var textarea = document.getElementById('hr-job-description');
+          var titleInput = document.getElementById('hr-job-title');
+          var amount = document.getElementById('candidatesAmount');
+          var desc = (textarea && textarea.value || '').trim();
+          if (!desc) {
+            if (textarea) {
+              textarea.focus();
+              textarea.classList.add('border-red-500');
+              setTimeout(function() { textarea.classList.remove('border-red-500'); }, 2000);
+            }
+            alert('გთხოვთ ჩასვათ ვაკანსიის აღწერა (მინიმუმ 20 სიმბოლო)');
+            return;
+          }
+          var topK = parseInt(amount && amount.value || '10', 10) || 10;
+          var jobTitle = (titleInput && titleInput.value || '').trim();
+          var matchLevelEl = document.getElementById('matchLevel');
+          var minMatchLevel = (matchLevelEl && matchLevelEl.value) ? matchLevelEl.value : 'strong';
+
+          var txtEl = searchBtn.querySelector('.hr-search-text');
+          var loadEl = searchBtn.querySelector('.hr-search-loading');
+          var statusEl = searchBtn.closest('div') && searchBtn.closest('div').querySelector('.hr-search-status');
+          if (txtEl) txtEl.classList.add('hidden');
+          if (loadEl) loadEl.classList.remove('hidden');
+          if (statusEl) statusEl.classList.remove('hidden');
+          searchBtn.disabled = true;
+
+          fetch('/hr/dashboard/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ job_description: desc, job_title: jobTitle, topK: topK, minMatchLevel: minMatchLevel }),
+          })
+          .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+          .then(function(r) {
+            if (r.ok && r.data.candidates !== undefined) {
+              var jobName = r.data.jobName || 'ძებნის შედეგები';
+              var candidates = r.data.candidates || [];
+              var container = document.getElementById('hr-search-results');
+              var titleEl = document.getElementById('hr-results-job-name');
+              var listEl = document.getElementById('hr-results-list');
+              if (titleEl) titleEl.textContent = jobName;
+              if (listEl) {
+                listEl.innerHTML = '';
+                candidates.forEach(function(c) {
+                  var verdictLabel = verdictLabelOnly(c.verdict);
+                  var verdictClass = (c.verdict === 'STRONG_MATCH') ? 'text-white bg-[#315EFF]' : (c.verdict === 'GOOD_MATCH') ? 'text-white bg-[#16a34a]' : (c.verdict === 'PARTIAL_MATCH') ? 'text-[#0F172A] bg-slate-200' : '';
+                  var card = document.createElement('div');
+                  card.className = 'hr-candidate-card bg-white rounded-xl border border-slate-200 shadow-md p-5';
+                  card.setAttribute('data-candidate-id', (c.id || '').replace(/"/g, '&quot;'));
+                  card.setAttribute('data-full-name', (c.fullName || c.firstName || '').replace(/"/g, '&quot;'));
+                  card.setAttribute('data-email', (c.email || '').replace(/"/g, '&quot;'));
+                  card.setAttribute('data-cv-url', (c.cvUrl || '').replace(/"/g, '&quot;'));
+                  card.setAttribute('data-ai-summary', (c.aiSummary || '').replace(/"/g, '&quot;'));
+                  card.setAttribute('data-job-name', jobName.replace(/"/g, '&quot;'));
+                  card.setAttribute('data-verdict', (c.verdict || '').replace(/"/g, '&quot;'));
+                  card.innerHTML =
+                    '<div class="flex gap-4">' +
+                    '  <div class="w-12 h-12 shrink-0 rounded-full bg-slate-200 flex items-center justify-center text-[#475569] font-semibold text-sm">' + (c.initials || '?') + '</div>' +
+                    '  <div class="flex-1 min-w-0">' +
+                    '    <p class="font-medium text-[#1F2937]">' + escapeHtml(c.firstName || c.fullName || '') + '</p>' +
+                    (verdictLabel ? '<span class="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium ' + verdictClass + '">' + escapeHtml(verdictLabel) + '</span>' : '') +
+                    '    <p class="mt-1 text-xs text-[#9CA3AF]">ბოლო ვიზიტი: ' + escapeHtml(c.lastSeenFormatted || 'უცნობია') + '</p>' +
+                    (c.aiSummary ? '<p class="mt-2 text-sm text-[#4B5563] leading-relaxed">' + escapeHtml(c.aiSummary) + '</p>' : '') +
+                    '    <button type="button" class="hr-unlock-btn mt-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200">მიიღე რეზიუმე</button>' +
+                    '  </div>' +
+                    '</div>';
+                  listEl.appendChild(card);
+                });
+              }
+              if (container) {
+                container.classList.remove('hidden');
+                container.scrollIntoView({ behavior: 'smooth' });
+              }
+            } else {
+              alert(r.data && r.data.error || 'შეცდომა. სცადეთ თავიდან.');
+            }
+            if (txtEl) txtEl.classList.remove('hidden');
+            if (loadEl) loadEl.classList.add('hidden');
+            if (statusEl) statusEl.classList.add('hidden');
+            searchBtn.disabled = false;
+          })
+          .catch(function() {
+            alert('შეცდომა. სცადეთ თავიდან.');
+            if (txtEl) txtEl.classList.remove('hidden');
+            if (loadEl) loadEl.classList.add('hidden');
+            if (statusEl) statusEl.classList.add('hidden');
+            searchBtn.disabled = false;
+          });
+        });
+      }
+
+      // Auto-generate job title from pasted/typed description (Gemini)
+      (function() {
+        var textarea = document.getElementById('hr-job-description');
+        var titleInput = document.getElementById('hr-job-title');
+        var statusEl = document.getElementById('hr-job-title-status');
+        if (!textarea || !titleInput) return;
+
+        var debounceTimer = null;
+        var inflightController = null;
+        var lastSent = '';
+
+        function setStatus(msg) {
+          if (!statusEl) return;
+          if (!msg) {
+            statusEl.classList.add('hidden');
+            statusEl.textContent = '';
+            return;
+          }
+          statusEl.textContent = msg;
+          statusEl.classList.remove('hidden');
+        }
+
+        titleInput.addEventListener('input', function() {
+          titleInput.dataset.userEdited = '1';
+        });
+
+        function requestTitle(desc, forceOverwrite) {
+          var trimmed = (desc || '').trim();
+          if (trimmed.length < 20) return;
+          if (trimmed === lastSent) return;
+          lastSent = trimmed;
+
+          if (inflightController) {
+            try { inflightController.abort(); } catch (e) {}
+          }
+          inflightController = new AbortController();
+
+          setStatus('ვაკანსიის დასახელების დადგენა...');
+          fetch('/hr/dashboard/job-title', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            signal: inflightController.signal,
+            body: JSON.stringify({ job_description: trimmed })
+          })
+          .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+          .then(function(r) {
+            if (!r.ok || !r.data || !r.data.ok) {
+              setStatus('');
+              return;
+            }
+            var title = (r.data.title || '').trim();
+            if (!title) {
+              setStatus('');
+              return;
+            }
+            var userEdited = titleInput.dataset.userEdited === '1';
+            if (forceOverwrite || !userEdited || !(titleInput.value || '').trim()) {
+              titleInput.value = title;
+              delete titleInput.dataset.userEdited;
+            }
+            setStatus('');
+          })
+          .catch(function(err) {
+            if (err && err.name === 'AbortError') return;
+            setStatus('');
+          });
+        }
+
+        function scheduleTitle(desc, forceOverwrite) {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(function() {
+            requestTitle(desc, forceOverwrite);
+          }, 700);
+        }
+
+        textarea.addEventListener('paste', function() {
+          // likely a new description: overwrite any previous manual title
+          delete titleInput.dataset.userEdited;
+          setTimeout(function() {
+            scheduleTitle(textarea.value, true);
+          }, 0);
+        });
+
+        textarea.addEventListener('input', function() {
+          scheduleTitle(textarea.value, false);
+        });
+      })();
+
+      // Initial credits visibility + view from query param
+      (function() {
+        try {
+          var vEl = document.getElementById('hr-credits-value');
+          var initial = vEl ? parseInt((vEl.textContent || '').trim(), 10) : NaN;
+          if (!isNaN(initial)) setCreditsValue(initial);
+        } catch (e) {}
+
+        var refreshBtn = document.getElementById('hr-history-refresh');
+        if (refreshBtn) refreshBtn.addEventListener('click', function() { loadCreditsHistory(); });
+
+        var params = new URLSearchParams(window.location.search || '');
+        var view = (params.get('view') || '').trim();
+        if (view === 'history') loadCreditsHistory();
+      })();
+    })();
+  </script>
 </body>
 </html>

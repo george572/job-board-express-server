@@ -5,12 +5,12 @@ const Bottleneck = require("bottleneck");
 
 const JINA_API_KEY = (process.env.JINA_API_KEY || "").trim();
 
-// Jina free tier: 500 RPM / ~8.3 RPS. Stay safely below that.
+// Jina free tier: 500 RPM / ~8.3 RPS. No delay between requests; rely on concurrent limit.
 const limiter = new Bottleneck({
   maxConcurrent: 2,
-  minTime: 200, // 5 req/s max
-  reservoir: 30, // burst budget per interval
-  reservoirRefreshAmount: 30,
+  minTime: 0,
+  reservoir: 60,
+  reservoirRefreshAmount: 60,
   reservoirRefreshInterval: 60_000,
 });
 
