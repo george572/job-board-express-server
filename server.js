@@ -23,7 +23,6 @@ const pageCache = new NodeCache({ stdTTL: 86400 }); // 24 hours
 app.locals.pageCache = pageCache;
 const port = process.env.PORT || 4000;
 const session = require("express-session");
-const pgSession = require("connect-pg-simple")(session);
 
 // Base URL for SEO (sitemap, robots, canonicals)
 const SITE_BASE_URL = process.env.SITE_BASE_URL || "https://samushao.ge";
@@ -769,7 +768,7 @@ if (process.env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
 }
 
-// Session options: Postgres store in production, memory in dev
+// Session: in-memory only (no DB). Session ID is in browser cookie; no cookie = no session (e.g. incognito = no access).
 const sessionOptions = {
   resave: false,
   secret: process.env.SESSION_SECRET || "askmdaksdhjkqjqkqkkq1",
@@ -780,15 +779,8 @@ const sessionOptions = {
     maxAge: 365 * 24 * 60 * 60 * 1000,
     sameSite: "lax",
   },
+  // No store = default MemoryStore; session data lives in server memory, not DB.
 };
-
-if (process.env.NODE_ENV === "production") {
-  sessionOptions.store = new pgSession({
-    conString: process.env.DATABASE_URL,
-    tableName: "session",
-    createTableIfMissing: true,
-  });
-}
 
 // Fast path: serve cached HTML for anonymous visitors BEFORE session/visitor/DB middleware
 // Skips 3 sequential DB round-trips (~15-30ms) for every cached anonymous page view
@@ -2126,11 +2118,12 @@ app.post("/api/sheqmeni-cv/chat", async (req, res) => {
     - Use "action": "save_cv" ONLY when the user explicitly confirms saving. Never use it when asking, suggesting, or when user says no.
     - If the user does not confirm saving, omit the "action" field or use "action": null.
 
-    RESPONSE LENGTH RULE:
+    RESPONSE RULE AND RESPONSE LENGTH RULE:
     - Natural-language response must never exceed 15 words.
     - This rule does NOT apply to JSON.
     - Always end natural-language response with a clear question
       asking for the next missing required field.
+    - when you see user provided most of the information, or even when not,  but  you have already asked for it once, offer them to save a CV.
     
     THINGS YOU SHOULD GENERATE WITHOUT BEING ASKED:
     - After you have job experience info:
@@ -2158,6 +2151,7 @@ app.post("/api/sheqmeni-cv/chat", async (req, res) => {
     - "experience" must be an array if you change it.
     - "jobs" must always be an array of objects if you change it.
     - Never output [object Object].
+    - Never output JSON in the converastion with user, like "json": {...}
     
     JSON FORMAT (STRICT):
     - At the end of every reply, output ONLY this JSON shape ( never show this to users ):

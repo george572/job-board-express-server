@@ -19,6 +19,20 @@
       background: rgba(49, 94, 255, 0.06);
       box-shadow: 0 0 0 2px rgba(49, 94, 255, 0.2);
     }
+    #credits-buy-btn.loading .credits-buy-btn-text { display: none; }
+    #credits-buy-btn.loading .credits-buy-btn-spinner { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+    #credits-buy-btn { position: relative; min-width: 8rem; }
+    .credits-buy-btn-spinner {
+      display: none;
+      width: 1.25rem;
+      height: 1.25rem;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: credits-spin 0.7s linear infinite;
+    }
+    #credits-buy-btn.loading .credits-buy-btn-spinner { display: block; }
+    @keyframes credits-spin { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
   </style>
 </head>
 <body class="hr-dashboard font-sans text-secondary bg-[#F8FAFC] min-h-screen flex flex-col antialiased">
@@ -82,7 +96,10 @@
           </div>
         </div>
 
-        <button type="button" id="credits-buy-btn" class="mt-6 px-6 py-3 rounded-lg bg-[#315EFF] text-white hover:bg-[#2a4fd9] font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer" disabled>ყიდვა</button>
+        <button type="button" id="credits-buy-btn" class="mt-6 px-6 py-3 rounded-lg bg-[#315EFF] text-white hover:bg-[#2a4fd9] font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer" disabled>
+          <span class="credits-buy-btn-text">ყიდვა</span>
+          <span class="credits-buy-btn-spinner" aria-hidden="true"></span>
+        </button>
         <div id="credits-success-msg" class="hidden mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-medium">ინვოისს გამოგიგზავნით რამდენიმე წუთში თქვენს მეილზე (<%= (hrUser && hrUser.email) ? hrUser.email : '' %>).</div>
 
       </div>
@@ -135,6 +152,7 @@
         var credits = selectedPreset ? selectedPreset.credits : (parseInt(customInput.value, 10) || 0);
         if (credits < 1) return;
         buyBtn.disabled = true;
+        buyBtn.classList.add('loading');
         fetch('/hr/dashboard/credits/request', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -144,6 +162,7 @@
         .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
         .then(function(r) {
           buyBtn.disabled = false;
+          buyBtn.classList.remove('loading');
           if (r.ok && r.data && r.data.ok) {
             successMsg.classList.remove('hidden');
             successMsg.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -153,6 +172,7 @@
         })
         .catch(function() {
           buyBtn.disabled = false;
+          buyBtn.classList.remove('loading');
           alert('შეცდომა მოხდა.');
         });
       });
