@@ -808,7 +808,7 @@ app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 // Other hosts: redirect /hr to hr.samushao.ge
 const hrRouter = require("./routes/hrDashboard")(db);
 app.use((req, res, next) => {
-  if (req.hostname === "hr.samushao.ge") {
+  if (req.hostname === "hr.samushao.ge" || req.hostname === "hr.localhost") {
     return hrRouter(req, res, next);
   }
   if (req.path === "/hr" || req.path.startsWith("/hr/")) {
@@ -3653,7 +3653,7 @@ app.get("/api/admin/users-registrations-by-day", async (req, res) => {
       .select(db.raw("(users.created_at AT TIME ZONE ?)::date as date", [TZ]))
       .count("id as count")
       .groupByRaw("1")
-      .orderByRaw("1 DESC");
+      .orderByRaw("1 ASC");
 
     const fromParam = String(req.query.from || "").trim();
     const toParam = String(req.query.to || "").trim();

@@ -355,29 +355,6 @@ module.exports = function (db) {
     });
   });
 
-  // POST /dashboard/job-title – Gemini: extract/guess job title from description
-  router.post("/dashboard/job-title", async (req, res) => {
-    if (!SKIP_HR_AUTH && !req.session.hrUser) {
-      return res.status(401).json({ ok: false, error: "ავტორიზაცია საჭიროა" });
-    }
-    const jobDescription = (req.body.job_description || "").toString().trim();
-    if (!jobDescription || jobDescription.length < 20) {
-      return res.status(400).json({ ok: false, error: "ვაკანსიის აღწერა საჭიროა (მინიმუმ 20 სიმბოლო)" });
-    }
-    try {
-      const { generateJobTitleFromDescription } = require("../services/geminiJobTitle");
-      const title = await withTimeout(
-        generateJobTitleFromDescription(jobDescription),
-        12000,
-        "generate job title"
-      );
-      return res.json({ ok: true, title: (title || "").trim() });
-    } catch (err) {
-      console.error("hr/dashboard/job-title error:", err);
-      return res.status(500).json({ ok: false, error: err.message || "შეცდომა" });
-    }
-  });
-
   // POST /dashboard/search – run Pinecone + Gemini, store in session, return redirect
   const VECTOR_MIN_SCORE = 0.4;
   const FETCH_MULTIPLIER = 6;
@@ -393,6 +370,7 @@ module.exports = function (db) {
     }
     const jobDescription = (req.body.job_description || "").trim();
     const jobTitle = (req.body.job_title || req.body.jobName || "").toString().trim();
+    const aiInstructions = (req.body.ai_instructions || "").trim();
     const topK = Math.min(50, Math.max(5, parseInt(req.body.topK, 10) || 10));
     const rawLevels = Array.isArray(req.body.minMatchLevels)
       ? req.body.minMatchLevels
@@ -430,9 +408,9 @@ module.exports = function (db) {
       } = require("../services/geminiCandidateAssessment");
       const { extractTextFromCv } = require("../services/cvTextExtractor");
 
-      const job = { jobDescription, jobName: "", job_city: "", job_experience: "", job_type: "" };
+      const job = { jobDescription, jobName: "", job_city: "", job_experience: "", job_type: "", ai_instructions: aiInstructions };
       const fetchCount = Math.min(100, Math.max(topK * 2, topK * FETCH_MULTIPLIER));
-      const matches = await getTopCandidatesForJob({ jobDescription, requireRoleMatch: false }, fetchCount);
+      const matches = await getTopCandidatesForJob({ jobDescription, requireRoleMatch: false, ai_instructions: aiInstructions }, fetchCount);
       const qualified = matches
         .filter((m) => (m.score || 0) >= VECTOR_MIN_SCORE)
         .slice(0, Math.min(matches.length, topK * assessLimitMultiplier));

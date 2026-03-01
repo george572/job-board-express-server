@@ -26,6 +26,7 @@ async function assessCandidateAlignment(job, cvText) {
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
   const jobDesc = (job.jobDescription || job.job_description || "").trim();
+  const aiInstructions = (job.ai_instructions || "").trim();
   const jobDetails = [
     `Job title: ${job.jobName || "N/A"}`,
     `Company: ${job.companyName || "N/A"}`,
@@ -36,11 +37,16 @@ async function assessCandidateAlignment(job, cvText) {
     "",
     "Job description (full text – use it; do not claim it is missing or lacks detail):",
     jobDesc || "N/A",
-  ].join("\n");
+    aiInstructions ? `\n\nAdditional HR instructions (apply these when assessing): ${aiInstructions}` : "",
+  ].filter(Boolean).join("\n");
 
   const jobCity = (job.job_city || "").trim();
   const cityRule = jobCity
     ? `CITY RULE: The job is in "${jobCity}". If the CV mentions the candidate's city and it does NOT match "${jobCity}", fit_score cannot exceed 25 (WEAK_MATCH). If the CV does not mention any city/location, note "ქალაქი CV-ში არ არის მითითებული" in the summary but do NOT penalize the score for it.`
+    : "";
+
+  const hrRule = aiInstructions
+    ? `HR RULE (STRICT): The HR specified: "${aiInstructions}". Parse these words literally. Example: "cashier with bank sector experience only" means ONLY cashiers who have bank experience – a sales manager in a bank does NOT qualify (wrong role). Apply ALL parts: if HR says "X with Y only", the candidate must match BOTH X (exact role/title) AND Y (sector/field). If the candidate does NOT meet the HR instructions, give fit_score at most 30 and verdict WEAK_MATCH – they will be excluded from results.`
     : "";
 
   const prompt = `You are an elite recruiter. Analyze how well the candidate's CV aligns with the job below. The job description is complete – do NOT say the job post lacked a detailed description. When assessing, ignore candidates' personal soft skill claims like being able to work under stress.
@@ -63,7 +69,7 @@ SCORING (0-100):
 4. Education/soft skills (10%): Degree or communication fit.
 
 If a mandatory requirement is clearly missing (e.g. JD asks for Java, candidate has none), fit_score cannot exceed 30.
-${cityRule}
+${cityRule}${hrRule}
 
 Write the summary in Georgian (ქართული ენა). Respond in this exact JSON format (no other text):
 {"fit_score": <0-100>, "summary": "<2-3 sentence explanation in Georgian>", "verdict": "STRONG_MATCH"|"GOOD_MATCH"|"PARTIAL_MATCH"|"WEAK_MATCH"}
@@ -129,6 +135,7 @@ async function assessNoCvAlignment(job, noCvRow) {
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
   const jobDesc = (job.jobDescription || job.job_description || "").trim();
+  const aiInstructions = (job.ai_instructions || "").trim();
   const jobDetails = [
     `Job title: ${job.jobName || "N/A"}`,
     `City: ${job.job_city || "N/A"}`,
@@ -137,7 +144,8 @@ async function assessNoCvAlignment(job, noCvRow) {
     "",
     "Job description (full – use it; do not claim it lacks detail):",
     jobDesc || "N/A",
-  ].join("\n");
+    aiInstructions ? `\n\nAdditional HR instructions (apply these when assessing): ${aiInstructions}` : "",
+  ].filter(Boolean).join("\n");
 
   const desc = (noCvRow.short_description || "").toString().trim();
   const cats = (noCvRow.categories || "").toString().trim();
@@ -156,6 +164,10 @@ async function assessNoCvAlignment(job, noCvRow) {
   const jobCity = (job.job_city || "").trim();
   const cityRule = jobCity
     ? `CITY RULE: The job is in "${jobCity}". If the candidate mentions their city and it does NOT match "${jobCity}", fit_score cannot exceed 25 (WEAK_MATCH). If the candidate does not mention any city/location, note "ქალაქი არ არის მითითებული" in the summary but do NOT penalize the score for it.`
+    : "";
+
+  const hrRule = aiInstructions
+    ? `HR RULE (STRICT): The HR specified: "${aiInstructions}". Parse literally. Example: "cashier with bank sector experience only" = ONLY cashiers with bank experience – sales manager in bank = wrong role = WEAK_MATCH. If the candidate does NOT meet the HR instructions, give fit_score at most 30 and verdict WEAK_MATCH – they will be excluded.`
     : "";
 
   const prompt = `You are an elite recruiter. A candidate WITHOUT a CV filled out a short form. Judge how well they might fit the job based on:
@@ -180,7 +192,7 @@ SCORING (0-100):
 2. Category overlap with job requirements (30%)
 3. General fit / potential (20%)
 
-${cityRule}
+${cityRule}${hrRule}
 
 Verdict mapping: 80-100=STRONG_MATCH, 60-79=GOOD_MATCH, 40-59=PARTIAL_MATCH, 0-39=WEAK_MATCH
 

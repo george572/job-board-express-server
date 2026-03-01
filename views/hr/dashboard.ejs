@@ -91,16 +91,14 @@
             placeholder="ჩასვი აქ "
             class="w-full max-w-2xl px-4 py-3 text-[15px] border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#315EFF] focus:border-transparent resize-none placeholder-[#9CA3AF] bg-white"
           ></textarea>
-          <label for="hr-job-title" class="block mt-4 text-sm font-medium text-[#374151] w-full max-w-2xl">ვაკანსიის დასახელება</label>
-          <input
-            id="hr-job-title"
-            name="job_title"
-            type="text"
-            placeholder="AI დააგენერირებს ავტომატურად, შეასწორეთ თუ არასწორია"
-            class="mt-2 w-full max-w-2xl px-4 py-3 text-[15px] border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#315EFF] focus:border-transparent placeholder-[#9CA3AF] bg-white"
-            autocomplete="off"
-          />
-          <p id="hr-job-title-status" class="hidden mt-2 text-xs text-[#6B7280] w-full max-w-2xl"></p>
+          <label for="hr-ai-instructions" class="block mt-4 text-sm font-medium text-[#374151] w-full max-w-2xl">უთხარი AI-ს დამატებითი მითითებები</label>
+          <textarea
+            id="hr-ai-instructions"
+            name="ai_instructions"
+            rows="3"
+            placeholder="მაგ. მხოლოდ ქართულენოვანი კანდიდატები, უპირატესობა მიანიჭე 2+ წლიან გამოცდილებას..."
+            class="mt-2 w-full max-w-2xl px-4 py-3 text-[15px] border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#315EFF] focus:border-transparent resize-none placeholder-[#9CA3AF] bg-white"
+          ></textarea>
           <p class="block mt-4 text-sm font-medium text-[#374151] w-full max-w-2xl">შესაბამისობის დონეები ( კრედიტი ძებნაში არ იხარჯება ) — შეგიძლიათ რამდენიმე აირჩიოთ</p>
           <div class="mt-2 w-full max-w-2xl space-y-2 px-1">
             <label class="flex items-center gap-3 py-2 cursor-pointer hover:bg-slate-50 rounded-lg px-2 -mx-2">
@@ -390,7 +388,6 @@
       if (searchBtn) {
         searchBtn.addEventListener('click', function() {
           var textarea = document.getElementById('hr-job-description');
-          var titleInput = document.getElementById('hr-job-title');
           var amount = document.getElementById('candidatesAmount');
           var desc = (textarea && textarea.value || '').trim();
           if (!desc) {
@@ -404,10 +401,11 @@
           }
           var topK = parseInt(amount && amount.value || '5', 10) || 5;
           topK = Math.min(50, Math.max(5, topK));
-          var jobTitle = (titleInput && titleInput.value || '').trim();
           var matchLevelCheckboxes = document.querySelectorAll('input[name="matchLevels"]:checked');
           var minMatchLevels = Array.from(matchLevelCheckboxes).map(function(cb) { return cb.value; });
           if (minMatchLevels.length === 0) minMatchLevels = ['strong'];
+          var aiInstructionsEl = document.getElementById('hr-ai-instructions');
+          var aiInstructions = (aiInstructionsEl && aiInstructionsEl.value || '').trim();
 
           var txtEl = searchBtn.querySelector('.hr-search-text');
           var loadEl = searchBtn.querySelector('.hr-search-loading');
@@ -421,7 +419,7 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
-            body: JSON.stringify({ job_description: desc, job_title: jobTitle, topK: topK, minMatchLevels: minMatchLevels }),
+            body: JSON.stringify({ job_description: desc, job_title: '', topK: topK, minMatchLevels: minMatchLevels, ai_instructions: aiInstructions || undefined }),
           })
           .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
           .then(function(r) {
@@ -486,95 +484,6 @@
           });
         });
       }
-
-      // Auto-generate job title from pasted/typed description (Gemini)
-      (function() {
-        var textarea = document.getElementById('hr-job-description');
-        var titleInput = document.getElementById('hr-job-title');
-        var statusEl = document.getElementById('hr-job-title-status');
-        if (!textarea || !titleInput) return;
-
-        var debounceTimer = null;
-        var inflightController = null;
-        var lastSent = '';
-
-        function setStatus(msg) {
-          if (!statusEl) return;
-          if (!msg) {
-            statusEl.classList.add('hidden');
-            statusEl.textContent = '';
-            return;
-          }
-          statusEl.textContent = msg;
-          statusEl.classList.remove('hidden');
-        }
-
-        titleInput.addEventListener('input', function() {
-          titleInput.dataset.userEdited = '1';
-        });
-
-        function requestTitle(desc, forceOverwrite) {
-          var trimmed = (desc || '').trim();
-          if (trimmed.length < 20) return;
-          if (trimmed === lastSent) return;
-          lastSent = trimmed;
-
-          if (inflightController) {
-            try { inflightController.abort(); } catch (e) {}
-          }
-          inflightController = new AbortController();
-
-          setStatus('ვაკანსიის დასახელების დადგენა...');
-          fetch('/dashboard/job-title', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            signal: inflightController.signal,
-            body: JSON.stringify({ job_description: trimmed })
-          })
-          .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
-          .then(function(r) {
-            if (!r.ok || !r.data || !r.data.ok) {
-              setStatus('');
-              return;
-            }
-            var title = (r.data.title || '').trim();
-            if (!title) {
-              setStatus('');
-              return;
-            }
-            var userEdited = titleInput.dataset.userEdited === '1';
-            if (forceOverwrite || !userEdited || !(titleInput.value || '').trim()) {
-              titleInput.value = title;
-              delete titleInput.dataset.userEdited;
-            }
-            setStatus('');
-          })
-          .catch(function(err) {
-            if (err && err.name === 'AbortError') return;
-            setStatus('');
-          });
-        }
-
-        function scheduleTitle(desc, forceOverwrite) {
-          if (debounceTimer) clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(function() {
-            requestTitle(desc, forceOverwrite);
-          }, 700);
-        }
-
-        textarea.addEventListener('paste', function() {
-          // likely a new description: overwrite any previous manual title
-          delete titleInput.dataset.userEdited;
-          setTimeout(function() {
-            scheduleTitle(textarea.value, true);
-          }, 0);
-        });
-
-        textarea.addEventListener('input', function() {
-          scheduleTitle(textarea.value, false);
-        });
-      })();
 
       // Initial credits visibility + view from query param
       (function() {

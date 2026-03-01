@@ -251,8 +251,9 @@ async function upsertCandidate(userId, cvText) {
  * 1) Candidate profession/job title match
  * 2) Past work experience match
  * 3) For basic roles (waitress, consultant, admin etc.) – allow any profession
+ * 4) HR-specific instructions (ai_instructions) appended for semantic matching
  *
- * @param {object} opts - { job_role (or jobName), job_experience, job_type, job_city, jobDescription }
+ * @param {object} opts - { job_role (or jobName), job_experience, job_type, job_city, jobDescription, ai_instructions }
  */
 function buildJobSearchText(opts) {
   const role = (opts.job_role || opts.jobName || "").trim();
@@ -260,6 +261,7 @@ function buildJobSearchText(opts) {
   const type = (opts.job_type || "").trim();
   const city = (opts.job_city || "").trim();
   const desc = (opts.jobDescription || "").trim();
+  const aiInstructions = (opts.ai_instructions || "").trim();
 
   const synonyms = role ? expandWithSynonyms(role) : "";
   const roleWithSynonyms = synonyms ? `${role} (ან ${synonyms})` : role;
@@ -275,6 +277,7 @@ function buildJobSearchText(opts) {
   if (exp) parts.push(`Required experience: ${exp}.`);
   if (type) parts.push(`Employment type: ${type}.`);
   if (city) parts.push(`Location: ${city}.`);
+  if (aiInstructions) parts.push(`Additional HR instructions for candidate matching: ${aiInstructions}.`);
 
   return parts.filter(Boolean).join(" ");
 }
