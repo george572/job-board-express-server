@@ -3646,35 +3646,46 @@ app.post("/api/user-without-cv", async (req, res) => {
 });
 
 // Admin: users registered per day (default last 7 days; ?days=N or ?from=YYYY-MM-DD&to=YYYY-MM-DD)
+// Always returns every day in the range (count 0 for days with no registrations) so "today" and other empty days show.
 app.get("/api/admin/users-registrations-by-day", async (req, res) => {
   try {
     const TZ = TZ_GEORGIA;
-    let query = db("users")
-      .select(db.raw("(users.created_at AT TIME ZONE ?)::date as date", [TZ]))
-      .count("id as count")
-      .groupByRaw("1")
-      .orderByRaw("1 ASC");
-
     const fromParam = String(req.query.from || "").trim();
     const toParam = String(req.query.to || "").trim();
     const daysParam = parseInt(req.query.days, 10);
 
+    let rows;
     if (fromParam && toParam) {
-      query = query.whereRaw("(users.created_at AT TIME ZONE ?)::date BETWEEN ? AND ?", [TZ, fromParam, toParam]);
-    } else if (!Number.isNaN(daysParam) && daysParam > 0) {
-      const n = Math.min(daysParam, 365);
-      query = query.whereRaw(
-        "(users.created_at AT TIME ZONE ?)::date >= (NOW() AT TIME ZONE ?)::date - ?::integer",
-        [TZ, TZ, n]
-      );
+      rows = await db.raw(
+        `SELECT d.d::date AS date, COALESCE(agg.cnt, 0)::int AS count
+         FROM generate_series(?::date, ?::date, '1 day'::interval) AS d(d)
+         LEFT JOIN (
+           SELECT (users.created_at AT TIME ZONE ?)::date AS date, COUNT(users.id)::int AS cnt
+           FROM users
+           WHERE (users.created_at AT TIME ZONE ?)::date BETWEEN ?::date AND ?::date
+           GROUP BY 1
+         ) agg ON d.d::date = agg.date
+         ORDER BY 1 ASC`,
+        [fromParam, toParam, TZ, TZ, fromParam, toParam]
+      ).then((r) => r.rows || []);
     } else {
-      query = query.whereRaw(
-        "(users.created_at AT TIME ZONE ?)::date >= (NOW() AT TIME ZONE ?)::date - 7",
-        [TZ, TZ]
-      );
+      const n = (!Number.isNaN(daysParam) && daysParam > 0) ? Math.min(daysParam, 365) : 7;
+      const todayExpr = `(NOW() AT TIME ZONE ?)::date`;
+      const startExpr = `(NOW() AT TIME ZONE ?)::date - ?::integer`;
+      rows = await db.raw(
+        `SELECT d.d::date AS date, COALESCE(agg.cnt, 0)::int AS count
+         FROM generate_series(${startExpr}, ${todayExpr}, '1 day'::interval) AS d(d)
+         LEFT JOIN (
+           SELECT (users.created_at AT TIME ZONE ?)::date AS date, COUNT(users.id)::int AS cnt
+           FROM users
+           WHERE (users.created_at AT TIME ZONE ?)::date >= ${startExpr} AND (users.created_at AT TIME ZONE ?)::date <= ${todayExpr}
+           GROUP BY 1
+         ) agg ON d.d::date = agg.date
+         ORDER BY 1 ASC`,
+        [TZ, n, TZ, TZ, TZ, TZ, n, TZ, TZ]
+      ).then((r) => r.rows || []);
     }
 
-    const rows = await query;
     const items = rows.map((r) => ({
       date: r.date ? String(r.date).slice(0, 10) : null,
       count: parseInt(r.count, 10) || 0,

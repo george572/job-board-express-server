@@ -1,0 +1,63 @@
+<% const current = typeof active !== 'undefined' ? active : ''; %>
+<!-- Mobile overlay backdrop -->
+<div id="hr-sidebar-backdrop" class="fixed inset-0 z-40 bg-black/50 opacity-0 invisible transition-all duration-300 lg:hidden" aria-hidden="true"></div>
+
+<aside id="hr-sidebar" class="hr-sidebar fixed lg:relative inset-y-0 left-0 z-50 w-[280px] max-w-[85vw] lg:w-auto lg:min-w-[300px] min-h-[calc(100vh-4rem)] lg:min-h-[calc(100vh-4rem)] -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-out shadow-sm shrink-0 border-r border-[#E5E7EB] py-6 bg-white">
+  <div class="flex items-center justify-between px-4 py-2 mb-4 lg:hidden border-b border-slate-200">
+    <span class="font-semibold text-[#0F172A]">მენიუ</span>
+    <button type="button" id="hr-sidebar-close" class="p-2 -mr-2 rounded-lg text-[#6B7280] hover:bg-slate-100 hover:text-[#1F2937] transition-colors" aria-label="მენიუის დახურვა">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <nav class="space-y-0.5 px-3">
+    <a href="/dashboard" class="hr-sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-[15px] font-medium text-[#374151] transition-colors <%= current === 'search' ? 'active' : '' %>">
+      <svg class="w-5 h-5 text-[#6B7280]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+      ძებნა
+    </a>
+    <a href="/dashboard/candidates" class="hr-sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-[15px] font-medium text-[#374151] transition-colors <%= current === 'candidates' ? 'active' : '' %>">
+      <svg class="w-5 h-5 text-[#6B7280]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
+      მონიშნული რეზიუმეები
+    </a>
+    <a href="/dashboard?view=history" class="hr-sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-[15px] font-medium text-[#374151] transition-colors <%= current === 'history' ? 'active' : '' %>">
+      <svg class="w-5 h-5 text-[#6B7280]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+      კრედიტებს ისტორია
+    </a>
+    <a href="/dashboard/credits" class="hr-sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-[15px] font-medium text-[#374151] transition-colors <%= current === 'credits' ? 'active' : '' %>">
+      <svg class="w-5 h-5 text-[#6B7280]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125H21M2.25 15v2.25c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125V15M3 12h.375a.75.75 0 0 1 .75.75v.75H3v-.75Zm12 0h.375a.75.75 0 0 1 .75.75v.75H15v-.75ZM3 15h.375a.75.75 0 0 1 .75.75v.75H3v-.75Zm12 0h.375a.75.75 0 0 1 .75.75v.75H15v-.75Z"/></svg>
+      კრედიტების ყიდვა
+    </a>
+    <a href="/dashboard/credits-return" class="hr-sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-[15px] font-medium text-[#374151] transition-colors <%= current === 'credits-return' ? 'active' : '' %>">
+      <svg class="w-5 h-5 text-[#6B7280]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"/></svg>
+      კრედიტების დაბრუნება
+    </a>
+  </nav>
+</aside>
+
+<script>
+(function(){
+  var burger = document.getElementById('hr-nav-burger');
+  var sidebar = document.getElementById('hr-sidebar');
+  var backdrop = document.getElementById('hr-sidebar-backdrop');
+  var closeBtn = document.getElementById('hr-sidebar-close');
+
+  function openNav() {
+    if (sidebar) sidebar.classList.remove('-translate-x-full');
+    if (backdrop) { backdrop.classList.remove('opacity-0', 'invisible'); backdrop.classList.add('opacity-100', 'visible'); }
+    document.body.style.overflow = 'hidden';
+  }
+  function closeNav() {
+    if (sidebar) sidebar.classList.add('-translate-x-full');
+    if (backdrop) { backdrop.classList.add('opacity-0', 'invisible'); backdrop.classList.remove('opacity-100', 'visible'); }
+    document.body.style.overflow = '';
+  }
+
+  if (burger) burger.addEventListener('click', openNav);
+  if (closeBtn) closeBtn.addEventListener('click', closeNav);
+  if (backdrop) backdrop.addEventListener('click', closeNav);
+  document.querySelectorAll('.hr-sidebar-item').forEach(function(a) {
+    a.addEventListener('click', function() {
+      if (window.innerWidth < 1024) closeNav();
+    });
+  });
+})();
+</script>

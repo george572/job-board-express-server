@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <%- include('../partials/head-meta', { seo }) %>
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    .hr-sidebar-item:hover,
+    .hr-sidebar-item.active {
+      background: rgba(59, 130, 246, 0.08);
+      color: rgba(37, 99, 235, 0.95);
+    }
+  </style>
+</head>
+<body class="hr-dashboard font-sans text-secondary bg-[#F8FAFC] min-h-screen flex flex-col antialiased">
+  <%- include('../partials/gtm-noscript') %>
+  <header class="border-b border-[#E5E7EB] bg-white shadow-sm">
+    <div class="w-full px-4">
+      <div class="flex justify-between items-center h-16">
+        <div class="flex items-center gap-3">
+          <button type="button" id="hr-nav-burger" class="lg:hidden p-2 -ml-2 rounded-lg text-[#6B7280] hover:bg-slate-100 hover:text-[#1F2937] transition-colors" aria-label="მენიუ">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+          <a href="/dashboard" class="flex items-center">
+            <img src="/images/logo.svg" alt="Samushao.ge" class="h-8" />
+          </a>
+        </div>
+        <div class="hidden lg:flex items-center gap-4">
+          <span class="text-xs px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 inline-flex items-center gap-2">
+            <span class="font-medium">კრედიტები:</span>
+            <span><%= (hrUser && hrUser.creditsDisplay != null) ? hrUser.creditsDisplay : '0' %></span>
+          </span>
+          <a href="/dashboard/credits" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 font-medium hover:bg-emerald-200 transition-colors">იყიდე კრედიტები</a>
+          <span class="text-sm text-[#6B7280]"><%= hrUser.company_name || hrUser.company_identifier %></span>
+          <form action="/dashboard/logout" method="POST" class="inline">
+            <button type="submit" class="text-sm px-4 py-2 rounded-lg text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#1F2937] transition-colors">გასვლა</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <%- include('partials/mobile-top-bar') %>
+
+  <div class="flex flex-1 w-full flex-col lg:flex-row">
+    <%- include('partials/sidebar', { active: 'candidates' }) %>
+
+    <main class="flex-1 p-4 sm:p-6 lg:p-8 bg-[#F8FAFC] overflow-auto w-full min-w-0">
+      <div class="w-full max-w-4xl mx-auto">
+        <h1 class="text-2xl font-semibold text-[#0F172A] tracking-tight mb-6">რეზიუმეები</h1>
+        <% if (!jobsWithResumes || jobsWithResumes.length === 0) { %>
+        <p class="text-[#64748B]">ჯერ არც ერთი რეზიუმე არ გაქვთ მიღებული. ძებნის შედეგებში დააწკაპუნეთ «მიიღე რეზიუმე».</p>
+        <a href="/dashboard" class="inline-block mt-4 px-4 py-2 rounded-lg bg-[#315EFF] text-white hover:bg-[#2a4fd9]">ძებნაში გადასვლა</a>
+        <% } else { %>
+        <% jobsWithResumes.forEach(function(group) { %>
+        <section class="mb-10">
+          <h2 class="text-lg font-semibold text-[#0F172A] mb-4"><%= group.jobName %></h2>
+          <div class="space-y-4">
+            <% (group.resumes || []).forEach(function(r) { %>
+            <div class="hr-candidate-row w-full bg-white rounded-xl border border-slate-200 shadow-md p-5 flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between gap-4" data-job-name="<%= (group.jobName || '').replace(/"/g, '&quot;') %>" data-candidate-id="<%= (r.candidate_id || '').replace(/"/g, '&quot;') %>">
+              <div class="min-w-0 flex-1">
+                <p class="font-medium text-[#1F2937] text-base"><%= r.full_name || 'უცნობი' %></p>
+                <% if (r.match_verdict_label) { %><span class="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium <%= r.match_verdict_class %>"><%= r.match_verdict_label %></span><% } %>
+                <% if (r.email) { %><p class="mt-1 text-sm text-[#6B7280]">ელფოსტა: <a href="mailto:<%= r.email %>" class="text-[#315EFF] hover:underline"><%= r.email %></a></p><% } %>
+                <% if (r.cv_url) { %>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <a href="<%= r.cv_url %>" target="_blank" rel="noopener" download class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-[#374151] border border-slate-200 hover:bg-[#2a4fd9] hover:text-white transition-colors cursor-pointer">CV გადმოწერა</a>
+                  <button type="button" class="hr-cv-preview-btn inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-white border border-slate-200 text-[#374151] hover:bg-[#2a4fd9] hover:text-white transition-colors cursor-pointer" data-preview-url="/dashboard/candidates/cv-preview?jobName=<%= encodeURIComponent(group.jobName || '') %>&candidateId=<%= encodeURIComponent(r.candidate_id || '') %>">CV სწრაფი ნახავა</button>
+                </div>
+                <% } %>
+                <p class="mt-1 text-sm text-[#64748B]">ბოლო ვიზიტი საიტზე: <%= r.last_visit || 'უცნობია' %></p>
+                <% if (r.ai_summary) { %><p class="mt-2 text-sm text-[#4B5563] leading-relaxed"><%= r.ai_summary %></p><% } %>
+              </div>
+              <button type="button" class="hr-remove-candidate shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium bg-white border border-slate-200 text-[#374151] hover:bg-red-500 hover:text-white hover:border-red-500 transition-colors cursor-pointer">წაშლა</button>
+            </div>
+            <% }); %>
+          </div>
+        </section>
+        <% }); %>
+        <a href="/dashboard" class="inline-block mt-6 px-4 py-2 rounded-lg border border-slate-200 text-[#374151] hover:bg-slate-50">ახალი ძებნა</a>
+        <% } %>
+      </div>
+    </main>
+  </div>
+
+  <!-- CV quick view dialog -->
+  <div id="hr-cv-preview-dialog" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4" aria-hidden="true">
+    <div class="bg-white rounded-xl shadow-xl flex flex-col max-w-7xl w-full max-h-[90vh]" role="dialog" aria-modal="true" aria-labelledby="hr-cv-preview-title">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 shrink-0">
+        <h2 id="hr-cv-preview-title" class="text-lg font-semibold text-[#0F172A]">რეზიუმეს ნახვა</h2>
+        <button type="button" id="hr-cv-preview-close" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors" aria-label="დახურვა">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="flex-1 min-h-0 flex flex-col p-4">
+        <iframe id="hr-cv-preview-iframe" class="w-full flex-1 min-h-[70vh] rounded-lg border border-slate-200 bg-white" title="რეზიუმე"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <% if (jobsWithResumes && jobsWithResumes.length > 0) { %>
+  <script>
+    (function() {
+      var dialog = document.getElementById('hr-cv-preview-dialog');
+      var iframe = document.getElementById('hr-cv-preview-iframe');
+      var closeBtn = document.getElementById('hr-cv-preview-close');
+
+      function openCvPreview(url) {
+        if (!iframe || !dialog) return;
+        iframe.src = url;
+        dialog.classList.remove('hidden');
+        dialog.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeCvPreview() {
+        if (!dialog) return;
+        dialog.classList.add('hidden');
+        dialog.classList.remove('flex');
+        document.body.style.overflow = '';
+        if (iframe) iframe.src = 'about:blank';
+      }
+
+      if (closeBtn) closeBtn.addEventListener('click', closeCvPreview);
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && dialog && !dialog.classList.contains('hidden')) closeCvPreview();
+      });
+
+      document.addEventListener('click', function(e) {
+        var previewBtn = e.target && e.target.closest && e.target.closest('.hr-cv-preview-btn');
+        if (previewBtn) {
+          e.preventDefault();
+          var url = previewBtn.getAttribute('data-preview-url');
+          if (url) openCvPreview(url);
+          return;
+        }
+        if (e.target === dialog || (closeBtn && e.target.closest && e.target.closest('#hr-cv-preview-close'))) {
+          closeCvPreview();
+          return;
+        }
+        var btn = e.target && e.target.closest && e.target.closest('.hr-remove-candidate');
+        if (!btn || btn.disabled) return;
+        var row = btn.closest('.hr-candidate-row');
+        if (!row) return;
+        var jobName = (row.getAttribute('data-job-name') || '').trim();
+        var candidateId = (row.getAttribute('data-candidate-id') || '').trim();
+        if (!jobName || !candidateId) return;
+        var name = (row.querySelector('p.font-medium') && row.querySelector('p.font-medium').textContent || '').trim() || 'კანდიდატი';
+        if (!confirm('დარწმუნებული ხართ, რომ გსურთ „' + name + '“ სიიდან წაშლა?')) return;
+        btn.disabled = true;
+        btn.textContent = '...';
+        fetch('/dashboard/candidates/remove', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ jobName: jobName, candidateId: candidateId })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data && data.ok) {
+            row.remove();
+          } else {
+            btn.disabled = false;
+            btn.textContent = 'წაშლა';
+            alert(data && data.error || 'შეცდომა');
+          }
+        })
+        .catch(function() {
+          btn.disabled = false;
+          btn.textContent = 'წაშლა';
+          alert('შეცდომა');
+        });
+      });
+    })();
+  </script>
+  <% } %>
+</body>
+</html>

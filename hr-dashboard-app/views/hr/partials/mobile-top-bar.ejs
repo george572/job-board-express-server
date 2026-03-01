@@ -1,0 +1,16 @@
+<!-- First section (mobile only): credits, add credits, company, გასვლა -->
+<section class="lg:hidden border-b border-[#E5E7EB] bg-white px-4 py-3">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex flex-wrap items-center gap-3 min-w-0">
+      <span class="text-xs px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 inline-flex items-center gap-2 shrink-0">
+        <span class="font-medium">კრედიტები:</span>
+        <span id="hr-mobile-credits-value"><%= (hrUser && hrUser.creditsDisplay != null) ? hrUser.creditsDisplay : '0' %></span>
+      </span>
+      <a href="/dashboard/credits" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 font-medium inline-flex hover:bg-emerald-200 transition-colors shrink-0">იყიდე კრედიტები</a>
+      <span class="text-sm text-[#6B7280] truncate max-w-[140px]" title="<%= (hrUser && hrUser.company_name) ? hrUser.company_name : (hrUser && hrUser.company_identifier) ? hrUser.company_identifier : '' %>"><%= hrUser.company_name || hrUser.company_identifier || '' %></span>
+    </div>
+    <form action="/dashboard/logout" method="POST" class="inline shrink-0">
+      <button type="submit" class="text-sm px-4 py-2 rounded-lg text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#1F2937] transition-colors">გასვლა</button>
+    </form>
+  </div>
+</section>
