@@ -795,7 +795,7 @@ const sessionOptions = {
     httpOnly: true,
     maxAge: 365 * 24 * 60 * 60 * 1000,
     sameSite: "lax",
-    domain: process.env.NODE_ENV === "production" ? ".samushao.ge" : undefined,
+    // No domain = host-only cookie; works reliably with proxies & Google auth
   },
 };
 app.use(session(sessionOptions));
