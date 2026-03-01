@@ -3652,8 +3652,8 @@ app.get("/api/admin/users-registrations-by-day", async (req, res) => {
     let query = db("users")
       .select(db.raw("(users.created_at AT TIME ZONE ?)::date as date", [TZ]))
       .count("id as count")
-      .groupByRaw("(users.created_at AT TIME ZONE ?)::date", [TZ])
-      .orderByRaw("(users.created_at AT TIME ZONE ?)::date DESC", [TZ]);
+      .groupByRaw("1")
+      .orderByRaw("1 DESC");
 
     const fromParam = String(req.query.from || "").trim();
     const toParam = String(req.query.to || "").trim();
