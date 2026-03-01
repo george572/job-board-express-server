@@ -202,13 +202,13 @@
   <main class="pb-52 lg:pb-12">
     <nav class="my-6 max-w-[1400px] mx-auto px-5" aria-label="Breadcrumb">
       <ol class="flex items-center gap-2 text-sm text-gray-500">
-        <li class="flex items-center"><a href="/" class="hover:text-blue-600">ვაკანსიები</a></li>
+        <li class="flex items-center"><a id="breadcrumb-vacancies-link" href="/" class="hover:text-blue-600">ვაკანსიები</a></li>
         <li class="flex items-center"><span class="mx-2">/</span><span class="text-gray-700" aria-current="page"><%= job.jobName %></span></li>
       </ol>
     </nav>
     <article class="max-w-[1400px] mx-auto p-1 flex gap-1 flex-col lg:flex-row  relative">
       <nav class="flex flex-col relative p-4">
-        <div class="flex items-center gap-2 mb-6"><a href="/" class="flex items-center gap-2 cursor-pointer"><svg width="5" height="8" viewBox="0 0 5 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <div class="flex items-center gap-2 mb-6"><a id="back-vacancies-link" href="/" class="flex items-center gap-2 cursor-pointer"><svg width="5" height="8" viewBox="0 0 5 8" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M3.86089 7.1124L1.14214 4.39365C1.07964 4.33115 1.03589 4.26865 1.01089 4.20615C0.985889 4.14365 0.973389 4.0749 0.973389 3.9999C0.973389 3.9249 0.985889 3.85615 1.01089 3.79365C1.03589 3.73115 1.07964 3.66865 1.14214 3.60615L3.86089 0.887402C3.89839 0.849902 3.93901 0.821777 3.98276 0.803027C4.02651 0.784277 4.07339 0.774902 4.12339 0.774902C4.22339 0.774902 4.31089 0.809277 4.38589 0.878027C4.46089 0.946777 4.49839 1.0374 4.49839 1.1499V6.8499C4.49839 6.9624 4.46089 7.05303 4.38589 7.12178C4.31089 7.19053 4.22339 7.2249 4.12339 7.2249C4.09839 7.2249 4.01089 7.1874 3.86089 7.1124Z" fill="#151515"></path>
             </svg><span class="text-[14px]">ყველა ვაკანსია</span></a></div>
         <section class="bg-white rounded-lg self-start w-full lg:min-w-[360px] lg:max-w-[360px] relative <%= (job.job_premium_status === 'premium' || job.job_premium_status === 'premiumPlus') ? 'pt-2 px-4 pb-4 lg:px-8 lg:pb-8 border border-[#EBEBEB]' : 'p-4 lg:p-8 border border-[#EBEBEB]' %>">
@@ -612,7 +612,8 @@
       '23': 'ექთანი',
       '24': 'ექიმი',
       '25': 'ადმინისტრატორი',
-      '26': 'HR'
+      '26': 'HR',
+      '27': 'იურიდიული'
     };
 
     function trackPremiumPrioritizedClicks(link, section) {
@@ -1307,6 +1308,22 @@
     }
   });
 })();
+  </script>
+  <script>
+  (function(){
+    var ref = document.referrer;
+    if (!ref) return;
+    try {
+      var refUrl = new URL(ref);
+      if (refUrl.origin === location.origin && refUrl.pathname === '/' && refUrl.search) {
+        var href = refUrl.pathname + refUrl.search;
+        ['breadcrumb-vacancies-link', 'back-vacancies-link'].forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el) el.href = href;
+        });
+      }
+    } catch (_) {}
+  })();
   </script>
 </body>
 

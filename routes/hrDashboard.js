@@ -305,7 +305,7 @@ module.exports = function (db) {
     }
   });
 
-  // Professions (categories) for HR search
+  // Professions (categories) for HR search, sorted alphabetically
   const PROFESSIONS = [
     { id: 1, name: "საოფისე" }, { id: 2, name: "მომხმარებელთან ურთიერთობები" }, { id: 3, name: "გაყიდვები" },
     { id: 4, name: "საბანკო-საფინანსო" }, { id: 5, name: "საწყობი და წარმოება" }, { id: 6, name: "საცალო ვაჭრობა" },
@@ -315,7 +315,8 @@ module.exports = function (db) {
     { id: 18, name: "დიასახლისი" }, { id: 19, name: "სხვა" }, { id: 20, name: "ბუღალტერია" },
     { id: 21, name: "მძღოლი" }, { id: 22, name: "Web/Digital/Design" }, { id: 23, name: "ექთანი" },
     { id: 24, name: "ექიმი" }, { id: 25, name: "ადმინისტრატორი" }, { id: 26, name: "HR" },
-  ];
+    { id: 27, name: "იურიდიული" },
+  ].sort((a, b) => a.name.localeCompare(b.name, "ka"));
   const LOCATIONS = ["თბილისი", "ქუთაისი", "ბათუმი", "ზუგდიდი", "გორი", "რუსთავი", "მცხეთა", "თელავი", "მესტია", "ფოთი", "ჭიათურა", "ზესტაფონი", "მარნეული"];
 
   // GET /dashboard – actual dashboard (logged-in only; skip auth when HR_SKIP_AUTH=1 for dev)

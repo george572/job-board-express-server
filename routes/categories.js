@@ -7,7 +7,7 @@ module.exports = function (db) {
 
   router.get("/", async (req, res) => {
     try {
-      const rows = await db("categories").select("*");
+      const rows = await db("categories").select("*").orderBy("name", "asc");
       if (!rows || rows.length === 0) {
         return res.status(404).json({ error: "Categories not found" });
       }
