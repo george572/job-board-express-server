@@ -3680,17 +3680,19 @@ app.get("/api/admin/users-registrations-by-day", async (req, res) => {
       return res.status(400).json({ error: "Invalid date range" });
     }
 
+    // created_at is stored as UTC (timestamp or timestamptz); convert to Georgia date for grouping
+    const dateInGeorgia = "(users.created_at AT TIME ZONE 'UTC' AT TIME ZONE ?)::date";
     const { rows: countRows } = await db.raw(
-      `SELECT (users.created_at AT TIME ZONE ?)::date AS date, COUNT(users.id)::int AS count
+      `SELECT to_char(${dateInGeorgia}, 'YYYY-MM-DD') AS date, COUNT(users.id)::int AS count
        FROM users
-       WHERE (users.created_at AT TIME ZONE ?)::date >= ?::date
-         AND (users.created_at AT TIME ZONE ?)::date <= ?::date
+       WHERE ${dateInGeorgia} >= ?::date
+         AND ${dateInGeorgia} <= ?::date
        GROUP BY 1
        ORDER BY 1 ASC`,
       [TZ, TZ, startDate, TZ, endDate]
     );
     const countByDate = Object.fromEntries(
-      (countRows || []).map((r) => [String(r.date).slice(0, 10), parseInt(r.count, 10) || 0])
+      (countRows || []).map((r) => [String(r.date).trim(), parseInt(r.count, 10) || 0])
     );
 
     const items = [];
