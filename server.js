@@ -3662,18 +3662,22 @@ app.get("/api/admin/users-registrations-by-day", async (req, res) => {
       // n = number of days before today; total days = n + 1 (today + n previous). Default 7 days = today + 6 previous.
       const n = (!Number.isNaN(daysParam) && daysParam > 0) ? Math.min(daysParam - 1, 364) : 6;
       const { rows: dateRow } = await db.raw(
-        "SELECT (NOW() AT TIME ZONE ?)::date AS today",
+        "SELECT to_char((NOW() AT TIME ZONE ?)::date, 'YYYY-MM-DD') AS today",
         [TZ]
       );
-      const todayStr = dateRow?.[0]?.today ? String(dateRow[0].today).slice(0, 10) : null;
-      if (!todayStr) {
+      const todayStr = dateRow?.[0]?.today ? String(dateRow[0].today).trim() : null;
+      if (!todayStr || !/^\d{4}-\d{2}-\d{2}$/.test(todayStr)) {
         return res.status(500).json({ error: "Could not get today date" });
       }
       endDate = todayStr;
-      const end = new Date(endDate + "T00:00:00.000Z");
+      const end = new Date(todayStr + "T12:00:00.000Z");
       const start = new Date(end);
       start.setUTCDate(start.getUTCDate() - n);
       startDate = start.toISOString().slice(0, 10);
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+      return res.status(400).json({ error: "Invalid date range" });
     }
 
     const { rows: countRows } = await db.raw(
@@ -3690,8 +3694,11 @@ app.get("/api/admin/users-registrations-by-day", async (req, res) => {
     );
 
     const items = [];
-    const cur = new Date(startDate + "T00:00:00.000Z");
-    const end = new Date(endDate + "T00:00:00.000Z");
+    const cur = new Date(startDate + "T12:00:00.000Z");
+    const end = new Date(endDate + "T12:00:00.000Z");
+    if (Number.isNaN(cur.getTime()) || Number.isNaN(end.getTime())) {
+      return res.status(500).json({ error: "Invalid date range" });
+    }
     for (; cur <= end; cur.setUTCDate(cur.getUTCDate() + 1)) {
       const d = cur.toISOString().slice(0, 10);
       items.push({ date: d, count: countByDate[d] ?? 0 });
