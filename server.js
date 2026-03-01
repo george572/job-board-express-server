@@ -3649,9 +3649,8 @@ app.post("/api/user-without-cv", async (req, res) => {
 app.get("/api/admin/users-registrations-by-day", async (req, res) => {
   try {
     const TZ = TZ_GEORGIA;
-    const dateExpr = db.raw(`(users.created_at AT TIME ZONE ?)::date`, [TZ]);
     let query = db("users")
-      .select(dateExpr.as("date"))
+      .select(db.raw("(users.created_at AT TIME ZONE ?)::date as date", [TZ]))
       .count("id as count")
       .groupByRaw("(users.created_at AT TIME ZONE ?)::date", [TZ])
       .orderByRaw("(users.created_at AT TIME ZONE ?)::date DESC", [TZ]);
