@@ -248,4 +248,17 @@ Respond in this exact JSON format (no other text):
   }
 }
 
-module.exports = { assessCandidateAlignment, assessNoCvAlignment };
+/**
+ * Returns true if verdict indicates the candidate is a good/best fit and should be allowed to apply.
+ * Passes: STRONG_MATCH, GOOD_MATCH.
+ * Rejects: PARTIAL_MATCH, WEAK_MATCH.
+ */
+function passesFitCheck(verdict) {
+  return verdict === "STRONG_MATCH" || verdict === "GOOD_MATCH";
+}
+
+module.exports = {
+  assessCandidateAlignment,
+  assessNoCvAlignment,
+  passesFitCheck,
+};

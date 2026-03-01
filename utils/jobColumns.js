@@ -34,6 +34,7 @@ const JOBS_LIST_COLUMNS = [
   "cv_submissions_email_sent",
   "disable_cv_filter",
   "accept_form_submissions",
+  "candidates_must_be_exact_match",
 ];
 
 module.exports = { JOBS_LIST_COLUMNS };

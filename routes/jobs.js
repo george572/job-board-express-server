@@ -2146,12 +2146,14 @@ const JOB_UPDATE_WHITELIST = [
   "cv_submissions_email_sent",
   "disable_cv_filter",
   "accept_form_submissions",
+  "candidates_must_be_exact_match",
   "updated_at",
 ];
 // Admin apps often send camelCase; map to DB column names
 const CAMEL_TO_SNAKE = {
   acceptFormSubmissions: "accept_form_submissions",
   disableCvFilter: "disable_cv_filter",
+  candidatesMustBeExactMatch: "candidates_must_be_exact_match",
   premiumUntil: "premium_until",
   helioUrl: "helio_url",
 };
@@ -2179,6 +2181,7 @@ const patchOrPutJob = async (req, res) => {
     const booleanFields = new Set([
       "accept_form_submissions",
       "disable_cv_filter",
+      "candidates_must_be_exact_match",
       "isHelio",
       "jobIsUrgent",
       "prioritize",

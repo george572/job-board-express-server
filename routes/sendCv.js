@@ -143,6 +143,45 @@ router.post("/", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    // If job requires exact match, assess CV fit before allowing application
+    const mustBeExact =
+      job.candidates_must_be_exact_match === true ||
+      job.candidates_must_be_exact_match === 1 ||
+      String(job.candidates_must_be_exact_match || "").toLowerCase() === "true";
+    if (mustBeExact) {
+      const {
+        assessCandidateAlignment,
+        passesFitCheck,
+      } = require("../services/geminiCandidateAssessment");
+      const { extractTextFromCv } = require("../services/cvTextExtractor");
+      let cvText = "";
+      try {
+        cvText =
+          (await extractTextFromCv(resume.file_url, resume.file_name)) || "";
+      } catch (extractErr) {
+        console.warn("[sendCv] CV text extraction failed:", extractErr.message);
+      }
+      if (!cvText || cvText.length < 50) {
+        return res.status(400).json({
+          error: "თქვენი რეზიუმე არ ერგება ვაკანსიის მოთხოვნებს",
+        });
+      }
+      try {
+        const assessment = await assessCandidateAlignment(job, cvText);
+        if (!passesFitCheck(assessment.verdict)) {
+          return res.status(400).json({
+            error: "თქვენი რეზიუმე არ ერგება ვაკანსიის მოთხოვნებს",
+          });
+        }
+      } catch (assessErr) {
+        console.error("[sendCv] CV assessment failed:", assessErr);
+        return res.status(500).json({
+          error:
+            "დაფიქსირდა შეცდომა შეფასებისას. გთხოვთ სცადოთ თავიდან მოგვიანებით.",
+        });
+      }
+    }
+
     const cvsSentBefore = job.cvs_sent || 0;
     const isThirdCv = cvsSentBefore === 2;
 
