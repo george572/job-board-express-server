@@ -3685,9 +3685,9 @@ app.get("/api/admin/users-registrations-by-day", async (req, res) => {
        FROM users
        WHERE (users.created_at AT TIME ZONE ?)::date >= ?::date
          AND (users.created_at AT TIME ZONE ?)::date <= ?::date
-       GROUP BY (users.created_at AT TIME ZONE ?)::date
+       GROUP BY 1
        ORDER BY 1 ASC`,
-      [TZ, TZ, startDate, TZ, endDate, TZ]
+      [TZ, TZ, startDate, TZ, endDate]
     );
     const countByDate = Object.fromEntries(
       (countRows || []).map((r) => [String(r.date).slice(0, 10), parseInt(r.count, 10) || 0])
