@@ -25,11 +25,14 @@ module.exports = function (db) {
 
       if (searchRaw) {
         const parts = searchRaw.split(/\s+/).filter(Boolean);
+        const escapeLike = (s) => s.replace(/[%_\\]/g, "\\$&");
         baseQuery = baseQuery.where(function () {
           parts.forEach((part) => {
-            this.andWhereRaw("LOWER(user_name) LIKE ?", [
-              `%${part.toLowerCase()}%`,
-            ]);
+            const safe = `%${escapeLike(part).toLowerCase()}%`;
+            this.andWhere(function () {
+              this.whereRaw("LOWER(user_name) LIKE ? ESCAPE '\\'", [safe])
+                .orWhereRaw("LOWER(user_email) LIKE ? ESCAPE '\\'", [safe]);
+            });
           });
         });
       }
