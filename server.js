@@ -3645,6 +3645,49 @@ app.post("/api/user-without-cv", async (req, res) => {
   }
 });
 
+// Admin: users registered per day (default last 7 days; ?days=N or ?from=YYYY-MM-DD&to=YYYY-MM-DD)
+app.get("/api/admin/users-registrations-by-day", async (req, res) => {
+  try {
+    const TZ = TZ_GEORGIA;
+    const dateExpr = db.raw(`(users.created_at AT TIME ZONE ?)::date`, [TZ]);
+    let query = db("users")
+      .select(dateExpr.as("date"))
+      .count("id as count")
+      .groupByRaw("(users.created_at AT TIME ZONE ?)::date", [TZ])
+      .orderByRaw("(users.created_at AT TIME ZONE ?)::date DESC", [TZ]);
+
+    const fromParam = String(req.query.from || "").trim();
+    const toParam = String(req.query.to || "").trim();
+    const daysParam = parseInt(req.query.days, 10);
+
+    if (fromParam && toParam) {
+      query = query.whereRaw("(users.created_at AT TIME ZONE ?)::date BETWEEN ? AND ?", [TZ, fromParam, toParam]);
+    } else if (!Number.isNaN(daysParam) && daysParam > 0) {
+      const n = Math.min(daysParam, 365);
+      query = query.whereRaw(
+        "(users.created_at AT TIME ZONE ?)::date >= (NOW() AT TIME ZONE ?)::date - ?::integer",
+        [TZ, TZ, n]
+      );
+    } else {
+      query = query.whereRaw(
+        "(users.created_at AT TIME ZONE ?)::date >= (NOW() AT TIME ZONE ?)::date - 7",
+        [TZ, TZ]
+      );
+    }
+
+    const rows = await query;
+    const items = rows.map((r) => ({
+      date: r.date ? String(r.date).slice(0, 10) : null,
+      count: parseInt(r.count, 10) || 0,
+    }));
+    const total = items.reduce((sum, i) => sum + i.count, 0);
+    res.json({ items, total });
+  } catch (err) {
+    console.error("admin users-registrations-by-day error:", err);
+    res.status(500).json({ error: err?.message || "Server error" });
+  }
+});
+
 // Admin: list candidates without CV (user_without_cv submissions)
 app.get("/api/admin/user-without-cv", async (req, res) => {
   try {
